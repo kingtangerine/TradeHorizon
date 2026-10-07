@@ -1,4 +1,5 @@
 import {
+  type CSSProperties,
   type FormEvent,
   useCallback,
   useEffect,
@@ -9,21 +10,58 @@ import {
 import { CryptoChartSurface } from '../chart/CryptoChartSurface'
 import { DISPLAY_INTERVALS } from '../chart/intervals'
 import type { KLineChartController } from '../chart/KLineChartController'
-import { CRYPTO_MARKETS, DEFAULT_CRYPTO_MARKET } from '../chart/markets'
+import { allMarkets, getMarket, refreshMarketCatalog } from '../chart/markets'
 import type { ChartRuntimeState } from '../chart/types'
 import {
   DrawingStore,
   createLocalStorageDrawingRepository,
   deleteDrawing,
   updateDrawing,
+  type DrawingType,
 } from '../drawings'
-import type { MarketInterval } from '../market'
+import { MARKET_INTERVALS, MARKET_INTERVAL_SPECS, type MarketInterval } from '../market'
 import { alertReached, loadAlerts, saveAlerts, type AlertDirection, type PriceAlert } from './alerts'
 import { logIn, logOut, restoreSession, signUp, type AppUser } from './auth'
-import { loadWorkspace, saveWorkspace, type ChartTab } from './workspace'
+import { Superchart } from './Superchart'
 import {
+  DEFAULT_INDICATORS,
+  DOMINANCE_DESCRIPTIONS,
+  DOMINANCE_LABELS,
+  MAX_MOVING_AVERAGE_PERIODS,
+  MAX_MOVING_AVERAGE_PERIOD,
+  MOVING_AVERAGE_COLORS,
+  MOVING_AVERAGE_LABELS,
+  addMovingAveragePeriod,
+  movingAverageActive,
+  parsePeriod,
+  removeMovingAveragePeriod,
+  type DominanceKey,
+  type IndicatorSettings,
+  type MovingAverageKind,
+} from '../chart/indicators'
+import { REPLAY_SPEEDS } from '../chart/replay'
+import { DRAWING_TOOLS, TOOL_ORDER } from '../chart/tools'
+import { SymbolSearch } from './SymbolSearch'
+import {
+  adoptActiveLayout,
+  createLayout,
+  duplicateLayout,
+  loadSavedLayouts,
+  loadWorkspace,
+  saveSavedLayouts,
+  saveWorkspace,
+  type ChartTab,
+  type SavedLayout,
+} from './workspace'
+import {
+  CopyIcon,
   CursorIcon,
   CloseIcon,
+  FibIcon,
+  MagnetIcon,
+  RayIcon,
+  ShortPositionIcon,
+  VerticalLineIcon,
   BellIcon,
   EyeIcon,
   EyeOffIcon,
@@ -34,6 +72,12 @@ import {
   LongPositionIcon,
   PlusIcon,
   PriceRangeIcon,
+  CandlesIcon,
+  LineChartIcon,
+  PauseIcon,
+  PlayIcon,
+  ReplayIcon,
+  StepForwardIcon,
   RedoIcon,
   RectangleIcon,
   RefreshIcon,
@@ -47,6 +91,32 @@ import {
 } from './Icons'
 
 const INITIAL_INTERVAL: MarketInterval = '15m'
+
+const TOOL_ICONS: Readonly<Record<DrawingType, typeof CursorIcon>> = {
+  trendLine: TrendLineIcon,
+  ray: RayIcon,
+  horizontalLine: HorizontalLineIcon,
+  verticalLine: VerticalLineIcon,
+  rectangle: RectangleIcon,
+  priceRange: PriceRangeIcon,
+  fibRetracement: FibIcon,
+  longPosition: LongPositionIcon,
+  shortPosition: ShortPositionIcon,
+}
+
+function isPositionTool(type: DrawingType): boolean {
+  return DRAWING_TOOLS[type].placement === 'position'
+}
+const DEFAULT_LAYOUT_NAME = 'Main layout'
+
+function formatMemberSince(value: number): string {
+  return new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric', year: 'numeric' }).format(value)
+}
+
+function formatReplayTime(valueMs: number | null): string {
+  if (valueMs === null) return '—'
+  return `${new Date(valueMs).toISOString().slice(0, 16).replace('T', ' ')} UTC`
+}
 
 function formatPrice(value?: number, precision = 2): string {
   if (value === undefined || !Number.isFinite(value)) return '—'
@@ -98,9 +168,9 @@ interface WorkspaceAppProps {
 }
 
 function WorkspaceApp({ user, onLogout }: WorkspaceAppProps) {
-  const [workspace, setWorkspace] = useState(() => loadWorkspace(user.id))
+  const [workspace, setWorkspace] = useState(() => adoptActiveLayout(loadWorkspace(user.id)))
   const initialTab = workspace.tabs.find((tab) => tab.id === workspace.activeTabId) ?? workspace.tabs[0]
-  const initialMarket = CRYPTO_MARKETS.find((item) => item.symbol === initialTab.symbol) ?? DEFAULT_CRYPTO_MARKET
+  const initialMarket = getMarket(initialTab.symbol)
   const [drawingStore] = useState(
     () =>
       new DrawingStore({
@@ -118,18 +188,38 @@ function WorkspaceApp({ user, onLogout }: WorkspaceAppProps) {
   const [interval, setInterval] = useState<MarketInterval>(initialTab.interval)
   const [market, setMarket] = useState(initialMarket)
   const [controller, setController] = useState<KLineChartController | null>(null)
-  const [activeTool, setActiveTool] = useState<
-    'cursor' | 'trendLine' | 'horizontalLine' | 'rectangle' | 'longPosition' | 'priceRange'
-  >('cursor')
+  const [activeTool, setActiveTool] = useState<'cursor' | DrawingType>('cursor')
   const [selectedDrawingId, setSelectedDrawingId] = useState<string>()
   const [objectTreeOpen, setObjectTreeOpen] = useState(true)
   const [positionSettingsOpen, setPositionSettingsOpen] = useState(false)
   const [superchartOpen, setSuperchartOpen] = useState(false)
+  const [symbolSearch, setSymbolSearch] = useState<'change' | 'new' | null>(null)
+  const [markets, setMarkets] = useState(() => allMarkets())
   const [alertsOpen, setAlertsOpen] = useState(false)
+  const [profileOpen, setProfileOpen] = useState(false)
+  const [layoutMenuOpen, setLayoutMenuOpen] = useState(false)
+  const [saveAsOpen, setSaveAsOpen] = useState(false)
+  const [timeframeMenuOpen, setTimeframeMenuOpen] = useState(false)
+  const [indicatorMenuOpen, setIndicatorMenuOpen] = useState(false)
+  const [maDraft, setMaDraft] = useState<Record<MovingAverageKind, string>>({ sma: '', ema: '' })
+  const [maError, setMaError] = useState<{ kind: MovingAverageKind; message: string } | null>(null)
+  const [layoutDraftName, setLayoutDraftName] = useState(workspace.layoutName)
+  const [customIntervalAmount, setCustomIntervalAmount] = useState('12')
+  const [customIntervalUnit, setCustomIntervalUnit] = useState<'m' | 'h' | 'd' | 'w' | 'M'>('h')
+  const [customIntervalError, setCustomIntervalError] = useState('')
+  const [savedLayouts, setSavedLayouts] = useState<SavedLayout[]>(() => loadSavedLayouts(user.id))
+  const indicators = workspace.indicators ?? DEFAULT_INDICATORS
+  const activeTab = workspace.tabs.find((tab) => tab.id === workspace.activeTabId) ?? workspace.tabs[0]
+  const currentLayout = savedLayouts.find((layout) => layout.id === activeTab.layoutId)
+  const [layoutNotice, setLayoutNotice] = useState('')
   const [alerts, setAlerts] = useState<PriceAlert[]>(() => loadAlerts(user.id))
   const [alertDirection, setAlertDirection] = useState<AlertDirection>('above')
   const [alertPrice, setAlertPrice] = useState('')
   const previousPriceRef = useRef<number | undefined>(undefined)
+  const profileMenuRef = useRef<HTMLDivElement>(null)
+  const layoutMenuRef = useRef<HTMLDivElement>(null)
+  const timeframeMenuRef = useRef<HTMLDivElement>(null)
+  const indicatorMenuRef = useRef<HTMLDivElement>(null)
   const [runtime, setRuntime] = useState<ChartRuntimeState>({
     interval: INITIAL_INTERVAL,
     connection: 'loading',
@@ -137,6 +227,10 @@ function WorkspaceApp({ user, onLogout }: WorkspaceAppProps) {
     error: null,
     followingLive: true,
   })
+
+  const replay = runtime.replay ?? null
+  const replayActive = replay?.status === 'active'
+  const replayPlaying = !!replay?.playing
 
   const handleControllerChange = useCallback(
     (next: KLineChartController | null) => setController(next),
@@ -150,29 +244,45 @@ function WorkspaceApp({ user, onLogout }: WorkspaceAppProps) {
 
   const chooseCursor = useCallback(() => {
     controller?.cancelActiveTool()
+    controller?.cancelReplaySelection()
     controller?.clearDrawingSelection()
     setActiveTool('cursor')
   }, [controller])
 
-  const chooseTrendLine = useCallback(() => {
-    if (controller?.startTrendLine()) setActiveTool('trendLine')
+  const chooseTool = useCallback((type: DrawingType) => {
+    if (controller?.startTool(type)) setActiveTool(type)
   }, [controller])
 
-  const chooseHorizontalLine = useCallback(() => {
-    if (controller?.startHorizontalLine()) setActiveTool('horizontalLine')
-  }, [controller])
+  const updateIndicators = useCallback((update: (current: IndicatorSettings) => IndicatorSettings) => {
+    setWorkspace((current) => ({ ...current, indicators: update(current.indicators ?? DEFAULT_INDICATORS) }))
+  }, [])
 
-  const chooseRectangle = useCallback(() => {
-    if (controller?.startRectangle()) setActiveTool('rectangle')
-  }, [controller])
+  const addMovingAverage = useCallback((kind: MovingAverageKind) => {
+    const period = parsePeriod(maDraft[kind])
+    const settings = indicators[kind]
+    if (period === undefined) {
+      setMaError({ kind, message: `Enter a whole number from 1 to ${MAX_MOVING_AVERAGE_PERIOD}.` })
+      return
+    }
+    if (!settings.periods.includes(period) && settings.periods.length >= MAX_MOVING_AVERAGE_PERIODS) {
+      setMaError({ kind, message: `You can plot up to ${MAX_MOVING_AVERAGE_PERIODS} lengths.` })
+      return
+    }
+    setMaError(null)
+    setMaDraft((current) => ({ ...current, [kind]: '' }))
+    updateIndicators((current) => ({ ...current, [kind]: addMovingAveragePeriod(current[kind], period) }))
+  }, [indicators, maDraft, updateIndicators])
 
-  const chooseLongPosition = useCallback(() => {
-    if (controller?.startLongPosition()) setActiveTool('longPosition')
-  }, [controller])
+  const toggleMovingAverage = useCallback((kind: MovingAverageKind) => {
+    updateIndicators((current) => ({
+      ...current,
+      [kind]: { ...current[kind], visible: !current[kind].visible && current[kind].periods.length > 0 },
+    }))
+  }, [updateIndicators])
 
-  const choosePriceRange = useCallback(() => {
-    if (controller?.startPriceRange()) setActiveTool('priceRange')
-  }, [controller])
+  const toggleDominance = useCallback((key: DominanceKey) => {
+    updateIndicators((current) => ({ ...current, dominance: { ...current.dominance, [key]: !current.dominance[key] } }))
+  }, [updateIndicators])
 
   const updateActiveTab = useCallback((changes: Partial<Pick<ChartTab, 'symbol' | 'interval'>>) => {
     setWorkspace((current) => ({
@@ -192,7 +302,7 @@ function WorkspaceApp({ user, onLogout }: WorkspaceAppProps) {
   }, [updateActiveTab])
 
   const activateTab = useCallback((tab: ChartTab) => {
-    const nextMarket = CRYPTO_MARKETS.find((item) => item.symbol === tab.symbol) ?? DEFAULT_CRYPTO_MARKET
+    const nextMarket = getMarket(tab.symbol)
     setWorkspace((current) => ({ ...current, activeTabId: tab.id }))
     setMarket(nextMarket)
     setInterval(tab.interval)
@@ -206,8 +316,8 @@ function WorkspaceApp({ user, onLogout }: WorkspaceAppProps) {
       interval: INITIAL_INTERVAL,
       createdAtMs: Date.now(),
     }
-    setWorkspace((current) => ({ tabs: [...current.tabs, tab], activeTabId: tab.id }))
-    const nextMarket = CRYPTO_MARKETS.find((item) => item.symbol === symbol) ?? DEFAULT_CRYPTO_MARKET
+    setWorkspace((current) => ({ ...current, tabs: [...current.tabs, tab], activeTabId: tab.id }))
+    const nextMarket = getMarket(symbol)
     setMarket(nextMarket)
     setInterval(tab.interval)
     setSuperchartOpen(false)
@@ -220,12 +330,123 @@ function WorkspaceApp({ user, onLogout }: WorkspaceAppProps) {
       const tabs = current.tabs.filter((tab) => tab.id !== id)
       if (current.activeTabId !== id) return { ...current, tabs }
       const next = tabs[Math.max(0, index - 1)] ?? tabs[0]
-      const nextMarket = CRYPTO_MARKETS.find((item) => item.symbol === next.symbol) ?? DEFAULT_CRYPTO_MARKET
+      const nextMarket = getMarket(next.symbol)
       setMarket(nextMarket)
       setInterval(next.interval)
-      return { tabs, activeTabId: next.id }
+      return { ...current, tabs, activeTabId: next.id }
     })
   }, [])
+
+  const saveCurrentLayout = useCallback((name = layoutDraftName, forceNew = false) => {
+    const normalizedName = name.trim() || DEFAULT_LAYOUT_NAME
+    const now = Date.now()
+    const existing = !forceNew && currentLayout ? currentLayout : undefined
+    const id = existing?.id ?? crypto.randomUUID()
+    const groupTabs = workspace.tabs.filter((tab) => tab.layoutId === activeTab.layoutId)
+    const nextLayout: SavedLayout = {
+      id,
+      name: normalizedName,
+      tabs: groupTabs.map(({ layoutId: _layoutId, ...tab }) => tab),
+      activeTabId: workspace.activeTabId,
+      volumeVisible: workspace.volumeVisible,
+      customIntervals: workspace.customIntervals,
+      ...(workspace.indicators ? { indicators: workspace.indicators } : {}),
+      createdAtMs: existing?.createdAtMs ?? now,
+      updatedAtMs: now,
+      ...(existing?.favorite ? { favorite: true } : {}),
+    }
+    setSavedLayouts((current) => existing
+      ? current.map((layout) => layout.id === id ? nextLayout : layout)
+      : [nextLayout, ...current])
+    setWorkspace((current) => ({
+      ...current,
+      tabs: current.tabs.map((tab) => groupTabs.some((item) => item.id === tab.id) ? { ...tab, layoutId: id } : tab),
+      layoutName: normalizedName,
+      activeLayoutId: id,
+    }))
+    setLayoutDraftName(normalizedName)
+    setLayoutNotice('Saved')
+    globalThis.setTimeout(() => setLayoutNotice(''), 1600)
+  }, [activeTab.layoutId, currentLayout, layoutDraftName, workspace])
+
+  const openSavedLayout = useCallback((layout: SavedLayout) => {
+    const openedTabs: ChartTab[] = layout.tabs.map((tab) => ({ ...tab, id: crypto.randomUUID(), layoutId: layout.id }))
+    const index = Math.max(0, layout.tabs.findIndex((tab) => tab.id === layout.activeTabId))
+    const focused = openedTabs[index]
+    setWorkspace((current) => ({
+      ...current,
+      tabs: [...current.tabs, ...openedTabs],
+      activeTabId: focused.id,
+      volumeVisible: layout.volumeVisible,
+      indicators: layout.indicators ?? DEFAULT_INDICATORS,
+      customIntervals: [...new Set([...current.customIntervals, ...layout.customIntervals])],
+    }))
+    setLayoutDraftName(layout.name)
+    setMarket(getMarket(focused.symbol))
+    setInterval(focused.interval)
+    setSuperchartOpen(false)
+    setLayoutMenuOpen(false)
+  }, [])
+
+  const createNewLayout = useCallback(() => {
+    const layout = createLayout(DEFAULT_LAYOUT_NAME, Date.now())
+    setSavedLayouts((current) => [layout, ...current])
+    openSavedLayout(layout)
+  }, [openSavedLayout])
+
+  const toggleLayoutFavorite = useCallback((id: string) => {
+    setSavedLayouts((current) => current.map((layout) => {
+      if (layout.id !== id) return layout
+      const { favorite, ...rest } = layout
+      return favorite ? rest : { ...rest, favorite: true }
+    }))
+  }, [])
+
+  const renameLayout = useCallback((id: string, name: string) => {
+    const nextName = name.trim().slice(0, 48)
+    if (!nextName) return
+    setSavedLayouts((current) => current.map((layout) => (
+      layout.id === id ? { ...layout, name: nextName, updatedAtMs: Date.now() } : layout
+    )))
+    if (currentLayout?.id === id) setLayoutDraftName(nextName)
+  }, [currentLayout?.id])
+
+  const duplicateSavedLayout = useCallback((id: string) => {
+    const source = savedLayouts.find((layout) => layout.id === id)
+    if (!source) return
+    setSavedLayouts((current) => [duplicateLayout(source, Date.now()), ...current])
+  }, [savedLayouts])
+
+  const deleteSavedLayout = useCallback((id: string) => {
+    setSavedLayouts((current) => current.filter((layout) => layout.id !== id))
+    setWorkspace((current) => {
+      const { activeLayoutId, ...rest } = current
+      return {
+        ...(activeLayoutId === id ? rest : current),
+        tabs: current.tabs.map((tab) => (tab.layoutId === id ? { ...tab, layoutId: undefined } : tab)),
+      }
+    })
+  }, [])
+
+  const addCustomInterval = useCallback(() => {
+    const candidate = `${Number(customIntervalAmount)}${customIntervalUnit}`
+    const next = MARKET_INTERVALS.find((value) => value === candidate)
+    if (!next) {
+      setCustomIntervalError('This interval is not available from the Binance spot feed.')
+      return
+    }
+    setCustomIntervalError('')
+    if (!(DISPLAY_INTERVALS as readonly MarketInterval[]).includes(next)) {
+      setWorkspace((current) => ({
+        ...current,
+        customIntervals: current.customIntervals.includes(next)
+          ? current.customIntervals
+          : [...current.customIntervals, next],
+      }))
+    }
+    changeInterval(next)
+    setTimeframeMenuOpen(false)
+  }, [changeInterval, customIntervalAmount, customIntervalUnit])
 
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
@@ -233,6 +454,25 @@ function WorkspaceApp({ user, onLogout }: WorkspaceAppProps) {
       if (target instanceof HTMLInputElement || target instanceof HTMLTextAreaElement) return
 
       if (event.key === 'Escape') chooseCursor()
+      if (event.shiftKey && replayActive && event.key === 'ArrowRight') {
+        event.preventDefault()
+        controller?.stepReplay()
+      }
+      if (event.shiftKey && replayActive && event.key === 'ArrowDown') {
+        event.preventDefault()
+        controller?.setReplayPlaying(!replayPlaying)
+      }
+      if (event.altKey && !event.ctrlKey && !event.metaKey) {
+        const tool = TOOL_ORDER.find((type) => `Key${DRAWING_TOOLS[type].shortcut}` === event.code)
+        if (tool) {
+          event.preventDefault()
+          chooseTool(tool)
+        }
+      }
+      if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'd' && selectedDrawingId) {
+        event.preventDefault()
+        controller?.cloneDrawing(selectedDrawingId)
+      }
       if ((event.key === 'Delete' || event.key === 'Backspace') && selectedDrawingId) {
         event.preventDefault()
         controller?.deleteSelected()
@@ -249,7 +489,7 @@ function WorkspaceApp({ user, onLogout }: WorkspaceAppProps) {
 
     globalThis.addEventListener('keydown', handleKeyDown)
     return () => globalThis.removeEventListener('keydown', handleKeyDown)
-  }, [chooseCursor, controller, drawingStore, selectedDrawingId])
+  }, [chooseCursor, chooseTool, controller, drawingStore, replayActive, replayPlaying, selectedDrawingId])
 
   useEffect(() => {
     setSelectedDrawingId(undefined)
@@ -257,11 +497,42 @@ function WorkspaceApp({ user, onLogout }: WorkspaceAppProps) {
     previousPriceRef.current = undefined
   }, [market])
 
+  useEffect(() => {
+    const controller = new AbortController()
+    refreshMarketCatalog(undefined, controller.signal)
+      .then((changed) => { if (changed) setMarkets(allMarkets()) })
+      .catch(() => {
+        // Offline or blocked: the curated and cached markets stay available.
+      })
+    return () => controller.abort()
+  }, [])
+
+  useEffect(() => {
+    setLayoutDraftName(currentLayout?.name ?? workspace.layoutName)
+  }, [currentLayout?.id])
+
   useEffect(() => saveWorkspace(user.id, workspace), [user.id, workspace])
+  useEffect(() => saveSavedLayouts(user.id, savedLayouts), [savedLayouts, user.id])
   useEffect(() => saveAlerts(user.id, alerts), [alerts, user.id])
 
   useEffect(() => {
+    const closeDetachedMenus = (event: MouseEvent) => {
+      const target = event.target as Node
+      if (!profileMenuRef.current?.contains(target)) setProfileOpen(false)
+      if (!layoutMenuRef.current?.contains(target)) setLayoutMenuOpen(false)
+      if (!timeframeMenuRef.current?.contains(target)) setTimeframeMenuOpen(false)
+      if (!indicatorMenuRef.current?.contains(target)) setIndicatorMenuOpen(false)
+    }
+    globalThis.addEventListener('mousedown', closeDetachedMenus)
+    return () => globalThis.removeEventListener('mousedown', closeDetachedMenus)
+  }, [])
+
+  useEffect(() => {
     const price = runtime.quote?.close
+    if (runtime.replay) {
+      previousPriceRef.current = undefined
+      return
+    }
     if (price === undefined) return
     const previous = previousPriceRef.current
     previousPriceRef.current = price
@@ -300,14 +571,20 @@ function WorkspaceApp({ user, onLogout }: WorkspaceAppProps) {
         })
       }
     }
-  }, [alerts, market.symbol, runtime.quote?.close])
+  }, [alerts, market.symbol, runtime.quote?.close, runtime.replay])
 
   const quote = runtime.quote
+  const activeIndicatorCount =
+    (workspace.volumeVisible ? 1 : 0) +
+    (movingAverageActive(indicators.sma) ? 1 : 0) +
+    (movingAverageActive(indicators.ema) ? 1 : 0) +
+    Object.values(indicators.dominance).filter(Boolean).length
   const isPositive = (quote?.changePercent ?? 0) >= 0
   const blockingLoad = !quote && runtime.connection !== 'error'
   const connectionLabel = connectionCopy(runtime)
   const marketDrawings = drawingSnapshot.drawings.filter((drawing) => drawing.marketId === market.marketId)
   const selectedDrawing = drawingSnapshot.drawings.find((drawing) => drawing.id === selectedDrawingId)
+  const allDrawingsHidden = marketDrawings.length > 0 && marketDrawings.every((drawing) => drawing.hidden)
 
   const updateSelectedStyle = (changes: Record<string, string | number>) => {
     if (!selectedDrawing) return
@@ -318,69 +595,27 @@ function WorkspaceApp({ user, onLogout }: WorkspaceAppProps) {
 
   return (
     <div className="terminal-shell">
-      <header className="topbar">
-        <div className="brand" aria-label="TradeHorizon">
+      <nav className="chart-tabs" aria-label="Open charts">
+        <div className="brand tabs-brand" aria-label="TradeHorizon">
           <HorizonLogo />
           <span className="brand-name">TradeHorizon</span>
           <span className="preview-pill">ALPHA</span>
         </div>
-
-        <div className="market-heading">
-          <span className="asset-badge">{market.mark}</span>
-          <div className="market-title-group">
-            <div className="market-title-row">
-              <label className="market-selector">
-                <span className="sr-only">Select crypto market</span>
-                <select
-                  value={market.symbol}
-                  onChange={(event) => {
-                    const next = CRYPTO_MARKETS.find((item) => item.symbol === event.target.value)
-                    if (next) changeMarket(next)
-                  }}
-                >
-                  {CRYPTO_MARKETS.map((item) => (
-                    <option value={item.symbol} key={item.symbol}>
-                      {item.baseAsset} / {item.quoteAsset} · {item.name}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <span className="market-kind">Spot</span>
-            </div>
-            <span>Binance</span>
-          </div>
-        </div>
-
-        <div className="quote-heading" aria-live="polite">
-          <strong>{formatPrice(quote?.close, market.pricePrecision)}</strong>
-          <span className={isPositive ? 'price-up' : 'price-down'}>
-            {quote ? `${isPositive ? '+' : ''}${quote.changePercent.toFixed(2)}%` : '—'}
-          </span>
-          <small>{interval} candle</small>
-        </div>
-
-        <div className={`connection-chip connection-${runtime.connection}`} title={runtime.error ?? connectionLabel}>
-          <span className="connection-dot" />
-          <span>{connectionLabel}</span>
-        </div>
-      </header>
-
-      <nav className="chart-tabs" aria-label="Open charts">
         <div className="chart-tabs-scroll">
           {workspace.tabs.map((tab) => {
-            const tabMarket = CRYPTO_MARKETS.find((item) => item.symbol === tab.symbol) ?? DEFAULT_CRYPTO_MARKET
-            const active = tab.id === workspace.activeTabId
+            const tabMarket = getMarket(tab.symbol)
+            const active = tab.id === workspace.activeTabId && !superchartOpen
             return (
               <div className={active ? 'chart-tab active' : 'chart-tab'} key={tab.id}>
                 <button type="button" className="chart-tab-main" onClick={() => activateTab(tab)}>
                   <span className="chart-tab-mark">{tabMarket.mark}</span>
-                  <span>{tabMarket.baseAsset} / USDT</span>
+                  <span>{tabMarket.pair}</span>
                   <small>{tab.interval}</small>
                 </button>
                 <button
                   type="button"
                   className="chart-tab-close"
-                  aria-label={`Close ${tabMarket.baseAsset} chart`}
+                  aria-label={`Close ${tabMarket.pair} chart`}
                   onClick={() => closeChartTab(tab.id)}
                   disabled={workspace.tabs.length === 1}
                 >
@@ -389,6 +624,22 @@ function WorkspaceApp({ user, onLogout }: WorkspaceAppProps) {
               </div>
             )
           })}
+          {superchartOpen && (
+            <div className="chart-tab active">
+              <span className="chart-tab-main chart-tab-static">
+                <LayersIcon />
+                <span>New tab</span>
+              </span>
+              <button
+                type="button"
+                className="chart-tab-close"
+                aria-label="Close new tab"
+                onClick={() => setSuperchartOpen(false)}
+              >
+                <CloseIcon />
+              </button>
+            </div>
+          )}
         </div>
         <button
           type="button"
@@ -399,11 +650,50 @@ function WorkspaceApp({ user, onLogout }: WorkspaceAppProps) {
         >
           <PlusIcon />
         </button>
+
+        <div className="profile-control" ref={profileMenuRef}>
+          <button
+            type="button"
+            className="profile-avatar"
+            aria-label="Open user profile"
+            aria-expanded={profileOpen}
+            onClick={() => setProfileOpen((open) => !open)}
+          >
+            <UserIcon />
+          </button>
+          {profileOpen && (
+            <div className="top-menu profile-menu" role="dialog" aria-label="User profile">
+              <div className="profile-summary">
+                <span className="profile-large-avatar"><UserIcon /></span>
+                <div><strong>{user.displayName}</strong><span>{user.email}</span></div>
+              </div>
+              <dl>
+                <div><dt>Member since</dt><dd>{formatMemberSince(user.createdAtMs)}</dd></div>
+                <div><dt>Workspace</dt><dd>{workspace.tabs.length} open tab{workspace.tabs.length === 1 ? '' : 's'}</dd></div>
+                <div><dt>Storage</dt><dd>Saved on this device</dd></div>
+              </dl>
+              <button type="button" className="profile-logout" onClick={onLogout}>Log out</button>
+            </div>
+          )}
+        </div>
       </nav>
 
       <div className="market-toolbar">
+        <button
+          type="button"
+          className="symbol-button"
+          title="Symbol search"
+          aria-haspopup="dialog"
+          onClick={() => setSymbolSearch('change')}
+        >
+          <span className="asset-badge">{market.mark}</span>
+          <strong>{market.symbol}</strong>
+        </button>
+
+        <span className="toolbar-divider" />
+
         <div className="timeframe-group" aria-label="Chart timeframe">
-          {DISPLAY_INTERVALS.map((value) => (
+          {[...DISPLAY_INTERVALS, ...workspace.customIntervals.filter((value) => !(DISPLAY_INTERVALS as readonly MarketInterval[]).includes(value))].map((value) => (
             <button
               className={interval === value ? 'timeframe-button active' : 'timeframe-button'}
               type="button"
@@ -416,13 +706,213 @@ function WorkspaceApp({ user, onLogout }: WorkspaceAppProps) {
           ))}
         </div>
 
-        <div className="ohlc-strip" aria-label="Current candle values">
-          <span><b>O</b>{formatPrice(quote?.open, market.pricePrecision)}</span>
-          <span><b>H</b>{formatPrice(quote?.high, market.pricePrecision)}</span>
-          <span><b>L</b>{formatPrice(quote?.low, market.pricePrecision)}</span>
-          <span><b>C</b>{formatPrice(quote?.close, market.pricePrecision)}</span>
-          <span className="volume-value"><b>Vol</b>{formatCompact(quote?.volume)}</span>
+        <div className="toolbar-popover-control" ref={timeframeMenuRef}>
+          <button
+            type="button"
+            className="more-timeframes-button"
+            aria-label="More timeframes"
+            aria-expanded={timeframeMenuOpen}
+            onClick={() => setTimeframeMenuOpen((open) => !open)}
+          >
+            More
+          </button>
+          {timeframeMenuOpen && (
+            <div className="top-menu timeframe-menu">
+              <strong>All timeframes</strong>
+              <div className="timeframe-menu-grid">
+                {MARKET_INTERVALS.map((value) => (
+                  <button
+                    type="button"
+                    className={interval === value ? 'active' : ''}
+                    key={value}
+                    onClick={() => { changeInterval(value); setTimeframeMenuOpen(false) }}
+                  >
+                    {MARKET_INTERVAL_SPECS[value].label}
+                  </button>
+                ))}
+              </div>
+              <form onSubmit={(event) => { event.preventDefault(); addCustomInterval() }}>
+                <span>Add a custom shortcut</span>
+                <div>
+                  <input
+                    type="number"
+                    min="1"
+                    max="30"
+                    value={customIntervalAmount}
+                    onChange={(event) => setCustomIntervalAmount(event.target.value)}
+                    aria-label="Custom timeframe amount"
+                  />
+                  <select
+                    value={customIntervalUnit}
+                    onChange={(event) => setCustomIntervalUnit(event.target.value as typeof customIntervalUnit)}
+                    aria-label="Custom timeframe unit"
+                  >
+                    <option value="m">Minutes</option>
+                    <option value="h">Hours</option>
+                    <option value="d">Days</option>
+                    <option value="w">Weeks</option>
+                    <option value="M">Months</option>
+                  </select>
+                  <button type="submit">Add</button>
+                </div>
+                {customIntervalError && <small>{customIntervalError}</small>}
+              </form>
+            </div>
+          )}
         </div>
+
+        <span className="toolbar-divider" />
+
+        <div className="chart-type-toggle" role="group" aria-label="Chart type">
+          <button
+            type="button"
+            className={workspace.chartType === 'line' ? '' : 'active'}
+            aria-pressed={workspace.chartType !== 'line'}
+            aria-label="Candlestick chart"
+            title="Candles"
+            onClick={() => setWorkspace((current) => {
+              const { chartType: _chartType, ...rest } = current
+              return rest
+            })}
+          >
+            <CandlesIcon />
+          </button>
+          <button
+            type="button"
+            className={workspace.chartType === 'line' ? 'active' : ''}
+            aria-pressed={workspace.chartType === 'line'}
+            aria-label="Line chart"
+            title="Line"
+            onClick={() => setWorkspace((current) => ({ ...current, chartType: 'line' }))}
+          >
+            <LineChartIcon />
+          </button>
+        </div>
+
+        <span className="toolbar-divider" />
+
+        <div className="toolbar-popover-control" ref={indicatorMenuRef}>
+          <button
+            type="button"
+            className={activeIndicatorCount > 0 ? 'indicators-button active' : 'indicators-button'}
+            aria-expanded={indicatorMenuOpen}
+            onClick={() => setIndicatorMenuOpen((open) => !open)}
+          >
+            <LayersIcon /> Indicators
+          </button>
+          {indicatorMenuOpen && (
+            <div className="top-menu indicator-menu">
+              <div className="indicator-menu-head">
+                <strong>Indicators</strong>
+                <small>{activeIndicatorCount} active</small>
+              </div>
+              <button
+                type="button"
+                className="indicator-row"
+                onClick={() => setWorkspace((current) => ({ ...current, volumeVisible: !current.volumeVisible }))}
+              >
+                <span><b>Volume</b><small>Binance base-asset volume</small></span>
+                {workspace.volumeVisible ? <EyeIcon /> : <EyeOffIcon />}
+              </button>
+
+              {(['sma', 'ema'] as const).map((kind) => {
+                const settings = indicators[kind]
+                return (
+                  <div className="indicator-group" key={kind}>
+                    <button type="button" className="indicator-row" onClick={() => toggleMovingAverage(kind)}>
+                      <span>
+                        <b>{kind === 'sma' ? 'Simple Moving Average' : 'Exponential Moving Average'}</b>
+                        <small>{MOVING_AVERAGE_LABELS[kind]} of the close · up to {MAX_MOVING_AVERAGE_PERIODS} lengths</small>
+                      </span>
+                      {movingAverageActive(settings) ? <EyeIcon /> : <EyeOffIcon />}
+                    </button>
+                    <div className="indicator-periods">
+                      {settings.periods.map((period, index) => (
+                        <span
+                          className="period-chip"
+                          style={{ '--chip-color': MOVING_AVERAGE_COLORS[kind][index % MOVING_AVERAGE_COLORS[kind].length] } as CSSProperties}
+                          key={period}
+                        >
+                          {period}
+                          <button
+                            type="button"
+                            aria-label={`Remove ${MOVING_AVERAGE_LABELS[kind]} ${period}`}
+                            onClick={() => updateIndicators((current) => ({ ...current, [kind]: removeMovingAveragePeriod(current[kind], period) }))}
+                          >
+                            ×
+                          </button>
+                        </span>
+                      ))}
+                      <form onSubmit={(event) => { event.preventDefault(); addMovingAverage(kind) }}>
+                        <input
+                          type="number"
+                          min="1"
+                          max={MAX_MOVING_AVERAGE_PERIOD}
+                          placeholder="Length"
+                          aria-label={`${MOVING_AVERAGE_LABELS[kind]} length`}
+                          value={maDraft[kind]}
+                          onChange={(event) => setMaDraft((current) => ({ ...current, [kind]: event.target.value }))}
+                        />
+                        <button type="submit">Add</button>
+                      </form>
+                    </div>
+                    {maError?.kind === kind && <small className="indicator-error">{maError.message}</small>}
+                  </div>
+                )
+              })}
+
+              <div className="indicator-section-title">
+                <b>Market dominance</b>
+                <small>CoinGecko caps, Binance prices · estimated</small>
+              </div>
+              {(['btc', 'usdt', 'alt'] as const).map((key) => (
+                <button type="button" className="indicator-row" key={key} onClick={() => toggleDominance(key)}>
+                  <span>
+                    <b>{DOMINANCE_DESCRIPTIONS[key]}</b>
+                    <small>{DOMINANCE_LABELS[key]} · % of total crypto market cap</small>
+                  </span>
+                  {indicators.dominance[key] ? <EyeIcon /> : <EyeOffIcon />}
+                </button>
+              ))}
+              {(indicators.dominance.btc || indicators.dominance.usdt || indicators.dominance.alt) && runtime.dominance === 'loading' && (
+                <p className="indicator-note">Importing dominance data…</p>
+              )}
+              {(indicators.dominance.btc || indicators.dominance.usdt || indicators.dominance.alt) && runtime.dominance === 'error' && (
+                <p className="indicator-note error">Could not import dominance data: {runtime.dominanceError}</p>
+              )}
+            </div>
+          )}
+        </div>
+
+        <button
+          type="button"
+          className={alertsOpen ? 'indicators-button active' : 'indicators-button'}
+          aria-pressed={alertsOpen}
+          onClick={() => setAlertsOpen((open) => !open)}
+        >
+          <BellIcon /> Alert
+        </button>
+
+        <button
+          type="button"
+          className={replay ? 'indicators-button active' : 'indicators-button'}
+          aria-pressed={!!replay}
+          title={replay ? 'Exit bar replay' : 'Bar replay: rewind the chart and play it forward'}
+          onClick={() => {
+            if (replay) {
+              controller?.exitReplay()
+            } else {
+              controller?.cancelActiveTool()
+              setActiveTool('cursor')
+              controller?.startReplaySelection()
+            }
+          }}
+          disabled={!controller || !quote}
+        >
+          <ReplayIcon /> Replay
+        </button>
+
+        <span className="toolbar-divider" />
 
         <button
           type="button"
@@ -433,6 +923,49 @@ function WorkspaceApp({ user, onLogout }: WorkspaceAppProps) {
           <TargetIcon />
           Go live
         </button>
+
+        <span className="toolbar-spacer" />
+
+        <div
+          className={`connection-chip connection-${replayActive ? 'loading' : runtime.connection}`}
+          title={replayActive ? 'Replaying history; live updates are paused' : runtime.error ?? connectionLabel}
+        >
+          <span className="connection-dot" />
+          <span>{replayActive ? 'Replay' : connectionLabel}</span>
+        </div>
+
+        <div className="layout-control" ref={layoutMenuRef}>
+          <button
+            type="button"
+            className="layout-name-button"
+            aria-expanded={layoutMenuOpen}
+            onClick={() => setLayoutMenuOpen((open) => !open)}
+          >
+            <LayersIcon />
+            <span>{currentLayout?.name ?? workspace.layoutName}</span>
+            <small>{layoutNotice || (currentLayout ? 'Saved layout' : 'Unsaved')}</small>
+          </button>
+          {layoutMenuOpen && (
+            <div className="top-menu layout-menu" role="menu">
+              <label>
+                <span>Layout name</span>
+                <input
+                  value={layoutDraftName}
+                  maxLength={48}
+                  onChange={(event) => {
+                    setLayoutDraftName(event.target.value)
+                    setWorkspace((current) => ({ ...current, layoutName: event.target.value || DEFAULT_LAYOUT_NAME }))
+                  }}
+                />
+              </label>
+              <button type="button" onClick={() => { saveCurrentLayout(layoutDraftName); setLayoutMenuOpen(false) }}>Save layout</button>
+              <button type="button" onClick={() => { setSaveAsOpen(true); setLayoutMenuOpen(false) }}>Save as…</button>
+              <button type="button" onClick={() => { setSuperchartOpen(true); setLayoutMenuOpen(false) }}>
+                Manage layouts <span>{savedLayouts.length}</span>
+              </button>
+            </div>
+          )}
+        </div>
       </div>
 
       <main className={objectTreeOpen ? 'workspace object-tree-visible' : 'workspace'}>
@@ -446,55 +979,39 @@ function WorkspaceApp({ user, onLogout }: WorkspaceAppProps) {
           >
             <CursorIcon />
           </button>
+          {TOOL_ORDER.map((type) => {
+            const tool = DRAWING_TOOLS[type]
+            const Icon = TOOL_ICONS[type]
+            return (
+              <button
+                type="button"
+                key={type}
+                className={activeTool === type ? 'tool-button active' : 'tool-button'}
+                aria-label={`Draw ${tool.label.toLowerCase()}`}
+                aria-pressed={activeTool === type}
+                title={`${tool.label} (Alt+${tool.shortcut})`}
+                onClick={() => (activeTool === type ? chooseCursor() : chooseTool(type))}
+                disabled={!controller || runtime.connection === 'error'}
+              >
+                <Icon />
+              </button>
+            )
+          })}
+
+          <span className="tool-divider" />
+
           <button
             type="button"
-            className={activeTool === 'trendLine' ? 'tool-button active' : 'tool-button'}
-            aria-label="Draw trend line"
-            title="Trend line"
-            onClick={chooseTrendLine}
-            disabled={!controller || runtime.connection === 'error'}
+            className={workspace.magnet ? 'tool-button active' : 'tool-button'}
+            aria-label="Magnet: snap to candle open, high, low, close"
+            aria-pressed={!!workspace.magnet}
+            title={workspace.magnet ? 'Magnet on: points snap to OHLC' : 'Magnet off: free placement'}
+            onClick={() => setWorkspace((current) => {
+              const { magnet, ...rest } = current
+              return magnet ? rest : { ...rest, magnet: true }
+            })}
           >
-            <TrendLineIcon />
-          </button>
-          <button
-            type="button"
-            className={activeTool === 'horizontalLine' ? 'tool-button active' : 'tool-button'}
-            aria-label="Draw horizontal line"
-            title="Horizontal line"
-            onClick={chooseHorizontalLine}
-            disabled={!controller || runtime.connection === 'error'}
-          >
-            <HorizontalLineIcon />
-          </button>
-          <button
-            type="button"
-            className={activeTool === 'rectangle' ? 'tool-button active' : 'tool-button'}
-            aria-label="Draw rectangle"
-            title="Rectangle"
-            onClick={chooseRectangle}
-            disabled={!controller || runtime.connection === 'error'}
-          >
-            <RectangleIcon />
-          </button>
-          <button
-            type="button"
-            className={activeTool === 'priceRange' ? 'tool-button active' : 'tool-button'}
-            aria-label="Draw price range"
-            title="Price range"
-            onClick={choosePriceRange}
-            disabled={!controller || runtime.connection === 'error'}
-          >
-            <PriceRangeIcon />
-          </button>
-          <button
-            type="button"
-            className={activeTool === 'longPosition' ? 'tool-button active' : 'tool-button'}
-            aria-label="Draw long position"
-            title="Long position"
-            onClick={chooseLongPosition}
-            disabled={!controller || runtime.connection === 'error'}
-          >
-            <LongPositionIcon />
+            <MagnetIcon />
           </button>
 
           <span className="tool-divider" />
@@ -531,67 +1048,125 @@ function WorkspaceApp({ user, onLogout }: WorkspaceAppProps) {
           </button>
         </aside>
 
-        <section className="chart-workspace" aria-label="Market chart workspace">
+        <section className={replayActive ? 'chart-workspace replay-active' : 'chart-workspace'} aria-label="Market chart workspace">
           <div className="chart-watermark" aria-hidden="true">
-            <strong>{market.symbol}</strong>
-            <span>{interval} · Binance Spot</span>
+            <strong>{market.name}</strong>
+            <span>· {interval} · {market.venue}</span>
+            <i className={`legend-dot legend-dot-${runtime.connection}`} />
+          </div>
+
+          <div className="chart-legend" aria-label="Current market and indicators">
+            <div className="chart-ohlc-row">
+              <span><b>O</b>{formatPrice(quote?.open, market.pricePrecision)}</span>
+              <span><b>H</b>{formatPrice(quote?.high, market.pricePrecision)}</span>
+              <span><b>L</b>{formatPrice(quote?.low, market.pricePrecision)}</span>
+              <span><b>C</b>{formatPrice(quote?.close, market.pricePrecision)}</span>
+              <span className={isPositive ? 'price-up' : 'price-down'}>{quote ? `${isPositive ? '+' : ''}${quote.changePercent.toFixed(2)}%` : '—'}</span>
+            </div>
+            {market.kind === 'spot' && <button
+              type="button"
+              className={workspace.volumeVisible ? 'chart-indicator-row' : 'chart-indicator-row muted'}
+              onClick={() => setWorkspace((current) => ({ ...current, volumeVisible: !current.volumeVisible }))}
+              title={workspace.volumeVisible ? 'Hide Volume' : 'Show Volume'}
+            >
+              <span>Volume · {market.baseAsset}</span>
+              <b>{formatCompact(quote?.volume)}</b>
+              {workspace.volumeVisible ? <EyeIcon /> : <EyeOffIcon />}
+            </button>}
+            {(['sma', 'ema'] as const).filter((kind) => movingAverageActive(indicators[kind])).map((kind) => (
+              <button
+                type="button"
+                key={kind}
+                className="chart-indicator-row"
+                onClick={() => toggleMovingAverage(kind)}
+                title={`Hide ${MOVING_AVERAGE_LABELS[kind]}`}
+              >
+                <span>{MOVING_AVERAGE_LABELS[kind]}</span>
+                {indicators[kind].periods.map((period, index) => (
+                  <b key={period} style={{ color: MOVING_AVERAGE_COLORS[kind][index % MOVING_AVERAGE_COLORS[kind].length] }}>{period}</b>
+                ))}
+                <EyeIcon />
+              </button>
+            ))}
           </div>
 
           <CryptoChartSurface
             interval={interval}
             market={market}
             drawingStore={drawingStore}
+            volumeVisible={workspace.volumeVisible}
+            indicators={indicators}
+            magnet={!!workspace.magnet}
+            chartType={workspace.chartType ?? 'candles'}
             onRuntimeState={setRuntime}
             onControllerChange={handleControllerChange}
             onToolSettled={handleToolSettled}
             onSelectionChange={handleSelectionChange}
           />
 
-          {activeTool === 'trendLine' && (
+          {replay?.status === 'picking' && (
             <div className="drawing-hint" role="status">
-              <TrendLineIcon />
-              Select two points on the chart
+              <ReplayIcon />
+              Click the candle to start the replay from
               <kbd>Esc</kbd>
             </div>
           )}
 
-          {activeTool === 'horizontalLine' && (
-            <div className="drawing-hint" role="status">
-              <HorizontalLineIcon />
-              Click anywhere on chart to place horizontal line
-              <kbd>Esc</kbd>
+          {replayActive && replay && (
+            <div className="replay-bar" role="toolbar" aria-label="Bar replay">
+              <button
+                type="button"
+                className="replay-primary"
+                aria-label={replay.playing ? 'Pause replay' : 'Play replay'}
+                title={replay.playing ? 'Pause (Shift+↓)' : 'Play (Shift+↓)'}
+                onClick={() => controller?.setReplayPlaying(!replay.playing)}
+                disabled={replay.atEnd}
+              >
+                {replay.playing ? <PauseIcon /> : <PlayIcon />}
+              </button>
+              <button
+                type="button"
+                aria-label="Forward one bar"
+                title="Forward one bar (Shift+→)"
+                onClick={() => controller?.stepReplay()}
+                disabled={replay.atEnd}
+              >
+                <StepForwardIcon />
+              </button>
+              <select
+                aria-label="Replay speed"
+                title="Replay speed"
+                value={replay.speedMs}
+                onChange={(event) => controller?.setReplaySpeed(Number(event.target.value))}
+              >
+                {REPLAY_SPEEDS.map((speed) => <option value={speed.ms} key={speed.ms}>{speed.label}</option>)}
+              </select>
+              <span className="replay-time">{replay.atEnd ? 'Reached the latest bar' : formatReplayTime(replay.timeMs)}</span>
+              <button type="button" title="Choose a different starting bar" onClick={() => controller?.startReplaySelection()}>
+                <ReplayIcon /> Jump to…
+              </button>
+              <button type="button" className="replay-exit" title="Exit replay and return to live" onClick={() => controller?.exitReplay()}>
+                <CloseIcon /> Exit
+              </button>
             </div>
           )}
 
-          {activeTool === 'rectangle' && (
-            <div className="drawing-hint" role="status">
-              <RectangleIcon />
-              Select two opposite corners
-              <kbd>Esc</kbd>
-            </div>
-          )}
-
-          {activeTool === 'priceRange' && (
-            <div className="drawing-hint" role="status">
-              <PriceRangeIcon />
-              Select start and end points to measure
-              <kbd>Esc</kbd>
-            </div>
-          )}
-
-          {activeTool === 'longPosition' && (
-            <div className="drawing-hint" role="status">
-              <LongPositionIcon />
-              Select entry, target, then stop
-              <kbd>Esc</kbd>
-            </div>
-          )}
+          {activeTool !== 'cursor' && (() => {
+            const Icon = TOOL_ICONS[activeTool]
+            return (
+              <div className="drawing-hint" role="status">
+                <Icon />
+                {DRAWING_TOOLS[activeTool].hint}
+                <kbd>Esc</kbd>
+              </div>
+            )
+          })()}
 
           {blockingLoad && (
             <div className="chart-state" role="status">
               <span className="loader-ring" />
-              <strong>Loading BTC candles</strong>
-              <span>Connecting to the Binance market feed…</span>
+              <strong>Loading {market.symbol}</strong>
+              <span>Connecting to the {market.venue} data feed…</span>
             </div>
           )}
 
@@ -610,33 +1185,15 @@ function WorkspaceApp({ user, onLogout }: WorkspaceAppProps) {
           {selectedDrawing && (
             <div className="floating-object-toolbar" role="toolbar" aria-label="Selected object properties">
               <span className="toolbar-grip" aria-hidden="true" />
-              <div
-                className="toolbar-object-type"
-                title={
-                  selectedDrawing.type === 'rectangle'
-                    ? 'Rectangle'
-                    : selectedDrawing.type === 'horizontalLine'
-                      ? 'Horizontal line'
-                      : selectedDrawing.type === 'priceRange'
-                        ? 'Price range'
-                        : selectedDrawing.type === 'longPosition'
-                          ? 'Long position'
-                          : 'Trend line'
-                }
-              >
-                {selectedDrawing.type === 'rectangle'
-                  ? <RectangleIcon />
-                  : selectedDrawing.type === 'horizontalLine'
-                    ? <HorizontalLineIcon />
-                    : selectedDrawing.type === 'priceRange'
-                      ? <PriceRangeIcon />
-                      : selectedDrawing.type === 'longPosition'
-                        ? <LongPositionIcon />
-                        : <TrendLineIcon />}
+              <div className="toolbar-object-type" title={DRAWING_TOOLS[selectedDrawing.type].label}>
+                {(() => {
+                  const Icon = TOOL_ICONS[selectedDrawing.type]
+                  return <Icon />
+                })()}
               </div>
               <span className="toolbar-separator" />
 
-              {selectedDrawing.type === 'longPosition' ? (
+              {isPositionTool(selectedDrawing.type) ? (
                 <>
                   <label className="toolbar-color-control" title="Target color">
                     <input
@@ -666,8 +1223,8 @@ function WorkspaceApp({ user, onLogout }: WorkspaceAppProps) {
                   <button
                     type="button"
                     className={positionSettingsOpen ? 'toolbar-action active' : 'toolbar-action'}
-                    aria-label="Long position settings"
-                    title="Long position settings"
+                    aria-label="Position settings"
+                    title="Position settings"
                     onClick={() => setPositionSettingsOpen((open) => !open)}
                   >
                     <SettingsIcon />
@@ -675,14 +1232,16 @@ function WorkspaceApp({ user, onLogout }: WorkspaceAppProps) {
                 </>
               ) : (
                 <>
-                  <label className="toolbar-color-control" title="Line color">
-                    <input
-                      type="color"
-                      aria-label="Line color"
-                      value={colorInputValue(selectedDrawing.style.color, selectedDrawing.type === 'rectangle' ? '#3aa9ff' : '#f4b860')}
-                      onChange={(event) => updateSelectedStyle({ color: event.target.value })}
-                    />
-                  </label>
+                  {selectedDrawing.type !== 'fibRetracement' && selectedDrawing.type !== 'priceRange' && (
+                    <label className="toolbar-color-control" title="Line color">
+                      <input
+                        type="color"
+                        aria-label="Line color"
+                        value={colorInputValue(selectedDrawing.style.color, selectedDrawing.type === 'rectangle' ? '#3aa9ff' : '#f4b860')}
+                        onChange={(event) => updateSelectedStyle({ color: event.target.value })}
+                      />
+                    </label>
+                  )}
                   <select
                     className="toolbar-select thickness-select"
                     aria-label="Line thickness"
@@ -733,6 +1292,15 @@ function WorkspaceApp({ user, onLogout }: WorkspaceAppProps) {
               <span className="toolbar-separator" />
               <button
                 type="button"
+                className="toolbar-action"
+                aria-label="Clone object"
+                title="Clone (Ctrl+D)"
+                onClick={() => controller?.cloneDrawing(selectedDrawing.id)}
+              >
+                <CopyIcon />
+              </button>
+              <button
+                type="button"
                 className={selectedDrawing.hidden ? 'toolbar-action active' : 'toolbar-action'}
                 aria-label={selectedDrawing.hidden ? 'Show object' : 'Hide object'}
                 title={selectedDrawing.hidden ? 'Show object' : 'Hide object'}
@@ -774,7 +1342,7 @@ function WorkspaceApp({ user, onLogout }: WorkspaceAppProps) {
             </div>
           )}
 
-          {selectedDrawing?.type === 'longPosition' && positionSettingsOpen && (
+          {selectedDrawing && isPositionTool(selectedDrawing.type) && positionSettingsOpen && (
             <div className="position-settings-backdrop" role="presentation" onMouseDown={() => setPositionSettingsOpen(false)}>
               <section
                 className="position-settings-dialog"
@@ -785,10 +1353,10 @@ function WorkspaceApp({ user, onLogout }: WorkspaceAppProps) {
               >
                 <header>
                   <div>
-                    <LongPositionIcon />
+                    {selectedDrawing.type === 'shortPosition' ? <ShortPositionIcon /> : <LongPositionIcon />}
                     <div>
                       <small>Drawing properties</small>
-                      <h2 id="position-settings-title">Long position</h2>
+                      <h2 id="position-settings-title">{DRAWING_TOOLS[selectedDrawing.type].label}</h2>
                     </div>
                   </div>
                   <button type="button" aria-label="Close settings" onClick={() => setPositionSettingsOpen(false)}>
@@ -800,7 +1368,7 @@ function WorkspaceApp({ user, onLogout }: WorkspaceAppProps) {
                   <h3>Risk inputs</h3>
                   <div className="position-settings-grid">
                     <label>
-                      <span>Account size <small>USDT</small></span>
+                      <span>Account size <small>{market.quoteAsset}</small></span>
                       <input
                         type="number"
                         min="0"
@@ -897,6 +1465,23 @@ function WorkspaceApp({ user, onLogout }: WorkspaceAppProps) {
                 <strong>Object tree</strong>
                 <span>{marketDrawings.length}</span>
               </div>
+              {marketDrawings.length > 0 && (
+                <button
+                  type="button"
+                  className="object-icon-button"
+                  aria-label={allDrawingsHidden ? 'Show all drawings' : 'Hide all drawings'}
+                  title={allDrawingsHidden ? 'Show all drawings' : 'Hide all drawings'}
+                  onClick={() => {
+                    for (const drawing of marketDrawings) {
+                      if (!!drawing.hidden === allDrawingsHidden) {
+                        drawingStore.execute(updateDrawing(drawing.id, { hidden: !allDrawingsHidden }))
+                      }
+                    }
+                  }}
+                >
+                  {allDrawingsHidden ? <EyeOffIcon /> : <EyeIcon />}
+                </button>
+              )}
               <button
                 type="button"
                 className="object-icon-button"
@@ -912,31 +1497,15 @@ function WorkspaceApp({ user, onLogout }: WorkspaceAppProps) {
               <span className="object-market-symbol">{market.mark}</span>
               <div>
                 <strong>{market.symbol}</strong>
-                <span>Binance Spot · {interval}</span>
+                <span>{market.venue} {market.kind === 'spot' ? 'Spot' : 'Index'} · {interval}</span>
               </div>
             </div>
 
             <div className="object-list">
               {[...marketDrawings].reverse().map((drawing, reverseIndex) => {
                 const originalIndex = marketDrawings.length - reverseIndex
-                const label = drawing.type === 'rectangle'
-                  ? 'Rectangle'
-                  : drawing.type === 'horizontalLine'
-                    ? 'Horizontal line'
-                    : drawing.type === 'priceRange'
-                      ? 'Price range'
-                      : drawing.type === 'longPosition'
-                        ? 'Long position'
-                        : 'Trend line'
-                const Icon = drawing.type === 'rectangle'
-                  ? RectangleIcon
-                  : drawing.type === 'horizontalLine'
-                    ? HorizontalLineIcon
-                    : drawing.type === 'priceRange'
-                      ? PriceRangeIcon
-                      : drawing.type === 'longPosition'
-                        ? LongPositionIcon
-                        : TrendLineIcon
+                const label = DRAWING_TOOLS[drawing.type].label
+                const Icon = TOOL_ICONS[drawing.type]
                 const selected = drawing.id === selectedDrawingId
 
                 return (
@@ -987,7 +1556,7 @@ function WorkspaceApp({ user, onLogout }: WorkspaceAppProps) {
                 <div className="object-tree-empty">
                   <LayersIcon />
                   <strong>No drawing objects</strong>
-                  <span>Add a trend line or rectangle to see it here.</span>
+                  <span>Pick a tool on the left, then click or drag on the chart.</span>
                 </div>
               )}
             </div>
@@ -1049,7 +1618,7 @@ function WorkspaceApp({ user, onLogout }: WorkspaceAppProps) {
               }
             }}
           >
-            <strong>Create alert for {market.baseAsset}</strong>
+            <strong>Create alert for {market.symbol}</strong>
             <label>
               <span>Trigger</span>
               <select value={alertDirection} onChange={(event) => setAlertDirection(event.target.value as AlertDirection)}>
@@ -1058,7 +1627,7 @@ function WorkspaceApp({ user, onLogout }: WorkspaceAppProps) {
               </select>
             </label>
             <label>
-              <span>Target price (USDT)</span>
+              <span>Target {market.kind === 'spot' ? 'price (USDT)' : 'level (%)'}</span>
               <input
                 type="number"
                 min="0"
@@ -1099,56 +1668,67 @@ function WorkspaceApp({ user, onLogout }: WorkspaceAppProps) {
         </aside>
       )}
 
-      {superchartOpen && (
-        <div className="superchart-backdrop" role="presentation" onMouseDown={() => setSuperchartOpen(false)}>
-          <section className="superchart-launcher" role="dialog" aria-modal="true" aria-labelledby="superchart-title" onMouseDown={(event) => event.stopPropagation()}>
+      {symbolSearch && (
+        <SymbolSearch
+          markets={markets}
+          current={market}
+          onSelect={(next) => {
+            if (symbolSearch === 'new') createChartTab(next.symbol)
+            else changeMarket(next)
+            setSymbolSearch(null)
+          }}
+          onClose={() => setSymbolSearch(null)}
+        />
+      )}
+
+      {saveAsOpen && (
+        <div className="superchart-backdrop" role="presentation" onMouseDown={() => setSaveAsOpen(false)}>
+          <form
+            className="compact-dialog"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="save-layout-title"
+            onMouseDown={(event) => event.stopPropagation()}
+            onSubmit={(event) => {
+              event.preventDefault()
+              saveCurrentLayout(layoutDraftName, true)
+              setSaveAsOpen(false)
+            }}
+          >
             <header>
-              <div>
-                <HorizonLogo />
-                <div><small>TradeHorizon</small><h2 id="superchart-title">Open Superchart</h2></div>
-              </div>
-              <button type="button" onClick={() => setSuperchartOpen(false)} aria-label="Close Superchart launcher"><CloseIcon /></button>
+              <div><LayersIcon /><h2 id="save-layout-title">Save layout as</h2></div>
+              <button type="button" onClick={() => setSaveAsOpen(false)} aria-label="Close"><CloseIcon /></button>
             </header>
-            <div className="saved-charts-section">
-              <h3>Saved tabs</h3>
-              <div className="saved-chart-list">
-                {workspace.tabs.map((tab) => {
-                  const tabMarket = CRYPTO_MARKETS.find((item) => item.symbol === tab.symbol) ?? DEFAULT_CRYPTO_MARKET
-                  return (
-                    <button type="button" key={tab.id} onClick={() => activateTab(tab)}>
-                      <span className="saved-chart-mark">{tabMarket.mark}</span>
-                      <span><strong>{tabMarket.baseAsset} / USDT</strong><small>Binance Spot · {tab.interval}</small></span>
-                    </button>
-                  )
-                })}
-              </div>
-            </div>
-            <div className="new-market-section">
-              <h3>Start a new chart</h3>
-              <div className="market-card-grid">
-                {CRYPTO_MARKETS.map((item) => (
-                  <button type="button" key={item.symbol} onClick={() => createChartTab(item.symbol)}>
-                    <span>{item.mark}</span>
-                    <strong>{item.baseAsset} / USDT</strong>
-                    <small>{item.name} · Binance Spot</small>
-                  </button>
-                ))}
-              </div>
-            </div>
-          </section>
+            <label>
+              <span>Layout name</span>
+              <input autoFocus required maxLength={48} value={layoutDraftName} onChange={(event) => setLayoutDraftName(event.target.value)} />
+            </label>
+            <footer><button type="button" onClick={() => setSaveAsOpen(false)}>Cancel</button><button type="submit">Save copy</button></footer>
+          </form>
         </div>
       )}
 
+      {superchartOpen && (
+        <Superchart
+          layouts={savedLayouts}
+          activeLayoutId={activeTab.layoutId}
+          onOpen={openSavedLayout}
+          onCreate={createNewLayout}
+          onNewChart={() => setSymbolSearch('new')}
+          onToggleFavorite={toggleLayoutFavorite}
+          onRename={renameLayout}
+          onDuplicate={duplicateSavedLayout}
+          onDelete={deleteSavedLayout}
+        />
+      )}
+
       <footer className="statusbar">
-        <span>BINANCE SPOT</span>
+        <span>{market.venue.toUpperCase()} {market.kind === 'spot' ? 'SPOT' : 'INDEX'}</span>
         <span>UTC</span>
         <span className="status-separator" />
-        <span>{marketDrawings.length} saved drawing{marketDrawings.length === 1 ? '' : 's'} for {market.baseAsset}</span>
+        <span>{marketDrawings.length} saved drawing{marketDrawings.length === 1 ? '' : 's'} for {market.symbol}</span>
         <span className="status-spacer" />
         <span className="status-note">Market data · Public feed</span>
-        <button type="button" className="user-menu-button" onClick={onLogout} title="Log out">
-          <UserIcon /> {user.displayName} · Log out
-        </button>
         {runtime.error && quote && (
           <button type="button" className="status-retry" onClick={() => controller?.retry()}>
             <RefreshIcon /> Refresh feed

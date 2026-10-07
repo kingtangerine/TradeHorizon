@@ -1,10 +1,20 @@
 import { getSupportedOverlays, registerOverlay } from 'klinecharts'
+import { FIB_LEVELS, clampPositionLevels, fibLevelPrice, type PositionDirection } from './geometry'
+import {
+  FIB_RETRACEMENT_OVERLAY_NAME,
+  HORIZONTAL_LINE_OVERLAY_NAME,
+  LONG_POSITION_OVERLAY_NAME,
+  PRICE_RANGE_OVERLAY_NAME,
+  RECTANGLE_OVERLAY_NAME,
+  SHORT_POSITION_OVERLAY_NAME,
+  VERTICAL_LINE_OVERLAY_NAME,
+} from './overlayNames'
 import { calculateLongPositionMetrics } from './position'
 
-export const RECTANGLE_OVERLAY_NAME = 'tradeHorizonRectangle'
-export const LONG_POSITION_OVERLAY_NAME = 'tradeHorizonLongPosition'
-export const HORIZONTAL_LINE_OVERLAY_NAME = 'tradeHorizonHorizontalLine'
-export const PRICE_RANGE_OVERLAY_NAME = 'tradeHorizonPriceRange'
+export * from './overlayNames'
+
+
+const FIB_COLORS = ['#787b86', '#f23645', '#ff9800', '#4caf50', '#089981', '#00bcd4', '#787b86', '#2962ff']
 
 function numericStyle(styles: unknown, key: string, fallback: number): number {
   if (!styles || typeof styles !== 'object') return fallback
@@ -140,8 +150,12 @@ export function registerTradeHorizonOverlays(): void {
     })
   }
 
-  if (!supported.has(LONG_POSITION_OVERLAY_NAME)) registerOverlay({
-    name: LONG_POSITION_OVERLAY_NAME,
+  const positions: Array<[string, PositionDirection]> = [
+    [LONG_POSITION_OVERLAY_NAME, 'long'],
+    [SHORT_POSITION_OVERLAY_NAME, 'short'],
+  ]
+  for (const [positionName, direction] of positions) if (!supported.has(positionName)) registerOverlay({
+    name: positionName,
     totalStep: 4,
     needDefaultPointFigure: true,
     needDefaultXAxisFigure: true,
@@ -208,7 +222,7 @@ export function registerTradeHorizonOverlays(): void {
         { type: 'line', attrs: { coordinates: [{ x: left, y: stopCoordinate.y }, { x: right, y: stopCoordinate.y }] }, styles: lineStyles },
         {
           type: 'text',
-          attrs: { x: left + 5, y: targetCoordinate.y, text: `Target: ${formatPositionNumber(target)} (${formatPositionNumber(metrics.targetPercent)}%)  P&L: ${formatPositionNumber(metrics.rewardAmount)}  Qty: ${formatPositionNumber(metrics.quantity, 6)}`, align: 'left', baseline: 'bottom' },
+          attrs: { x: left + 5, y: targetCoordinate.y, text: `Target: ${formatPositionNumber(target)} (${formatPositionNumber(metrics.targetPercent)}%)  P&L: ${formatPositionNumber(metrics.rewardAmount)}  Qty: ${formatPositionNumber(metrics.quantity, 6)}`, align: 'left', baseline: direction === 'long' ? 'bottom' : 'top' },
           styles: { ...textStyles, backgroundColor: targetColor },
           ignoreEvent: true,
         },
@@ -220,11 +234,26 @@ export function registerTradeHorizonOverlays(): void {
         },
         {
           type: 'text',
-          attrs: { x: left + 5, y: stopCoordinate.y, text: `Stop: ${formatPositionNumber(stop)} (${formatPositionNumber(metrics.stopPercent)}%)  Risk: ${formatPositionNumber(metrics.riskAmount)}`, align: 'left', baseline: 'top' },
+          attrs: { x: left + 5, y: stopCoordinate.y, text: `Stop: ${formatPositionNumber(stop)} (${formatPositionNumber(metrics.stopPercent)}%)  Risk: ${formatPositionNumber(metrics.riskAmount)}`, align: 'left', baseline: direction === 'long' ? 'top' : 'bottom' },
           styles: { ...textStyles, backgroundColor: stopColor },
           ignoreEvent: true,
         },
       ]
+    },
+    performEventPressedMove: ({ points, performPointIndex }) => {
+      if (points.length < 3) return
+      const entry = points[0].value
+      const target = points[1].value
+      const stop = points[2].value
+      if (entry === undefined || target === undefined || stop === undefined) return
+
+      if (performPointIndex === 0) {
+        points[0].value = Math.min(Math.max(target, stop), Math.max(Math.min(target, stop), entry))
+        return
+      }
+      const clamped = clampPositionLevels(direction, entry, target, stop)
+      points[1].value = clamped.target
+      points[2].value = clamped.stop
     },
   })
 
@@ -364,6 +393,112 @@ export function registerTradeHorizonOverlays(): void {
             },
             ignoreEvent: true,
           },
+        ]
+      },
+    })
+  }
+
+  if (!supported.has(VERTICAL_LINE_OVERLAY_NAME)) {
+    registerOverlay({
+      name: VERTICAL_LINE_OVERLAY_NAME,
+      totalStep: 2,
+      needDefaultPointFigure: true,
+      needDefaultXAxisFigure: true,
+      needDefaultYAxisFigure: false,
+      createPointFigures: ({ coordinates, bounding }) => {
+        if (coordinates.length < 1) return []
+        return [
+          {
+            type: 'line',
+            attrs: {
+              coordinates: [
+                { x: coordinates[0].x, y: 0 },
+                { x: coordinates[0].x, y: bounding.height },
+              ],
+            },
+          },
+        ]
+      },
+    })
+  }
+
+  if (!supported.has(FIB_RETRACEMENT_OVERLAY_NAME)) {
+    registerOverlay({
+      name: FIB_RETRACEMENT_OVERLAY_NAME,
+      totalStep: 3,
+      needDefaultPointFigure: true,
+      needDefaultXAxisFigure: true,
+      needDefaultYAxisFigure: true,
+      createPointFigures: ({ coordinates, overlay, chart, yAxis }) => {
+        if (coordinates.length < 2 || overlay.points.length < 2) return []
+        const first = overlay.points[0].value
+        const second = overlay.points[1].value
+        if (first === undefined || second === undefined || !yAxis) return []
+
+        const [c1, c2] = coordinates
+        const left = Math.min(c1.x, c2.x)
+        const right = Math.max(Math.max(c1.x, c2.x), left + 120)
+        const precision = chart.getSymbol()?.pricePrecision ?? 2
+        const fillOpacity = numericStyle(overlay.styles, 'fillOpacity', 8)
+        const lineWidth = numericStyle(overlay.styles, 'lineWidth', 1)
+        const lineStyle = stringStyle(overlay.styles, 'lineStyle', 'solid')
+        const levels = FIB_LEVELS.map((level, index) => {
+          const price = fibLevelPrice(first, second, level)
+          return { level, price, y: yAxis.convertToPixel(price), color: FIB_COLORS[index % FIB_COLORS.length] }
+        })
+
+        const bands = levels.slice(1).map((current, index) => {
+          const previous = levels[index]
+          return {
+            type: 'rect',
+            attrs: {
+              x: left,
+              y: Math.min(previous.y, current.y),
+              width: right - left,
+              height: Math.abs(current.y - previous.y),
+            },
+            styles: { style: 'fill', color: rgba(current.color, fillOpacity), borderSize: 0 },
+            ignoreEvent: true,
+          }
+        })
+        const lines = levels.map((item) => ({
+          type: 'line',
+          attrs: { coordinates: [{ x: left, y: item.y }, { x: right, y: item.y }] },
+          styles: { color: item.color, size: lineWidth, style: lineStyle, dashedValue: [4, 4] },
+        }))
+        const labels = levels.map((item) => ({
+          type: 'text',
+          attrs: {
+            x: left + 4,
+            y: item.y - 2,
+            text: `${item.level} (${formatPositionNumber(item.price, precision)})`,
+            align: 'left',
+            baseline: 'bottom',
+          },
+          styles: {
+            color: item.color,
+            size: 11,
+            family: 'Inter, system-ui, sans-serif',
+            weight: 600,
+            style: 'fill',
+            backgroundColor: 'transparent',
+            paddingLeft: 0,
+            paddingRight: 0,
+            paddingTop: 0,
+            paddingBottom: 0,
+          },
+          ignoreEvent: true,
+        }))
+
+        return [
+          ...bands,
+          ...lines,
+          {
+            type: 'line',
+            attrs: { coordinates: [c1, c2] },
+            styles: { color: '#787b86', size: 1, style: 'dashed', dashedValue: [3, 3] },
+          },
+          ...labels,
         ]
       },
     })

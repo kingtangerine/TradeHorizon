@@ -7,6 +7,67 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [0.4.0] - 2026-10-07
+
+### Added
+- **Drag to draw**: every two-point tool (trend line, ray, rectangle, price range, Fib) can be drawn by press-drag-release as well as click-click. Hold Shift to keep a trend line or ray level or vertical. Esc or right-click cancels.
+- **New tools**: Ray, Vertical line, Fibonacci retracement (levels 0 to 1.618 with prices), and Short position. Long and Short positions now place a default 2:1 box on a single click, or follow a drag from entry.
+- **Magnet toggle** in the tool rail (off by default) that snaps points to a candle's open, high, low or close. Remembered per workspace.
+- **Clone** a drawing from its toolbar or with Ctrl+D; **Hide/Show all** drawings from the Object tree; Alt+letter shortcuts for every tool.
+- **Bar replay**: the Replay button rewinds the chart to a candle you click, then plays it forward with play/pause, forward one bar, four speeds (1x to 10x), "Jump to…" a different start, and Exit back to live. Shift+→ steps and Shift+↓ plays or pauses. Drawing tools and indicators keep working; live updates and price alerts are paused while replaying.
+- **Candles / Line switch** in the toolbar, remembered per workspace.
+- **Dominance as chart symbols**: BTC.D, USDT.D and ALT.D appear in symbol search under a new Indices category and open as candlestick charts at every timeframe, with history paging and 20-second updates.
+
+### Changed
+- **Dominance engine rewritten.** Today's market caps come from CoinGecko (two cached requests) and history is rebuilt from Binance prices, so dominance is available instantly at any timeframe instead of depending on CoinGecko's rate-limited history endpoints. The indicator panes use the same engine and now match the chart's candles one for one.
+- Zoom-out range widened from 2px to 0.4px per candle (about 540 to about 2,600 candles on a typical screen); older candles load automatically as you zoom out.
+- Switching timeframe while looking at history now loads enough older candles (up to 10,000) to keep that moment on screen, and falls back to the live edge only if it is out of reach. Drawings are hidden while the new timeframe loads instead of collapsing into one spot.
+- Drawing tools are described once in a tool table that drives the rail, hints, toolbar, object tree and chart adapter.
+
+### Fixed
+- **Moving a drawing on a different timeframe no longer distorts it.** Every anchor used to be re-snapped to the current timeframe's bars, so a box drawn on 15m and nudged on 4h changed width, and shapes narrower than one bar collapsed to a line for good. Moves are now a pure time/price offset.
+- Right-clicking a drawing deleted it without warning; it now selects it.
+- A plain click on a drawing recorded an undo step and bumped its revision.
+- A fast second click when placing a shape was swallowed by the chart's double-click window.
+- The always-on weak magnet forced any point placed inside a candle's range onto its open, high, low or close.
+- Rectangle handles could drift out of order after flipping a corner; the eight handles are now always rebuilt from the box.
+- Line width, line style and fill opacity changes had no effect on Price range drawings.
+
+### Tested
+- 97 unit tests, plus scripted Chrome sessions against live Binance and CoinGecko data covering drawing, editing, timeframe switching, zoom, the new tools, and the dominance charts.
+
+## [0.3.1] - 2026-10-07
+
+### Added
+- **Symbol search dialog** opened from the toolbar symbol button: search by ticker or name, category pills, keyboard navigation (Up/Down/Enter/Esc), TradingView-style rows. Exchange names intentionally omitted for now.
+
+- **Supercharts "New tab" page** replacing the launcher modal and "My layouts" dialog: card grid of saved layouts with Create new layout, star/favorite, inline rename, make a copy, delete (with confirm), search, and sort (recently modified / created / name). A "New chart" button still adds a chart tab to the current layout. Favorites persist on saved layouts.
+
+- **Full Binance market list**: symbol search now covers every trading USDT spot pair (about 500) loaded from Binance `exchangeInfo`, with price/volume precision derived from the exchange filters, cached for 12 hours. Results rank exact ticker, then prefix, then substring matches.
+
+- **Moving average indicators** on the price chart: Simple Moving Average and Exponential Moving Average, each with up to 5 user-chosen lengths (1-500), colored per length, with show/hide in the Indicators menu and chart legend. Settings persist per workspace and per saved layout.
+- **Market dominance indicators** (BTC.D, USDT.D, ALT.D) imported from CoinGecko into their own panes aligned to the chart. History is estimated from the largest coins' market caps scaled to today's exact global total (CoinGecko's global history is paid), ALT.D is 100 minus BTC.D and USDT.D, and results are cached (30 min hourly, 6 h daily). Requests are paced and retried because CoinGecko's rate limiter returns CORS-less 429s.
+
+### Changed
+- Opening a saved layout from the Superchart page now adds it as new chart tab(s) instead of replacing the current workspace. Each chart tab remembers its layout, and the layout control, Save, and Save as follow the active tab.
+- Collapsed the three stacked header rows into TradingView's two: a slim chart-tab strip and a single top toolbar (symbol button, timeframes, Indicators, Alert, Go live, connection status, layout control).
+- Removed the duplicate quote/OHLC header; the in-chart legend now shows a TradingView-style title line (`Bitcoin · 15 · Binance`) above the OHLC row.
+- Re-skinned chrome and chart with TradingView's dark palette (`#131722` surfaces, `#2962ff` active accents, `#089981` / `#f23645` candles).
+
+## [0.3.0] - 2026-10-04
+
+### Added
+- **TradingView-inspired workspace chrome** with a top chart-tab strip, compact market controls, upper-right user profile panel, and responsive desktop/tablet behavior.
+- **Native Volume indicator pane** powered by Binance base-asset volume from both REST history and live WebSocket candles, with show/hide controls in the Indicators menu and chart legend.
+- **Expanded timeframe picker** covering every Binance-supported interval plus persistent user-selected custom shortcuts.
+- **Saved layouts** with editable names, Save, Save As, restore, list, and delete workflows stored per user on the device.
+- Workspace persistence tests covering legacy migration, chart preferences, custom intervals, and saved-layout validation.
+
+### Changed
+- Reordered the main workspace shell so active chart tabs sit above market, timeframe, indicator, and live-feed controls.
+- Moved the user profile entry from the bottom status bar to the upper-right application chrome.
+- Extended workspace persistence with backward-compatible defaults for layout name, Volume visibility, and custom timeframe shortcuts.
+
 ## [0.2.0] - 2026-10-04
 
 ### Added
