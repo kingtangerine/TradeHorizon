@@ -7,7 +7,7 @@ import {
   type DrawingType,
 } from '../drawings'
 import type { Candle } from '../market'
-import type { MarketId } from '../market'
+import { DRAWING_TOOLS, anchorCountFor } from './tools'
 
 export const DRAWING_GROUP_ID = 'trade-horizon:drawings'
 
@@ -23,7 +23,7 @@ export function candleToKLineData(candle: Candle): KLineData {
   }
 }
 
-function decimalString(value: number): string {
+export function decimalString(value: number): string {
   if (!Number.isFinite(value)) return '0'
   const direct = String(value)
   if (!/[eE]/.test(direct)) return direct
@@ -36,7 +36,7 @@ function decimalString(value: number): string {
     .replace(/\.0+$/, '')
 }
 
-export function overlayAnchors(overlay: Overlay, count = 2): readonly Anchor[] | null {
+export function overlayAnchors(overlay: Pick<Overlay, 'points'>, count = 2): readonly Anchor[] | null {
   if (overlay.points.length < count) return null
 
   const anchors: Anchor[] = []
@@ -62,27 +62,18 @@ export function overlayAnchors(overlay: Overlay, count = 2): readonly Anchor[] |
 
 export function drawingFromOverlay(
   overlay: Overlay,
-  marketId: MarketId,
+  marketId: string,
   existing?: Drawing,
   type: DrawingType = existing?.type ?? 'trendLine',
 ): Drawing | null {
   let anchors: readonly Anchor[] | null = null
 
   if (type === 'rectangle') {
-    if (overlay.points.length >= 8) {
-      anchors = overlayAnchors(overlay, 8)
-    } else if (overlay.points.length >= 2) {
-      const parsed = overlayAnchors(overlay, overlay.points.length >= 6 ? 6 : 2)
-      if (parsed) {
-        anchors = expandRectangleAnchors(parsed)
-      }
-    }
-  } else if (type === 'longPosition' || type === 'shortPosition') {
-    anchors = overlayAnchors(overlay, 3)
-  } else if (type === 'horizontalLine') {
-    anchors = overlayAnchors(overlay, 1)
+    // Any two or more corners define the box; the eight handles are always rebuilt from it.
+    const parsed = overlay.points.length >= 2 ? overlayAnchors(overlay, Math.min(overlay.points.length, 8)) : null
+    anchors = parsed ? expandRectangleAnchors(parsed) : null
   } else {
-    anchors = overlayAnchors(overlay, 2)
+    anchors = overlayAnchors(overlay, anchorCountFor(type))
   }
 
   if (!anchors) return null
@@ -93,26 +84,7 @@ export function drawingFromOverlay(
     marketId,
     type,
     anchors,
-    style: existing?.style ?? (
-      type === 'rectangle'
-        ? { color: '#3aa9ff', fillColor: '#3aa9ff', fillOpacity: 14, lineWidth: 2, lineStyle: 'solid' }
-        : type === 'priceRange'
-          ? { color: '#3aa9ff', upColor: '#10b981', downColor: '#ef4444', fillOpacity: 18, lineWidth: 1.5, lineStyle: 'solid' }
-          : type === 'horizontalLine'
-            ? { color: '#f4b860', lineWidth: 2, lineStyle: 'solid' }
-            : type === 'longPosition'
-              ? {
-                  targetColor: '#16a085',
-                  stopColor: '#f0445e',
-                  textColor: '#ffffff',
-                  lineColor: '#c7d0db',
-                  lineWidth: 1,
-                  fillOpacity: 22,
-                  accountSize: 10000,
-                  riskPercent: 1,
-                }
-              : { color: '#f4b860', lineWidth: 2, lineStyle: 'solid' }
-    ),
+    style: existing?.style ?? DRAWING_TOOLS[type].defaultStyle,
     revision: existing?.revision ?? 0,
   }
 }

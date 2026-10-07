@@ -18,12 +18,30 @@ export interface ChartQuote {
   updatedAtMs: number
 }
 
+export type DominanceStatus = 'idle' | 'loading' | 'ready' | 'error'
+
+export type ChartType = 'candles' | 'line'
+
+export interface ReplayState {
+  /** "picking" while the user chooses the bar to start from. */
+  status: 'picking' | 'active'
+  playing: boolean
+  /** Milliseconds between bars while playing. */
+  speedMs: number
+  /** Open time of the newest bar currently revealed. */
+  timeMs: number | null
+  atEnd: boolean
+}
+
 export interface ChartRuntimeState {
   interval: MarketInterval
   connection: ChartConnectionState
   quote: ChartQuote | null
   error: string | null
   followingLive: boolean
+  dominance?: DominanceStatus
+  dominanceError?: string | null
+  replay?: ReplayState | null
 }
 
 export function candleToQuote(candle: Candle): ChartQuote {

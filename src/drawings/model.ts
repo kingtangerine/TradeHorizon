@@ -8,8 +8,11 @@ export const DRAWING_SCHEMA_VERSION = 1 as const;
 
 export const DRAWING_TYPES = [
   "trendLine",
+  "ray",
   "horizontalLine",
+  "verticalLine",
   "rectangle",
+  "fibRetracement",
   "longPosition",
   "shortPosition",
   "priceRange",
@@ -179,7 +182,6 @@ function decimalString(value: number): string {
 }
 
 export function expandRectangleAnchors(anchors: readonly AnchorV1[]): AnchorV1[] {
-  if (anchors.length === 8) return [...anchors];
   if (anchors.length >= 2) {
     const times = anchors.map((a) => a.timeMs);
     const prices = anchors.map((a) => Number(a.price)).filter((p) => Number.isFinite(p));
@@ -211,7 +213,7 @@ export function expandRectangleAnchors(anchors: readonly AnchorV1[]): AnchorV1[]
 }
 
 function isValidAnchorCount(type: DrawingType, count: number): boolean {
-  if (type === "horizontalLine") return count === 1;
+  if (type === "horizontalLine" || type === "verticalLine") return count === 1;
   if (type === "priceRange") return count === 2;
   if (type === "longPosition" || type === "shortPosition") return count === 3;
   if (type === "rectangle") return count === 8 || count === 6 || count === 2;

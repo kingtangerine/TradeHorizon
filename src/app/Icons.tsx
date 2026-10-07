@@ -130,6 +130,102 @@ export function LongPositionIcon(props: IconProps) {
   )
 }
 
+export function ShortPositionIcon(props: IconProps) {
+  return (
+    <IconBase {...props}>
+      <path d="M5 12h14M8 5h8M8 19h8" />
+      <path d="M8 5v14M16 5v14" opacity=".55" />
+      <path d="m12 15 3 3M15 18v-3M12 9 9 6M9 6v3" />
+    </IconBase>
+  )
+}
+
+export function RayIcon(props: IconProps) {
+  return (
+    <IconBase {...props}>
+      <path d="M5 18 21 5" />
+      <circle cx="5" cy="18" r="1.7" />
+      <circle cx="12.4" cy="12" r="1.7" />
+    </IconBase>
+  )
+}
+
+export function VerticalLineIcon(props: IconProps) {
+  return (
+    <IconBase {...props}>
+      <path d="M12 3v18" />
+      <circle cx="12" cy="12" r="1.7" />
+    </IconBase>
+  )
+}
+
+export function FibIcon(props: IconProps) {
+  return (
+    <IconBase {...props}>
+      <path d="M4 5h16M4 10h16M4 14h16M4 19h16" />
+      <path d="m6 19 12-14" opacity=".55" />
+    </IconBase>
+  )
+}
+
+export function MagnetIcon(props: IconProps) {
+  return (
+    <IconBase {...props}>
+      <path d="M6 4v8a6 6 0 0 0 12 0V4h-4v8a2 2 0 0 1-4 0V4H6Z" />
+      <path d="M6 8h4M14 8h4" />
+    </IconBase>
+  )
+}
+
+export function CopyIcon(props: IconProps) {
+  return (
+    <IconBase {...props}>
+      <rect x="9" y="9" width="11" height="11" rx="2" />
+      <path d="M5 15V6a2 2 0 0 1 2-2h9" />
+    </IconBase>
+  )
+}
+
+export function CandlesIcon(props: IconProps) {
+  return (
+    <IconBase {...props}>
+      <path d="M8 3v3M8 15v4M16 5v4M16 17v4" />
+      <rect x="6" y="6" width="4" height="9" rx="1" />
+      <rect x="14" y="9" width="4" height="8" rx="1" />
+    </IconBase>
+  )
+}
+
+export function LineChartIcon(props: IconProps) {
+  return <IconBase {...props}><path d="m3 17 5-6 4 3 4-7 5 4" /></IconBase>
+}
+
+export function ReplayIcon(props: IconProps) {
+  return (
+    <IconBase {...props}>
+      <path d="m11 7-6 5 6 5V7Z" />
+      <path d="m19 7-6 5 6 5V7Z" />
+    </IconBase>
+  )
+}
+
+export function PlayIcon(props: IconProps) {
+  return <IconBase {...props}><path d="M8 5v14l11-7L8 5Z" /></IconBase>
+}
+
+export function PauseIcon(props: IconProps) {
+  return <IconBase {...props}><path d="M8 5v14M16 5v14" /></IconBase>
+}
+
+export function StepForwardIcon(props: IconProps) {
+  return (
+    <IconBase {...props}>
+      <path d="M6 5v14l9-7-9-7Z" />
+      <path d="M18 5v14" />
+    </IconBase>
+  )
+}
+
 export function SettingsIcon(props: IconProps) {
   return (
     <IconBase {...props}>
@@ -137,6 +233,30 @@ export function SettingsIcon(props: IconProps) {
       <path d="M19.4 15a1.7 1.7 0 0 0 .3 1.9l.1.1-2.8 2.8-.1-.1a1.7 1.7 0 0 0-1.9-.3 1.7 1.7 0 0 0-1 1.6v.2h-4V21a1.7 1.7 0 0 0-1-1.6 1.7 1.7 0 0 0-1.9.3l-.1.1L4.2 17l.1-.1a1.7 1.7 0 0 0 .3-1.9A1.7 1.7 0 0 0 3 14H2.8v-4H3a1.7 1.7 0 0 0 1.6-1 1.7 1.7 0 0 0-.3-1.9L4.2 7 7 4.2l.1.1a1.7 1.7 0 0 0 1.9.3A1.7 1.7 0 0 0 10 3V2.8h4V3a1.7 1.7 0 0 0 1 1.6 1.7 1.7 0 0 0 1.9-.3l.1-.1L19.8 7l-.1.1a1.7 1.7 0 0 0-.3 1.9 1.7 1.7 0 0 0 1.6 1h.2v4H21a1.7 1.7 0 0 0-1.6 1Z" />
     </IconBase>
   )
+}
+
+export function StarIcon({ filled, ...props }: IconProps & { filled?: boolean }) {
+  return (
+    <IconBase {...props} fill={filled ? 'currentColor' : 'none'}>
+      <path d="m12 3.5 2.6 5.3 5.9.9-4.3 4.1 1 5.8-5.2-2.7-5.2 2.7 1-5.8-4.3-4.1 5.9-.9L12 3.5Z" />
+    </IconBase>
+  )
+}
+
+export function MoreVerticalIcon(props: IconProps) {
+  return (
+    <IconBase {...props} fill="currentColor" stroke="none">
+      <circle cx="12" cy="5" r="1.7" /><circle cx="12" cy="12" r="1.7" /><circle cx="12" cy="19" r="1.7" />
+    </IconBase>
+  )
+}
+
+export function SortIcon(props: IconProps) {
+  return <IconBase {...props}><path d="M7 20V5m0 0L3.5 8.5M7 5l3.5 3.5M13 7h8M13 12h6M13 17h4" /></IconBase>
+}
+
+export function SearchIcon(props: IconProps) {
+  return <IconBase {...props}><circle cx="11" cy="11" r="7" /><path d="m20 20-4-4" /></IconBase>
 }
 
 export function PlusIcon(props: IconProps) {
