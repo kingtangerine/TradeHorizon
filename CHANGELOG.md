@@ -10,7 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [0.5.0] - 2026-10-08
 
 ### Added
-- **Accounts on a server.** Sign up and log in now go through a small auth server (`server/index.mjs`, no extra dependencies), so an account created on one computer works on any other. Passwords are salted scrypt hashes and sessions are random tokens; accounts live in `server/data/users.json` (git-ignored). Run it with `npm run dev:all` (server + Vite) or `npm run build && npm start` (serves the app and API on one port).
+- **Accounts on a server.** Sign up and log in now go through a small auth server (`server/index.mjs`, no extra dependencies), so an account created on one computer works on any other. Passwords are salted scrypt hashes and sessions are random tokens; accounts live in `server/data/users.json` (git-ignored). Run it with `npm run dev` (server + Vite) or `npm run build && npm start` (serves the app and API on one port).
 - Accounts that only existed in a browser's old local storage are moved to the server automatically the first time their owner logs in on that browser, keeping their charts and drawings.
 - **Alert "+" button.** Hovering the chart shows a + beside the price axis at the crosshair level; clicking it creates a price alert at that price (above or below depending on the last price) and opens the alerts panel.
 - **Color palette.** Every drawing color control now opens a TradingView-style palette of preset greys and hues, with a Custom option for any other color.

@@ -4,10 +4,10 @@
   "version": "0.5.0",
   "type": "module",
   "scripts": {
-    "dev": "vite",
+    "dev": "node scripts/dev-all.mjs",
+    "dev:client": "vite",
     "server": "node server/index.mjs",
     "start": "node server/index.mjs",
-    "dev:all": "node scripts/dev-all.mjs",
     "build": "tsc -b && vite build",
     "test": "vitest run",
     "test:watch": "vitest",

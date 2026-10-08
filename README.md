@@ -32,10 +32,10 @@
 # Install dependencies
 npm install
 
-# Start the auth server + dev server together (accounts need the server)
-npm run dev:all
+# Start the auth server + Vite dev server together (accounts need the server)
+npm run dev
 
-# Or separately: `npm run server` (port 8787) and `npm run dev`
+# Or separately: `npm run server` (port 8787) and `npm run dev:client`
 
 # Production: build, then serve app + API from one port (PORT, HOST, TH_DATA_DIR are configurable)
 npm run build && npm start

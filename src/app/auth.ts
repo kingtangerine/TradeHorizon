@@ -54,8 +54,12 @@ async function request<T>(path: string, init: { method?: string, body?: unknown,
   } catch {
     throw new AuthRequestError('Cannot reach the TradeHorizon server. Check your connection and that the server is running.', 0)
   }
-  const data = await response.json().catch(() => ({})) as { error?: string }
-  if (!response.ok) throw new AuthRequestError(data.error ?? 'Authentication failed.', response.status)
+  const data = await response.json().catch(() => null) as { error?: string } | null
+  if (!response.ok) {
+    // No JSON error body means the request never reached the auth server (e.g. the dev proxy got ECONNREFUSED).
+    if (!data?.error) throw new AuthRequestError('The TradeHorizon auth server is not running. Start the app with `npm run dev`.', response.status)
+    throw new AuthRequestError(data.error, response.status)
+  }
   return data as T
 }
 
