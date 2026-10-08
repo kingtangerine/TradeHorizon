@@ -4,13 +4,15 @@ import type { MarketDataFetch } from "./rest";
 export const BINANCE_EXCHANGE_INFO_ENDPOINT = "https://data-api.binance.vision/api/v3/exchangeInfo";
 
 export interface BinanceSpotListing {
+  /** Where the pair trades; missing means Binance (older cached catalogs). */
+  exchange?: "binance" | "bybit";
   symbol: string;
   baseAsset: string;
   pricePrecision: number;
   volumePrecision: number;
 }
 
-function precisionFromStep(step: unknown, fallback: number): number {
+export function precisionFromStep(step: unknown, fallback: number): number {
   if (typeof step !== "string") return fallback;
   const value = Number(step);
   if (!Number.isFinite(value) || value <= 0) return fallback;

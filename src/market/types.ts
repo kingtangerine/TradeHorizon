@@ -3,7 +3,8 @@ import type { MarketInterval } from "./intervals";
 export const DEFAULT_BINANCE_SPOT_SYMBOL = "BTCUSDT" as const;
 
 /** A stable identifier used by drawings and caches. */
-export type MarketId = `binance:spot:${string}`;
+export type MarketExchange = "binance" | "bybit";
+export type MarketId = `${MarketExchange}:spot:${string}`;
 
 /**
  * Prices and quantities stay as strings at the market-data boundary so that
@@ -39,8 +40,8 @@ export function normalizeBinanceSpotSymbol(symbol: string): string {
   return normalized;
 }
 
-export function marketIdFor(symbol: string): MarketId {
-  return `binance:spot:${normalizeBinanceSpotSymbol(symbol)}`;
+export function marketIdFor(symbol: string, exchange: MarketExchange = "binance"): MarketId {
+  return `${exchange}:spot:${normalizeBinanceSpotSymbol(symbol)}`;
 }
 
 export function candleKey(candle: Pick<Candle, "marketId" | "interval" | "openTimeMs">): string {

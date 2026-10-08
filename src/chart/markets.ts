@@ -1,5 +1,6 @@
 import {
   fetchBinanceSpotListings,
+  fetchBybitSpotListings,
   marketIdFor,
   type BinanceSpotListing,
   type MarketDataFetch,
@@ -16,7 +17,9 @@ export interface CryptoMarket {
   readonly volumePrecision: number
   /** Stable key for drawings and alerts. */
   readonly marketId: string
-  /** Binance spot pair, or a market-wide dominance index built from CoinGecko data. */
+  /** Exchange that serves candles for a spot pair. */
+  readonly exchange: 'binance' | 'bybit'
+  /** Spot pair, or a market-wide dominance index built from CoinGecko data. */
   readonly kind: 'spot' | 'dominance'
   readonly dominanceKey?: DominanceKey
   /** Data source shown in the UI. */
@@ -42,6 +45,7 @@ function market(
     pricePrecision,
     volumePrecision,
     marketId: marketIdFor(symbol),
+    exchange: 'binance',
     kind: 'spot',
     venue: 'Binance',
     pair: `${baseAsset} / USDT`,
@@ -74,6 +78,7 @@ function dominanceMarket(key: DominanceKey, baseAsset: string, mark: string): Cr
     pricePrecision: 2,
     volumePrecision: 0,
     marketId: `index:dominance:${key}`,
+    exchange: 'binance',
     kind: 'dominance',
     dominanceKey: key,
     venue: 'Market cap',
@@ -107,11 +112,12 @@ const COIN_NAMES: Readonly<Record<string, string>> = {
 const registry = new Map<string, CryptoMarket>(
   [...CRYPTO_MARKETS, ...DOMINANCE_MARKETS].map((item) => [item.symbol, item]),
 )
-const CATALOG_CACHE_KEY = 'trade-horizon:markets:v1'
+const CATALOG_CACHE_KEY = 'trade-horizon:markets:v2'
 const CATALOG_TTL_MS = 12 * 60 * 60 * 1000
 let cacheRestored = false
 
 function marketFromListing(listing: BinanceSpotListing): CryptoMarket {
+  const exchange = listing.exchange ?? 'binance'
   return {
     symbol: listing.symbol,
     baseAsset: listing.baseAsset,
@@ -120,9 +126,10 @@ function marketFromListing(listing: BinanceSpotListing): CryptoMarket {
     mark: listing.baseAsset.charAt(0),
     pricePrecision: listing.pricePrecision,
     volumePrecision: listing.volumePrecision,
-    marketId: marketIdFor(listing.symbol),
+    marketId: marketIdFor(listing.symbol, exchange),
+    exchange,
     kind: 'spot',
-    venue: 'Binance',
+    venue: exchange === 'bybit' ? 'Bybit' : 'Binance',
     pair: `${listing.baseAsset} / USDT`,
   }
 }
@@ -179,7 +186,14 @@ export async function refreshMarketCatalog(
   const cached = readCatalogCache()
   if (cached && nowMs - cached.fetchedAtMs < CATALOG_TTL_MS) return false
 
-  const listings = await fetchBinanceSpotListings(fetcher, signal)
+  // Binance is the primary source. Bybit adds the USDT pairs Binance does not list; if it is
+  // unreachable the catalog still works with Binance alone.
+  const [binance, bybit] = await Promise.all([
+    fetchBinanceSpotListings(fetcher, signal),
+    fetchBybitSpotListings(fetcher, signal).catch(() => [] as BinanceSpotListing[]),
+  ])
+  const binanceSymbols = new Set(binance.map((item) => item.symbol))
+  const listings = [...binance, ...bybit.filter((item) => !binanceSymbols.has(item.symbol))]
   registerListings(listings)
   try {
     localStorage.setItem(CATALOG_CACHE_KEY, JSON.stringify({ fetchedAtMs: nowMs, listings }))
