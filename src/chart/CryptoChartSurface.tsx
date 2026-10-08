@@ -19,6 +19,7 @@ interface CryptoChartSurfaceProps {
   onToolSettled(): void
   onSelectionChange(selectedId?: string): void
   onAddAlert?(price: number): void
+  theme?: 'dark' | 'light'
 }
 
 export function CryptoChartSurface({
@@ -34,7 +35,10 @@ export function CryptoChartSurface({
   onToolSettled,
   onSelectionChange,
   onAddAlert,
+  theme = 'dark',
 }: CryptoChartSurfaceProps) {
+  const themeRef = useRef(theme)
+  themeRef.current = theme
   const [alertHover, setAlertHover] = useState<{ top: number, left: number, price: number } | null>(null)
   const hostRef = useRef<HTMLDivElement>(null)
   const controllerRef = useRef<KLineChartController | null>(null)
@@ -61,6 +65,7 @@ export function CryptoChartSurface({
       controller.setIndicators(indicatorsRef.current)
       controller.setMagnet(magnetRef.current)
       controller.setChartType(chartTypeRef.current)
+      controller.setTheme(themeRef.current)
       onControllerChange(controller)
 
       return () => {
@@ -98,6 +103,10 @@ export function CryptoChartSurface({
   useEffect(() => {
     controllerRef.current?.setChartType(chartType)
   }, [chartType])
+
+  useEffect(() => {
+    controllerRef.current?.setTheme(theme)
+  }, [theme])
 
   // TradingView-style "+" next to the price axis at the crosshair level: click to alert at that price.
   useEffect(() => {

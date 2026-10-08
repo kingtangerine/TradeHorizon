@@ -6,6 +6,7 @@ import {
   PRICE_RANGE_OVERLAY_NAME,
   RECTANGLE_OVERLAY_NAME,
   SHORT_POSITION_OVERLAY_NAME,
+  TEXT_OVERLAY_NAME,
   VERTICAL_LINE_OVERLAY_NAME,
 } from './overlayNames'
 
@@ -107,6 +108,14 @@ export const DRAWING_TOOLS: Readonly<Record<DrawingType, DrawingToolSpec>> = {
     shortcut: 'S',
     defaultStyle: POSITION_STYLE,
   },
+  text: {
+    label: 'Text',
+    overlayName: TEXT_OVERLAY_NAME,
+    placement: 'onePoint',
+    hint: 'Click anywhere on the chart to place text, then type it in the toolbar.',
+    shortcut: 'X',
+    defaultStyle: { text: 'Text', color: '#2962ff', fontSize: 14, bold: false },
+  },
 }
 
 /** Tools in the order they appear in the left rail. */
@@ -120,6 +129,7 @@ export const TOOL_ORDER: readonly DrawingType[] = [
   'priceRange',
   'longPosition',
   'shortPosition',
+  'text',
 ]
 
 export function anchorCountFor(type: DrawingType): number {

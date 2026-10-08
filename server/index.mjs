@@ -152,6 +152,23 @@ async function handleApi(req, res, path) {
     }
     return send(res, 200, { ok: true })
   }
+  if (path === '/api/auth/password' && req.method === 'POST') {
+    const user = sessionUser(req)
+    if (!user) return send(res, 401, { error: 'Session expired.' })
+    if (throttled(req)) return send(res, 429, { error: 'Too many attempts. Wait a minute and try again.' })
+    const body = await readBody(req)
+    const next = String(body.newPassword ?? '')
+    if (next.length < 8) return send(res, 400, { error: 'Password must contain at least 8 characters.' })
+    if (!(await verifyHash(String(body.currentPassword ?? ''), user.passwordHash))) {
+      return send(res, 403, { error: 'Current password is incorrect.' })
+    }
+    user.passwordHash = await makeHash(next)
+    // Sign the account out everywhere else; this device stays signed in.
+    const keep = tokenHash((req.headers.authorization ?? '').slice(7))
+    db.sessions = db.sessions.filter((session) => session.userId !== user.id || session.tokenHash === keep)
+    save()
+    return send(res, 200, { ok: true })
+  }
   if (req.method !== 'POST' || (path !== '/api/auth/signup' && path !== '/api/auth/login')) {
     return send(res, 404, { error: 'Not found.' })
   }

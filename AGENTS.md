@@ -14,7 +14,7 @@ This document provides context, architectural principles, code conventions, and 
 - **Styling**: Modern Vanilla CSS with dark theme variables (`src/styles.css`)
 - **State Management**: React 19 `useSyncExternalStore` + Command Pattern `DrawingStore`
 - **Testing**: Vitest (`npm test`)
-- **Data Source**: Binance Spot REST API + WebSockets
+- **Data Source**: Binance Spot REST API + WebSockets; Bybit spot for USDT pairs Binance lacks (`src/market/bybit/`, picked by `CryptoMarket.exchange`)
 
 ---
 
@@ -37,6 +37,10 @@ TradeHorizon/
     │   ├── alerts.ts            # Price alert models and evaluation
     │   ├── auth.ts              # Auth client (talks to server/index.mjs)
     │   ├── ColorPicker.tsx      # Preset-palette color popover
+    │   ├── ProfileDialog.tsx    # Account window: info, password, theme, export/import
+    │   ├── ObjectList.tsx       # Object tree body with user folders (groups.ts holds the data)
+    │   ├── userSync.ts          # Mirrors per-user localStorage to the server
+    │   ├── theme.ts             # Dark/light theme; colors are CSS variables in styles.css
     │   └── workspace.ts         # Multi-tab workspace persistence
     ├── chart/                   # Charting engine & controller
     │   ├── CryptoChartSurface.tsx # React wrapper for klinecharts

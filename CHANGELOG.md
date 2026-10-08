@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [0.6.0] - 2026-10-08
+
+### Added
+- **More coins.** Symbol search was missing coins Binance does not list (ZETA, KAS, MNT, POPCAT and about 150 others). Those USDT pairs now come from Bybit spot, with history, live updates, and 8h/3d candles built from Bybit's 4h/1d. The catalog still uses Binance first; if Bybit is unreachable, search keeps working with Binance alone.
+- **Account window.** The profile button opens a window with account details, change password (other devices are signed out), a Dark/Light theme switch, and Export/Import of your data.
+- **Light theme.** The whole interface and the chart follow the choice, and it is saved with your account.
+- **Export / import data.** One JSON file holds tabs, saved layouts, drawings, groups, alerts and theme. Importing asks for confirmation first and restores into the signed-in account.
+- **Text tool** (Alt+X): click to place text, type it in the toolbar, with color, size and bold.
+- **Rectangle middle line:** a toolbar toggle draws a horizontal line through the middle of a rectangle.
+- **Object tree folders:** select objects, then create a named group or move them into an existing one. Groups can be renamed, collapsed, hidden or shown together, and deleted without deleting the objects. Saved and synced with your account.
+
+### Changed
+- The object tree and alerts panels are closed by default.
+- All interface colors are theme variables in `styles.css` (dark and light values side by side).
+
 ## [0.5.1] - 2026-10-08
 
 ### Fixed
