@@ -118,6 +118,13 @@ export async function logIn(email: string, password: string): Promise<AppUser> {
   }
 }
 
+export async function changePassword(currentPassword: string, newPassword: string): Promise<void> {
+  const session = readSession()
+  if (!session) throw new Error('Your session has expired. Log in again.')
+  if (newPassword.length < 8) throw new Error('Password must contain at least 8 characters.')
+  await request('/api/auth/password', { method: 'POST', token: session.token, body: { currentPassword, newPassword } })
+}
+
 export async function logOut(): Promise<void> {
   const session = readSession()
   localStorage.removeItem(SESSION_KEY)

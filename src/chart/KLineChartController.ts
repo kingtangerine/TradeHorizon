@@ -1076,6 +1076,27 @@ export class KLineChartController {
     this.#withIgnoredNavigation(() => this.#chart.scrollToTimestamp(centerTimeMs, 180))
   }
 
+  /** Re-colors the chart canvas (grid, axes, crosshair, legends) for the app theme. */
+  public setTheme(theme: 'dark' | 'light'): void {
+    const light = theme === 'light'
+    const grid = light ? '#e6e9ef' : '#1f2330'
+    const axis = light ? '#d3d8e0' : '#2a2e39'
+    const crosshair = light ? '#6b7280' : '#9598a1'
+    this.#chart.setStyles({
+      grid: {
+        horizontal: { color: grid },
+        vertical: { color: grid },
+      },
+      xAxis: { axisLine: { color: axis }, tickLine: { color: axis }, tickText: { color: light ? '#4b5563' : '#787b86' } },
+      yAxis: { axisLine: { color: axis }, tickLine: { color: axis }, tickText: { color: light ? '#374151' : '#b2b5be' } },
+      indicator: { tooltip: { title: { color: light ? '#374151' : '#b2b5be' } } },
+      crosshair: {
+        horizontal: { line: { color: crosshair } },
+        vertical: { line: { color: crosshair } },
+      },
+    } as never)
+  }
+
   public clearDrawingSelection(): void {
     this.#selectOverlay(undefined)
     // klinecharts has no public API to deselect, so it keeps drawing handles on the last
@@ -1324,11 +1345,15 @@ export class KLineChartController {
         lineWidth,
         lineStyle,
         fillOpacity,
+        showMidline: style.midline === true ? 1 : 0,
+        textValue: text('text', 'Text'),
+        fontSize: number('fontSize', 14),
+        bold: style.bold === true ? 1 : 0,
         targetColor: text('targetColor', '#16a085'),
         stopColor: text('stopColor', '#f0445e'),
         upColor: text('upColor', '#10b981'),
         downColor: text('downColor', '#ef4444'),
-        textColor: text('textColor', '#ffffff'),
+        textColor: type === 'text' ? color : text('textColor', '#ffffff'),
         positionLineColor: text('lineColor', '#c7d0db'),
         positionLineWidth: number('lineWidth', 1),
         positionFillOpacity: number('fillOpacity', 22),

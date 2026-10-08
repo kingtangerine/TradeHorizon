@@ -337,3 +337,38 @@ export function HorizonLogo() {
     </span>
   )
 }
+
+export function TextIcon(props: IconProps) {
+  return (
+    <IconBase {...props}>
+      <path d="M5 6V4h14v2" />
+      <path d="M12 4v16" />
+      <path d="M9 20h6" />
+    </IconBase>
+  )
+}
+
+export function MidlineIcon(props: IconProps) {
+  return (
+    <IconBase {...props}>
+      <rect x="4" y="5" width="16" height="14" rx="1" />
+      <line x1="4" y1="12" x2="20" y2="12" strokeDasharray="3 2" />
+    </IconBase>
+  )
+}
+
+export function FolderIcon(props: IconProps) {
+  return (
+    <IconBase {...props}>
+      <path d="M3 7a2 2 0 0 1 2-2h4l2 2.5h8a2 2 0 0 1 2 2V17a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7Z" />
+    </IconBase>
+  )
+}
+
+export function ChevronIcon(props: IconProps) {
+  return (
+    <IconBase {...props}>
+      <path d="m6 9 6 6 6-6" />
+    </IconBase>
+  )
+}

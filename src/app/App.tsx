@@ -22,6 +22,10 @@ import {
 import { MARKET_INTERVALS, MARKET_INTERVAL_SPECS, type MarketInterval } from '../market'
 import { alertReached, loadAlerts, saveAlerts, type AlertDirection, type PriceAlert } from './alerts'
 import { ColorPicker } from './ColorPicker'
+import { ObjectList } from './ObjectList'
+import { ProfileDialog } from './ProfileDialog'
+import { applyTheme, loadUserTheme, saveUserTheme, type Theme } from './theme'
+import { loadGroups, saveGroups } from './groups'
 import { startUserSync, stopUserSync } from './userSync'
 import { logIn, logOut, restoreSession, signUp, verifySession, type AppUser } from './auth'
 import { Superchart } from './Superchart'
@@ -90,6 +94,9 @@ import {
   UndoIcon,
   UnlockIcon,
   UserIcon,
+  TextIcon,
+  FolderIcon,
+  MidlineIcon,
 } from './Icons'
 
 const INITIAL_INTERVAL: MarketInterval = '15m'
@@ -104,6 +111,7 @@ const TOOL_ICONS: Readonly<Record<DrawingType, typeof CursorIcon>> = {
   fibRetracement: FibIcon,
   longPosition: LongPositionIcon,
   shortPosition: ShortPositionIcon,
+  text: TextIcon,
 }
 
 function isPositionTool(type: DrawingType): boolean {
@@ -164,6 +172,31 @@ function colorInputValue(value: unknown, fallback: string): string {
   return `#${rgba.slice(1, 4).map((part) => Math.max(0, Math.min(255, Number(part))).toString(16).padStart(2, '0')).join('')}`
 }
 
+/** Text field that commits on Enter or blur, so typing does not create one undo step per key. */
+function CommittedTextInput({ value, onCommit, label }: { value: string, onCommit(value: string): void, label: string }) {
+  const [draft, setDraft] = useState(value)
+  useEffect(() => setDraft(value), [value])
+  const commit = () => { if (draft !== value) onCommit(draft) }
+  return (
+    <input
+      className="toolbar-text-input"
+      aria-label={label}
+      placeholder={label}
+      value={draft}
+      maxLength={200}
+      autoFocus={value === 'Text'}
+      onFocus={(event) => { if (value === 'Text') event.currentTarget.select() }}
+      onChange={(event) => setDraft(event.target.value)}
+      onBlur={commit}
+      onKeyDown={(event) => {
+        event.stopPropagation()
+        if (event.key === 'Enter') { commit(); event.currentTarget.blur() }
+        if (event.key === 'Escape') { setDraft(value); event.currentTarget.blur() }
+      }}
+    />
+  )
+}
+
 interface WorkspaceAppProps {
   user: AppUser
   onLogout(): void
@@ -192,7 +225,10 @@ function WorkspaceApp({ user, onLogout }: WorkspaceAppProps) {
   const [controller, setController] = useState<KLineChartController | null>(null)
   const [activeTool, setActiveTool] = useState<'cursor' | DrawingType>('cursor')
   const [selectedDrawingId, setSelectedDrawingId] = useState<string>()
-  const [objectTreeOpen, setObjectTreeOpen] = useState(true)
+  const [objectTreeOpen, setObjectTreeOpen] = useState(false)
+  const [groupState, setGroupState] = useState(() => loadGroups(user.id))
+  const [theme, setTheme] = useState<Theme>(() => loadUserTheme(user.id))
+  const [groupSelectMode, setGroupSelectMode] = useState(false)
   const [positionSettingsOpen, setPositionSettingsOpen] = useState(false)
   const [superchartOpen, setSuperchartOpen] = useState(false)
   const [symbolSearch, setSymbolSearch] = useState<'change' | 'new' | null>(null)
@@ -532,6 +568,11 @@ function WorkspaceApp({ user, onLogout }: WorkspaceAppProps) {
   useEffect(() => saveWorkspace(user.id, workspace), [user.id, workspace])
   useEffect(() => saveSavedLayouts(user.id, savedLayouts), [savedLayouts, user.id])
   useEffect(() => saveAlerts(user.id, alerts), [alerts, user.id])
+  useEffect(() => saveGroups(user.id, groupState), [groupState, user.id])
+  useEffect(() => {
+    applyTheme(theme)
+    saveUserTheme(user.id, theme)
+  }, [theme, user.id])
 
   useEffect(() => {
     const closeDetachedMenus = (event: MouseEvent) => {
@@ -604,7 +645,7 @@ function WorkspaceApp({ user, onLogout }: WorkspaceAppProps) {
   const selectedDrawing = drawingSnapshot.drawings.find((drawing) => drawing.id === selectedDrawingId)
   const allDrawingsHidden = marketDrawings.length > 0 && marketDrawings.every((drawing) => drawing.hidden)
 
-  const updateSelectedStyle = (changes: Record<string, string | number>) => {
+  const updateSelectedStyle = (changes: Record<string, string | number | boolean>) => {
     if (!selectedDrawing) return
     drawingStore.execute(updateDrawing(selectedDrawing.id, {
       style: { ...selectedDrawing.style, ...changes },
@@ -680,18 +721,15 @@ function WorkspaceApp({ user, onLogout }: WorkspaceAppProps) {
             <UserIcon />
           </button>
           {profileOpen && (
-            <div className="top-menu profile-menu" role="dialog" aria-label="User profile">
-              <div className="profile-summary">
-                <span className="profile-large-avatar"><UserIcon /></span>
-                <div><strong>{user.displayName}</strong><span>{user.email}</span></div>
-              </div>
-              <dl>
-                <div><dt>Member since</dt><dd>{formatMemberSince(user.createdAtMs)}</dd></div>
-                <div><dt>Workspace</dt><dd>{workspace.tabs.length} open tab{workspace.tabs.length === 1 ? '' : 's'}</dd></div>
-                <div><dt>Storage</dt><dd>Saved on this device</dd></div>
-              </dl>
-              <button type="button" className="profile-logout" onClick={onLogout}>Log out</button>
-            </div>
+            <ProfileDialog
+              user={user}
+              theme={theme}
+              tabCount={workspace.tabs.length}
+              layoutCount={savedLayouts.length}
+              onTheme={setTheme}
+              onLogout={onLogout}
+              onClose={() => setProfileOpen(false)}
+            />
           )}
         </div>
       </nav>
@@ -1121,6 +1159,7 @@ function WorkspaceApp({ user, onLogout }: WorkspaceAppProps) {
             onToolSettled={handleToolSettled}
             onSelectionChange={handleSelectionChange}
             onAddAlert={addAlertAtPrice}
+            theme={theme}
           />
 
           {replay?.status === 'picking' && (
@@ -1239,6 +1278,34 @@ function WorkspaceApp({ user, onLogout }: WorkspaceAppProps) {
                     <SettingsIcon />
                   </button>
                 </>
+              ) : selectedDrawing.type === 'text' ? (
+                <>
+                  <CommittedTextInput
+                    label="Text"
+                    value={typeof selectedDrawing.style.text === 'string' ? selectedDrawing.style.text : 'Text'}
+                    onCommit={(text) => updateSelectedStyle({ text })}
+                  />
+                  <ColorPicker label="Text color" value={colorInputValue(selectedDrawing.style.color, '#2962ff')} onChange={(color) => updateSelectedStyle({ color })} />
+                  <select
+                    className="toolbar-select thickness-select"
+                    aria-label="Font size"
+                    title="Font size"
+                    value={styleNumber(selectedDrawing.style.fontSize, 14)}
+                    onChange={(event) => updateSelectedStyle({ fontSize: Number(event.target.value) })}
+                  >
+                    {[10, 12, 14, 16, 20, 24, 32, 48].map((size) => <option value={size} key={size}>{size}px</option>)}
+                  </select>
+                  <button
+                    type="button"
+                    className={selectedDrawing.style.bold === true ? 'toolbar-action active' : 'toolbar-action'}
+                    aria-label="Bold"
+                    title="Bold"
+                    aria-pressed={selectedDrawing.style.bold === true}
+                    onClick={() => updateSelectedStyle({ bold: selectedDrawing.style.bold !== true })}
+                  >
+                    <b>B</b>
+                  </button>
+                </>
               ) : (
                 <>
                   {selectedDrawing.type !== 'fibRetracement' && selectedDrawing.type !== 'priceRange' && (
@@ -1268,6 +1335,16 @@ function WorkspaceApp({ user, onLogout }: WorkspaceAppProps) {
                   {selectedDrawing.type === 'rectangle' && (
                     <>
                       <span className="toolbar-separator" />
+                      <button
+                        type="button"
+                        className={selectedDrawing.style.midline === true ? 'toolbar-action active' : 'toolbar-action'}
+                        aria-label="Middle line"
+                        title="Draw a horizontal line through the middle"
+                        aria-pressed={selectedDrawing.style.midline === true}
+                        onClick={() => updateSelectedStyle({ midline: selectedDrawing.style.midline !== true })}
+                      >
+                        <MidlineIcon />
+                      </button>
                       <label className="toolbar-color-control fill-control" title="Fill color">
                         <ColorPicker label="Rectangle fill color" value={colorInputValue(selectedDrawing.style.fillColor, '#3aa9ff')} onChange={(color) => updateSelectedStyle({ fillColor: color })} />
                       </label>
@@ -1451,6 +1528,18 @@ function WorkspaceApp({ user, onLogout }: WorkspaceAppProps) {
               {marketDrawings.length > 0 && (
                 <button
                   type="button"
+                  className={groupSelectMode ? 'object-icon-button active' : 'object-icon-button'}
+                  aria-label="Group objects"
+                  aria-pressed={groupSelectMode}
+                  title="Group objects into folders"
+                  onClick={() => setGroupSelectMode((on) => !on)}
+                >
+                  <FolderIcon />
+                </button>
+              )}
+              {marketDrawings.length > 0 && (
+                <button
+                  type="button"
                   className="object-icon-button"
                   aria-label={allDrawingsHidden ? 'Show all drawings' : 'Hide all drawings'}
                   title={allDrawingsHidden ? 'Show all drawings' : 'Hide all drawings'}
@@ -1484,66 +1573,23 @@ function WorkspaceApp({ user, onLogout }: WorkspaceAppProps) {
               </div>
             </div>
 
-            <div className="object-list">
-              {[...marketDrawings].reverse().map((drawing, reverseIndex) => {
-                const originalIndex = marketDrawings.length - reverseIndex
-                const label = DRAWING_TOOLS[drawing.type].label
-                const Icon = TOOL_ICONS[drawing.type]
-                const selected = drawing.id === selectedDrawingId
-
-                return (
-                  <div
-                    className={selected ? 'object-row selected' : 'object-row'}
-                    key={drawing.id}
-                    onClick={() => controller?.focusDrawing(drawing.id)}
-                  >
-                    <Icon />
-                    <button
-                      type="button"
-                      className="object-name"
-                      title={`Focus ${label.toLowerCase()}`}
-                      onClick={() => controller?.focusDrawing(drawing.id)}
-                    >
-                      <span>{label}</span>
-                      <small>#{originalIndex}</small>
-                    </button>
-                    <button
-                      type="button"
-                      className="object-icon-button"
-                      aria-label={`${drawing.hidden ? 'Show' : 'Hide'} ${label.toLowerCase()}`}
-                      title={drawing.hidden ? 'Show object' : 'Hide object'}
-                      onClick={(event) => {
-                        event.stopPropagation()
-                        drawingStore.execute(updateDrawing(drawing.id, { hidden: !drawing.hidden }))
-                      }}
-                    >
-                      {drawing.hidden ? <EyeOffIcon /> : <EyeIcon />}
-                    </button>
-                    <button
-                      type="button"
-                      className="object-icon-button delete"
-                      aria-label={`Delete ${label.toLowerCase()}`}
-                      title="Delete object"
-                      onClick={(event) => {
-                        event.stopPropagation()
-                        drawingStore.execute(deleteDrawing(drawing.id))
-                      }}
-                    >
-                      <TrashIcon />
-                    </button>
-                  </div>
-                )
-              })}
-
-              {marketDrawings.length === 0 && (
-                <div className="object-tree-empty">
-                  <LayersIcon />
-                  <strong>No drawing objects</strong>
-                  <span>Pick a tool on the left, then click or drag on the chart.</span>
-                </div>
-              )}
-            </div>
-
+            <ObjectList
+              drawings={marketDrawings}
+              selectedId={selectedDrawingId}
+              groupState={groupState}
+              icons={TOOL_ICONS}
+              selectMode={groupSelectMode}
+              onSelectModeChange={setGroupSelectMode}
+              onGroupState={setGroupState}
+              onFocus={(id) => controller?.focusDrawing(id)}
+              onSetHidden={(ids, hidden) => {
+                for (const id of ids) {
+                  const drawing = marketDrawings.find((item) => item.id === id)
+                  if (drawing && !!drawing.hidden !== hidden) drawingStore.execute(updateDrawing(id, { hidden }))
+                }
+              }}
+              onDelete={(id) => drawingStore.execute(deleteDrawing(id))}
+            />
           </aside>
         )}
 

@@ -7,6 +7,7 @@ import {
   PRICE_RANGE_OVERLAY_NAME,
   RECTANGLE_OVERLAY_NAME,
   SHORT_POSITION_OVERLAY_NAME,
+  TEXT_OVERLAY_NAME,
   VERTICAL_LINE_OVERLAY_NAME,
 } from './overlayNames'
 import { calculateLongPositionMetrics } from './position'
@@ -51,7 +52,7 @@ export function registerTradeHorizonOverlays(): void {
       needDefaultPointFigure: true,
       needDefaultXAxisFigure: true,
       needDefaultYAxisFigure: true,
-      createPointFigures: ({ coordinates }) => {
+      createPointFigures: ({ coordinates, overlay }) => {
         if (coordinates.length < 2) return []
 
         let minX = coordinates[0].x
@@ -67,7 +68,7 @@ export function registerTradeHorizonOverlays(): void {
           if (y > maxY) maxY = y
         }
 
-        return {
+        const figures: Array<Record<string, unknown>> = [{
           type: 'rect',
           attrs: {
             x: minX,
@@ -75,7 +76,13 @@ export function registerTradeHorizonOverlays(): void {
             width: Math.max(1, maxX - minX),
             height: Math.max(1, maxY - minY),
           },
+        }]
+        // Optional horizontal line through the middle of the box.
+        if (numericStyle(overlay.styles, 'showMidline', 0) === 1) {
+          const middle = (minY + maxY) / 2
+          figures.push({ type: 'line', attrs: { coordinates: [{ x: minX, y: middle }, { x: maxX, y: middle }] }, ignoreEvent: true })
         }
+        return figures as never
       },
       performEventPressedMove: ({ points, performPointIndex, performPoint }) => {
         if (points.length < 8) return
@@ -261,6 +268,44 @@ export function registerTradeHorizonOverlays(): void {
       points[2].value = clamped.stop
     },
   })
+
+  if (!supported.has(TEXT_OVERLAY_NAME)) {
+    registerOverlay({
+      name: TEXT_OVERLAY_NAME,
+      totalStep: 2,
+      needDefaultPointFigure: true,
+      needDefaultXAxisFigure: false,
+      needDefaultYAxisFigure: false,
+      createPointFigures: ({ coordinates, overlay }) => {
+        if (coordinates.length < 1) return []
+        const fontSize = numericStyle(overlay.styles, 'fontSize', 14)
+        const lines = (stringStyle(overlay.styles, 'textValue', 'Text') || ' ').split(String.fromCharCode(10))
+        return lines.map((line, index) => ({
+          type: 'text',
+          attrs: { x: coordinates[0].x, y: coordinates[0].y + index * fontSize * 1.35, text: line || ' ', align: 'left', baseline: 'middle' },
+          styles: {
+            style: 'fill',
+            color: stringStyle(overlay.styles, 'textColor', '#2962ff'),
+            size: fontSize,
+            family: 'Inter, system-ui, sans-serif',
+            weight: numericStyle(overlay.styles, 'bold', 0) === 1 ? 700 : 400,
+            backgroundColor: 'transparent',
+            borderSize: 0,
+            paddingLeft: 2,
+            paddingRight: 2,
+            paddingTop: 2,
+            paddingBottom: 2,
+          },
+        }))
+      },
+      performEventPressedMove: ({ points, performPoint }) => {
+        if (points.length < 1) return
+        points[0].timestamp = performPoint.timestamp
+        points[0].dataIndex = performPoint.dataIndex
+        points[0].value = performPoint.value
+      },
+    })
+  }
 
   if (!supported.has(HORIZONTAL_LINE_OVERLAY_NAME)) {
     registerOverlay({
