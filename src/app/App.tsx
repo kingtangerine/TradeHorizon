@@ -22,6 +22,7 @@ import {
 import { MARKET_INTERVALS, MARKET_INTERVAL_SPECS, type MarketInterval } from '../market'
 import { alertReached, loadAlerts, saveAlerts, type AlertDirection, type PriceAlert } from './alerts'
 import { ColorPicker } from './ColorPicker'
+import { startUserSync, stopUserSync } from './userSync'
 import { logIn, logOut, restoreSession, signUp, verifySession, type AppUser } from './auth'
 import { Superchart } from './Superchart'
 import {
@@ -1752,7 +1753,7 @@ function AuthScreen({ onAuthenticated }: { onAuthenticated(user: AppUser): void 
         <div className="auth-copy">
           <span className="preview-pill">ALPHA</span>
           <h1>{mode === 'login' ? 'Welcome back' : 'Create your trading workspace'}</h1>
-          <p>Your chart tabs, drawings, Long Positions, and price alerts are saved to your profile on this device.</p>
+          <p>Your chart tabs, drawings, Long Positions, and price alerts are saved to your account and follow you to any device.</p>
         </div>
         <div className="auth-tabs">
           <button type="button" className={mode === 'login' ? 'active' : ''} onClick={() => { setMode('login'); setError(undefined) }}>Log in</button>
@@ -1775,19 +1776,31 @@ function AuthScreen({ onAuthenticated }: { onAuthenticated(user: AppUser): void 
 
 export function App() {
   const [user, setUser] = useState<AppUser | null>(() => restoreSession())
+  const [syncedUserId, setSyncedUserId] = useState<string>()
   useEffect(() => {
     if (!user) return
     let live = true
-    void verifySession().then((valid) => { if (live && !valid) setUser(null) })
+    void (async () => {
+      if (!await verifySession()) {
+        if (live) setUser(null)
+        return
+      }
+      // Pull this user's layouts, drawings, alerts and workspace from the server before the workspace reads them.
+      await startUserSync(user.id)
+      if (live) setSyncedUserId(user.id)
+    })()
     return () => { live = false }
   }, [user?.id])
   if (!user) return <AuthScreen onAuthenticated={setUser} />
+  if (syncedUserId !== user.id) return <main className="auth-shell"><section className="auth-card"><div className="auth-copy"><h1>Loading your workspace…</h1></div></section></main>
   return (
     <WorkspaceApp
       key={user.id}
       user={user}
       onLogout={() => {
+        stopUserSync()
         void logOut()
+        setSyncedUserId(undefined)
         setUser(null)
       }}
     />
