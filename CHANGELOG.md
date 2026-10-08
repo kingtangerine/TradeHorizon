@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [0.5.1] - 2026-10-08
+
+### Fixed
+- **Layouts, drawings, alerts and workspace now sync across computers.** Only the account was on the server, so a second computer showed empty layouts. The app now mirrors each user's saved data to the server (`/api/data`, one file per user in `server/data/userdata/`) and loads it before the workspace opens. Last write wins per item; local changes that never reached the server are kept and uploaded. If the server has a different copy than a browser that never synced, the server copy is used and the browser's old copy is kept under a `trade-horizon:backup:` key. Data saved locally before this update is uploaded the first time that user logs in there.
+
 ## [0.5.0] - 2026-10-08
 
 ### Added

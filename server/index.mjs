@@ -79,13 +79,13 @@ function send(res, status, body) {
   res.end(JSON.stringify(body))
 }
 
-function readBody(req) {
+function readBody(req, limit = 10_000) {
   return new Promise((ok, fail) => {
     let size = 0
     const chunks = []
     req.on('data', (chunk) => {
       size += chunk.length
-      if (size > 10_000) { fail(new Error('Request too large.')); req.destroy(); return }
+      if (size > limit) { fail(new Error('Request too large.')); req.destroy(); return }
       chunks.push(chunk)
     })
     req.on('end', () => {
@@ -95,7 +95,50 @@ function readBody(req) {
   })
 }
 
+// Per-user synced data (layouts, drawings, alerts, workspace): one JSON file per user, last write wins.
+const userDataDir = join(dataDir, 'userdata')
+mkdirSync(userDataDir, { recursive: true })
+const userData = new Map()
+const DATA_KEY = /^[a-z0-9:_-]{1,64}$/i
+const MAX_VALUE_BYTES = 5_000_000
+const MAX_KEYS = 50
+
+function loadUserData(userId) {
+  let data = userData.get(userId)
+  if (!data) {
+    try { data = JSON.parse(readFileSync(join(userDataDir, `${userId}.json`), 'utf8')) } catch { data = {} }
+    userData.set(userId, data)
+  }
+  return data
+}
+
+function saveUserData(userId) {
+  const file = join(userDataDir, `${userId}.json`)
+  writeFileSync(`${file}.tmp`, JSON.stringify(userData.get(userId)))
+  renameSync(`${file}.tmp`, file)
+}
+
+async function handleData(req, res) {
+  const user = sessionUser(req)
+  if (!user) return send(res, 401, { error: 'Session expired.' })
+  const data = loadUserData(user.id)
+  if (req.method === 'GET') return send(res, 200, { items: data })
+  if (req.method === 'PUT') {
+    const body = await readBody(req, MAX_VALUE_BYTES + 1000)
+    const key = String(body.key ?? '')
+    if (!DATA_KEY.test(key) || typeof body.value !== 'string') return send(res, 400, { error: 'Invalid data.' })
+    if (body.value.length > MAX_VALUE_BYTES) return send(res, 413, { error: 'Data too large.' })
+    if (!(key in data) && Object.keys(data).length >= MAX_KEYS) return send(res, 400, { error: 'Too many items.' })
+    const updatedAtMs = Date.now()
+    data[key] = { value: body.value, updatedAtMs }
+    saveUserData(user.id)
+    return send(res, 200, { updatedAtMs })
+  }
+  return send(res, 404, { error: 'Not found.' })
+}
+
 async function handleApi(req, res, path) {
+  if (path === '/api/data') return handleData(req, res)
   if (path === '/api/auth/me' && req.method === 'GET') {
     const user = sessionUser(req)
     return user ? send(res, 200, { user: publicUser(user) }) : send(res, 401, { error: 'Session expired.' })

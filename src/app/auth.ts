@@ -63,6 +63,10 @@ async function request<T>(path: string, init: { method?: string, body?: unknown,
   return data as T
 }
 
+export function getSessionToken(): string | null {
+  return readSession()?.token ?? null
+}
+
 /** Instant, offline-safe restore of the cached session. Call `verifySession` afterwards. */
 export function restoreSession(): AppUser | null {
   return readSession()?.user ?? null
