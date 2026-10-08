@@ -20,11 +20,15 @@ import {
 } from '../drawings'
 import {
   BinanceKlineSubscription,
+  BybitKlineSubscription,
+  fetchBybitKlines,
   LatestBinanceKlinesLoader,
   MARKET_INTERVAL_SPECS,
   StaleMarketDataRequestError,
   fetchBinanceKlines,
+  type Candle,
   type DominanceRow,
+  type FetchBinanceKlinesOptions,
   type KlineStreamStatus,
   type MarketInterval,
 } from '../market'
@@ -177,11 +181,11 @@ export class KLineChartController {
   readonly #drawingStore: DrawingStore
   readonly #callbacks: KLineChartControllerCallbacks
   readonly #market: CryptoMarket
-  readonly #historyLoader = new LatestBinanceKlinesLoader()
+  readonly #historyLoader = new LatestBinanceKlinesLoader((options) => this.#fetchKlines(options))
 
   #interval: MarketInterval
   #runtimeState: ChartRuntimeState
-  #stream?: BinanceKlineSubscription
+  #stream?: { stop(): void }
   #drawingStoreUnsubscribe: () => void
   #dataEpoch = 0
   #disposed = false
@@ -277,7 +281,7 @@ export class KLineChartController {
             hasPage && bars.length > 0 && bars[0].timestamp > neededFrom && page < MAX_VIEWPORT_BACKFILL_PAGES;
             page += 1
           ) {
-            const older = await fetchBinanceKlines({
+            const older = await this.#fetchKlines({
               symbol: this.#market.symbol,
               interval,
               limit: HISTORY_PAGE_SIZE,
@@ -335,7 +339,8 @@ export class KLineChartController {
       const epoch = this.#dataEpoch
       let hasOpened = false
 
-      this.#stream = new BinanceKlineSubscription({
+      const Subscription = this.#market.exchange === 'bybit' ? BybitKlineSubscription : BinanceKlineSubscription
+      this.#stream = new Subscription({
         symbol: this.#market.symbol,
         interval,
         onCandle: (candle) => {
@@ -1122,13 +1127,18 @@ export class KLineChartController {
     }
   }
 
+  /** Candle history from the exchange this market trades on. */
+  #fetchKlines(options: FetchBinanceKlinesOptions): Promise<Candle[]> {
+    return this.#market.exchange === 'bybit' ? fetchBybitKlines(options) : fetchBinanceKlines(options)
+  }
+
   async #backfillAfterReconnect(
     interval: MarketInterval,
     epoch: number,
     callback: (data: KLineData) => void,
   ): Promise<void> {
     try {
-      const candles = await fetchBinanceKlines({
+      const candles = await this.#fetchKlines({
         symbol: this.#market.symbol,
         interval,
         limit: HISTORY_PAGE_SIZE,
