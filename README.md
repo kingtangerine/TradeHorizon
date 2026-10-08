@@ -32,8 +32,13 @@
 # Install dependencies
 npm install
 
-# Start development server
-npm run dev
+# Start the auth server + dev server together (accounts need the server)
+npm run dev:all
+
+# Or separately: `npm run server` (port 8787) and `npm run dev`
+
+# Production: build, then serve app + API from one port (PORT, HOST, TH_DATA_DIR are configurable)
+npm run build && npm start
 
 # Run unit tests
 npm test

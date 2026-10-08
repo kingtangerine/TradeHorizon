@@ -7,6 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [0.5.0] - 2026-10-08
+
+### Added
+- **Accounts on a server.** Sign up and log in now go through a small auth server (`server/index.mjs`, no extra dependencies), so an account created on one computer works on any other. Passwords are salted scrypt hashes and sessions are random tokens; accounts live in `server/data/users.json` (git-ignored). Run it with `npm run dev:all` (server + Vite) or `npm run build && npm start` (serves the app and API on one port).
+- Accounts that only existed in a browser's old local storage are moved to the server automatically the first time their owner logs in on that browser, keeping their charts and drawings.
+- **Alert "+" button.** Hovering the chart shows a + beside the price axis at the crosshair level; clicking it creates a price alert at that price (above or below depending on the last price) and opens the alerts panel.
+- **Color palette.** Every drawing color control now opens a TradingView-style palette of preset greys and hues, with a Custom option for any other color.
+
+### Changed
+- Long/Short position labels (Target, Entry, Stop, P&L, quantity) show only while the position is being placed or is selected. Clicking elsewhere on the chart or pressing Esc leaves just the clean lines.
+
+### Fixed
+- Esc and clicking empty chart space now actually deselect a drawing; klinecharts only deselected when another drawing was clicked.
+
+---
+
 ## [0.4.0] - 2026-10-07
 
 ### Added

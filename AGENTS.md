@@ -29,12 +29,14 @@ TradeHorizon/
 ├── CHANGELOG.md                 # Version history & change logs
 ├── AGENTS.md                    # Instructions for AI assistants
 ├── README.md                    # User-facing overview & quickstart
+├── server/index.mjs             # Auth server (accounts + sessions, JSON file store)
 └── src/
     ├── app/                     # React application UI layer
     │   ├── App.tsx              # Main application root & UI layout
     │   ├── Icons.tsx            # SVG icon components
     │   ├── alerts.ts            # Price alert models and evaluation
-    │   ├── auth.ts              # Local auth & session state
+    │   ├── auth.ts              # Auth client (talks to server/index.mjs)
+    │   ├── ColorPicker.tsx      # Preset-palette color popover
     │   └── workspace.ts         # Multi-tab workspace persistence
     ├── chart/                   # Charting engine & controller
     │   ├── CryptoChartSurface.tsx # React wrapper for klinecharts

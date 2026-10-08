@@ -33,3 +33,6 @@ Thumbs.db
 # Agent/Brain logs
 .system_generated/
 scratch/
+
+# Auth server data (accounts)
+server/data/
