@@ -180,6 +180,7 @@ export function registerTradeHorizonOverlays(): void {
       const lineWidth = numericStyle(overlay.styles, 'positionLineWidth', 1)
       const accountSize = numericStyle(overlay.styles, 'accountSize', 10_000)
       const riskPercent = numericStyle(overlay.styles, 'riskPercent', 1)
+      const showValues = numericStyle(overlay.styles, 'showValues', 1) !== 0
       const metrics = calculateLongPositionMetrics(entry, target, stop, accountSize, riskPercent)
       const lineStyles = { color: lineColor, size: lineWidth, style: 'solid' }
       const textStyles = {
@@ -195,6 +196,27 @@ export function registerTradeHorizonOverlays(): void {
         paddingTop: 3,
         paddingBottom: 3,
       }
+
+      const labels = !showValues ? [] : [
+        {
+          type: 'text',
+          attrs: { x: left + 5, y: targetCoordinate.y, text: `Target: ${formatPositionNumber(target)} (${formatPositionNumber(metrics.targetPercent)}%)  P&L: ${formatPositionNumber(metrics.rewardAmount)}  Qty: ${formatPositionNumber(metrics.quantity, 6)}`, align: 'left', baseline: direction === 'long' ? 'bottom' : 'top' },
+          styles: { ...textStyles, backgroundColor: targetColor },
+          ignoreEvent: true,
+        },
+        {
+          type: 'text',
+          attrs: { x: left + 5, y: entryCoordinate.y, text: `Entry: ${formatPositionNumber(entry)}  Risk/Reward: ${formatPositionNumber(metrics.riskReward)}`, align: 'left', baseline: 'bottom' },
+          styles: { ...textStyles, backgroundColor: '#3a4655' },
+          ignoreEvent: true,
+        },
+        {
+          type: 'text',
+          attrs: { x: left + 5, y: stopCoordinate.y, text: `Stop: ${formatPositionNumber(stop)} (${formatPositionNumber(metrics.stopPercent)}%)  Risk: ${formatPositionNumber(metrics.riskAmount)}`, align: 'left', baseline: direction === 'long' ? 'top' : 'bottom' },
+          styles: { ...textStyles, backgroundColor: stopColor },
+          ignoreEvent: true,
+        },
+      ]
 
       return [
         {
@@ -220,24 +242,7 @@ export function registerTradeHorizonOverlays(): void {
         { type: 'line', attrs: { coordinates: [{ x: left, y: targetCoordinate.y }, { x: right, y: targetCoordinate.y }] }, styles: lineStyles },
         { type: 'line', attrs: { coordinates: [{ x: left, y: entryCoordinate.y }, { x: right, y: entryCoordinate.y }] }, styles: lineStyles },
         { type: 'line', attrs: { coordinates: [{ x: left, y: stopCoordinate.y }, { x: right, y: stopCoordinate.y }] }, styles: lineStyles },
-        {
-          type: 'text',
-          attrs: { x: left + 5, y: targetCoordinate.y, text: `Target: ${formatPositionNumber(target)} (${formatPositionNumber(metrics.targetPercent)}%)  P&L: ${formatPositionNumber(metrics.rewardAmount)}  Qty: ${formatPositionNumber(metrics.quantity, 6)}`, align: 'left', baseline: direction === 'long' ? 'bottom' : 'top' },
-          styles: { ...textStyles, backgroundColor: targetColor },
-          ignoreEvent: true,
-        },
-        {
-          type: 'text',
-          attrs: { x: left + 5, y: entryCoordinate.y, text: `Entry: ${formatPositionNumber(entry)}  Risk/Reward: ${formatPositionNumber(metrics.riskReward)}`, align: 'left', baseline: 'bottom' },
-          styles: { ...textStyles, backgroundColor: '#3a4655' },
-          ignoreEvent: true,
-        },
-        {
-          type: 'text',
-          attrs: { x: left + 5, y: stopCoordinate.y, text: `Stop: ${formatPositionNumber(stop)} (${formatPositionNumber(metrics.stopPercent)}%)  Risk: ${formatPositionNumber(metrics.riskAmount)}`, align: 'left', baseline: direction === 'long' ? 'top' : 'bottom' },
-          styles: { ...textStyles, backgroundColor: stopColor },
-          ignoreEvent: true,
-        },
+        ...labels,
       ]
     },
     performEventPressedMove: ({ points, performPointIndex }) => {

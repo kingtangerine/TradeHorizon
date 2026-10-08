@@ -21,7 +21,8 @@ import {
 } from '../drawings'
 import { MARKET_INTERVALS, MARKET_INTERVAL_SPECS, type MarketInterval } from '../market'
 import { alertReached, loadAlerts, saveAlerts, type AlertDirection, type PriceAlert } from './alerts'
-import { logIn, logOut, restoreSession, signUp, type AppUser } from './auth'
+import { ColorPicker } from './ColorPicker'
+import { logIn, logOut, restoreSession, signUp, verifySession, type AppUser } from './auth'
 import { Superchart } from './Superchart'
 import {
   DEFAULT_INDICATORS,
@@ -237,6 +238,22 @@ function WorkspaceApp({ user, onLogout }: WorkspaceAppProps) {
     [],
   )
   const handleToolSettled = useCallback(() => setActiveTool('cursor'), [])
+  const addAlertAtPrice = useCallback((targetPrice: number) => {
+    const last = runtime.quote?.close
+    setAlerts((current) => [{
+      id: crypto.randomUUID(),
+      symbol: market.symbol,
+      targetPrice,
+      direction: last !== undefined && targetPrice < last ? 'below' : 'above',
+      enabled: true,
+      createdAtMs: Date.now(),
+    }, ...current])
+    setAlertsOpen(true)
+    if ('Notification' in globalThis && Notification.permission === 'default') {
+      void Notification.requestPermission()
+    }
+  }, [market.symbol, runtime.quote?.close])
+
   const handleSelectionChange = useCallback((id?: string) => {
     setSelectedDrawingId(id)
     setPositionSettingsOpen(false)
@@ -1102,6 +1119,7 @@ function WorkspaceApp({ user, onLogout }: WorkspaceAppProps) {
             onControllerChange={handleControllerChange}
             onToolSettled={handleToolSettled}
             onSelectionChange={handleSelectionChange}
+            onAddAlert={addAlertAtPrice}
           />
 
           {replay?.status === 'picking' && (
@@ -1196,20 +1214,10 @@ function WorkspaceApp({ user, onLogout }: WorkspaceAppProps) {
               {isPositionTool(selectedDrawing.type) ? (
                 <>
                   <label className="toolbar-color-control" title="Target color">
-                    <input
-                      type="color"
-                      aria-label="Target color"
-                      value={colorInputValue(selectedDrawing.style.targetColor, '#16a085')}
-                      onChange={(event) => updateSelectedStyle({ targetColor: event.target.value })}
-                    />
+                    <ColorPicker label="Target color" value={colorInputValue(selectedDrawing.style.targetColor, '#16a085')} onChange={(color) => updateSelectedStyle({ targetColor: color })} />
                   </label>
                   <label className="toolbar-color-control" title="Stop color">
-                    <input
-                      type="color"
-                      aria-label="Stop color"
-                      value={colorInputValue(selectedDrawing.style.stopColor, '#f0445e')}
-                      onChange={(event) => updateSelectedStyle({ stopColor: event.target.value })}
-                    />
+                    <ColorPicker label="Stop color" value={colorInputValue(selectedDrawing.style.stopColor, '#f0445e')} onChange={(color) => updateSelectedStyle({ stopColor: color })} />
                   </label>
                   <select
                     className="toolbar-select thickness-select"
@@ -1234,12 +1242,7 @@ function WorkspaceApp({ user, onLogout }: WorkspaceAppProps) {
                 <>
                   {selectedDrawing.type !== 'fibRetracement' && selectedDrawing.type !== 'priceRange' && (
                     <label className="toolbar-color-control" title="Line color">
-                      <input
-                        type="color"
-                        aria-label="Line color"
-                        value={colorInputValue(selectedDrawing.style.color, selectedDrawing.type === 'rectangle' ? '#3aa9ff' : '#f4b860')}
-                        onChange={(event) => updateSelectedStyle({ color: event.target.value })}
-                      />
+                      <ColorPicker label="Line color" value={colorInputValue(selectedDrawing.style.color, selectedDrawing.type === 'rectangle' ? '#3aa9ff' : '#f4b860')} onChange={(color) => updateSelectedStyle({ color: color })} />
                     </label>
                   )}
                   <select
@@ -1265,12 +1268,7 @@ function WorkspaceApp({ user, onLogout }: WorkspaceAppProps) {
                     <>
                       <span className="toolbar-separator" />
                       <label className="toolbar-color-control fill-control" title="Fill color">
-                        <input
-                          type="color"
-                          aria-label="Rectangle fill color"
-                          value={colorInputValue(selectedDrawing.style.fillColor, '#3aa9ff')}
-                          onChange={(event) => updateSelectedStyle({ fillColor: event.target.value })}
-                        />
+                        <ColorPicker label="Rectangle fill color" value={colorInputValue(selectedDrawing.style.fillColor, '#3aa9ff')} onChange={(color) => updateSelectedStyle({ fillColor: color })} />
                       </label>
                       <label className="toolbar-opacity" title="Fill opacity">
                         <span>{styleNumber(selectedDrawing.style.fillOpacity, 14)}%</span>
@@ -1397,35 +1395,19 @@ function WorkspaceApp({ user, onLogout }: WorkspaceAppProps) {
                   <div className="position-settings-grid colors-grid">
                     <label>
                       <span>Target color</span>
-                      <input
-                        type="color"
-                        value={colorInputValue(selectedDrawing.style.targetColor, '#16a085')}
-                        onChange={(event) => updateSelectedStyle({ targetColor: event.target.value })}
-                      />
+                      <ColorPicker label="Target color" value={colorInputValue(selectedDrawing.style.targetColor, '#16a085')} onChange={(color) => updateSelectedStyle({ targetColor: color })} />
                     </label>
                     <label>
                       <span>Stop color</span>
-                      <input
-                        type="color"
-                        value={colorInputValue(selectedDrawing.style.stopColor, '#f0445e')}
-                        onChange={(event) => updateSelectedStyle({ stopColor: event.target.value })}
-                      />
+                      <ColorPicker label="Stop color" value={colorInputValue(selectedDrawing.style.stopColor, '#f0445e')} onChange={(color) => updateSelectedStyle({ stopColor: color })} />
                     </label>
                     <label>
                       <span>Line color</span>
-                      <input
-                        type="color"
-                        value={colorInputValue(selectedDrawing.style.lineColor, '#c7d0db')}
-                        onChange={(event) => updateSelectedStyle({ lineColor: event.target.value })}
-                      />
+                      <ColorPicker label="Line color" value={colorInputValue(selectedDrawing.style.lineColor, '#c7d0db')} onChange={(color) => updateSelectedStyle({ lineColor: color })} />
                     </label>
                     <label>
                       <span>Text color</span>
-                      <input
-                        type="color"
-                        value={colorInputValue(selectedDrawing.style.textColor, '#ffffff')}
-                        onChange={(event) => updateSelectedStyle({ textColor: event.target.value })}
-                      />
+                      <ColorPicker label="Text color" value={colorInputValue(selectedDrawing.style.textColor, '#ffffff')} onChange={(color) => updateSelectedStyle({ textColor: color })} />
                     </label>
                     <label>
                       <span>Line thickness</span>
@@ -1768,7 +1750,7 @@ function AuthScreen({ onAuthenticated }: { onAuthenticated(user: AppUser): void 
       <section className="auth-card">
         <div className="auth-brand"><HorizonLogo /><div><strong>TradeHorizon</strong><span>Crypto Supercharts</span></div></div>
         <div className="auth-copy">
-          <span className="preview-pill">LOCAL ALPHA</span>
+          <span className="preview-pill">ALPHA</span>
           <h1>{mode === 'login' ? 'Welcome back' : 'Create your trading workspace'}</h1>
           <p>Your chart tabs, drawings, Long Positions, and price alerts are saved to your profile on this device.</p>
         </div>
@@ -1785,7 +1767,7 @@ function AuthScreen({ onAuthenticated }: { onAuthenticated(user: AppUser): void 
           {error && <div className="auth-error" role="alert">{error}</div>}
           <button type="submit" className="auth-submit" disabled={busy}>{busy ? 'Please wait…' : mode === 'login' ? 'Log in' : 'Create account'}</button>
         </form>
-        <small className="auth-disclaimer">Local testing mode. Production authentication will require a secure server and database.</small>
+        <small className="auth-disclaimer">Your account is stored on the TradeHorizon server, so you can sign in from any device.</small>
       </section>
     </main>
   )
@@ -1793,13 +1775,19 @@ function AuthScreen({ onAuthenticated }: { onAuthenticated(user: AppUser): void 
 
 export function App() {
   const [user, setUser] = useState<AppUser | null>(() => restoreSession())
+  useEffect(() => {
+    if (!user) return
+    let live = true
+    void verifySession().then((valid) => { if (live && !valid) setUser(null) })
+    return () => { live = false }
+  }, [user?.id])
   if (!user) return <AuthScreen onAuthenticated={setUser} />
   return (
     <WorkspaceApp
       key={user.id}
       user={user}
       onLogout={() => {
-        logOut()
+        void logOut()
         setUser(null)
       }}
     />

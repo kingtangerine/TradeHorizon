@@ -477,6 +477,7 @@ export class KLineChartController {
 
     // Capture-phase listeners let a drawing tool own the pointer before the chart starts panning.
     host.addEventListener('pointerdown', this.#handleToolPointerDown, true)
+    host.addEventListener('pointerdown', this.#handleDeselectPointerDown, true)
     host.addEventListener('mousedown', this.#blockChartWhileDrawing, true)
     host.addEventListener('touchstart', this.#blockChartWhileDrawing, true)
     host.addEventListener('contextmenu', this.#handleToolContextMenu, true)
@@ -538,6 +539,20 @@ export class KLineChartController {
         area: { lineColor: '#2962ff', lineSize: 2, value: 'close', smooth: false, backgroundColor: 'transparent' },
       },
     })
+  }
+
+  /** Price-pane bounds and the price under a viewport Y, for UI layered over the chart (alert "+" button). */
+  public pricePaneBounds(): DOMRect | null {
+    return this.#paneRect()
+  }
+
+  public priceAtClientY(clientY: number): number | null {
+    const rect = this.#paneRect()
+    if (!rect) return null
+    const y = Math.min(rect.height, Math.max(0, clientY - rect.top))
+    const [raw] = this.#chart.convertFromPixel([{ x: 0, y }], { paneId: 'candle_pane' }) as Array<Partial<Point>>
+    if (raw?.value === undefined || !Number.isFinite(raw.value)) return null
+    return Number(raw.value.toFixed(this.#chart.getSymbol()?.pricePrecision ?? 2))
   }
 
   /** Arms bar replay: the next click on the chart chooses the bar to rewind to. */
@@ -959,6 +974,15 @@ export class KLineChartController {
     this.#selectOverlay(drawing.id)
   }
 
+  /** klinecharts never deselects on empty space, so a press that is not on the selected drawing clears the selection. */
+  readonly #handleDeselectPointerDown = (event: PointerEvent): void => {
+    if (event.button !== 0 || this.#tool || this.#replayPicking || !this.#selectedDrawingId) return
+    const store = (this.#chart as unknown as { _chartStore?: { getHoverOverlayInfo?(): { overlay?: { id?: string } | null } } })._chartStore
+    const hovered = store?.getHoverOverlayInfo?.().overlay?.id
+    if (hovered === this.#selectedDrawingId) return
+    this.clearDrawingSelection()
+  }
+
   readonly #handleToolPointerDown = (event: PointerEvent): void => {
     if (this.#replayPicking) {
       if (event.button !== 0 || !this.#insidePane(event.clientX, event.clientY)) return
@@ -1049,6 +1073,14 @@ export class KLineChartController {
 
   public clearDrawingSelection(): void {
     this.#selectOverlay(undefined)
+    // klinecharts has no public API to deselect, so it keeps drawing handles on the last
+    // clicked overlay. Reset its click state (pinned version 10.0.3) so Esc leaves clean shapes.
+    const store = (this.#chart as unknown as { _chartStore?: { setClickOverlayInfo?(info: unknown, onSelected: () => void, onDeselected: () => void): void } })._chartStore
+    store?.setClickOverlayInfo?.(
+      { paneId: '', overlay: null, figureType: 'none', figureIndex: -1, figure: null },
+      () => undefined,
+      () => undefined,
+    )
   }
 
   public dispose(): void {
@@ -1063,6 +1095,7 @@ export class KLineChartController {
     this.#stopReplayTimer()
     if (this.#dominanceIndicatorPoll !== undefined) globalThis.clearInterval(this.#dominanceIndicatorPoll)
     this.#host.removeEventListener('pointerdown', this.#handleToolPointerDown, true)
+    this.#host.removeEventListener('pointerdown', this.#handleDeselectPointerDown, true)
     this.#host.removeEventListener('mousedown', this.#blockChartWhileDrawing, true)
     this.#host.removeEventListener('touchstart', this.#blockChartWhileDrawing, true)
     this.#host.removeEventListener('contextmenu', this.#handleToolContextMenu, true)
@@ -1291,6 +1324,8 @@ export class KLineChartController {
         positionFillOpacity: number('fillOpacity', 22),
         accountSize: number('accountSize', 10_000),
         riskPercent: number('riskPercent', 1),
+        // Position labels show while placing (no stored drawing yet) or while selected.
+        showValues: !drawing || id === this.#selectedDrawingId ? 1 : 0,
         point: {
           color,
           borderColor: '#131722',
@@ -1386,7 +1421,13 @@ export class KLineChartController {
   }
 
   #selectOverlay(id: string | undefined): void {
+    const previous = this.#selectedDrawingId
     this.#selectedDrawingId = id
+    if (previous !== id) {
+      for (const [overlayId, showValues] of [[previous, 0], [id, 1]] as const) {
+        if (overlayId) this.#chart.overrideOverlay({ id: overlayId, styles: { showValues } })
+      }
+    }
     this.#callbacks.onSelectionChange(id)
   }
 
