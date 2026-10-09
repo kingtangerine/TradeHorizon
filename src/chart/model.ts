@@ -66,7 +66,7 @@ export function drawingFromOverlay(
   existing?: Drawing,
   type: DrawingType = existing?.type ?? 'trendLine',
 ): Drawing | null {
-  let anchors: readonly Anchor[] | null = null
+  let anchors: readonly Anchor[] | null
 
   if (type === 'rectangle') {
     // Any two or more corners define the box; the eight handles are always rebuilt from it.

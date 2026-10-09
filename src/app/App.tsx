@@ -125,10 +125,6 @@ function isPositionTool(type: DrawingType): boolean {
 }
 const DEFAULT_LAYOUT_NAME = 'Main layout'
 
-function formatMemberSince(value: number): string {
-  return new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric', year: 'numeric' }).format(value)
-}
-
 function formatReplayTime(valueMs: number | null): string {
   if (valueMs === null) return '—'
   return `${new Date(valueMs).toISOString().slice(0, 16).replace('T', ' ')} UTC`
@@ -587,7 +583,8 @@ function WorkspaceApp({ user, onLogout }: WorkspaceAppProps) {
       }
       if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'z') {
         event.preventDefault()
-        event.shiftKey ? drawingStore.redo() : drawingStore.undo()
+        if (event.shiftKey) drawingStore.redo()
+        else drawingStore.undo()
       }
       if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'y') {
         event.preventDefault()
