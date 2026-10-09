@@ -24,6 +24,8 @@ interface SuperchartProps {
   layouts: readonly SavedLayout[]
   activeLayoutId?: string
   onOpen(layout: SavedLayout): void
+  /** Middle-click: open in a new tab without switching to it. */
+  onOpenInBackground(layout: SavedLayout): void
   onCreate(): void
   onNewChart(): void
   onToggleFavorite(id: string): void
@@ -36,6 +38,7 @@ export function Superchart({
   layouts,
   activeLayoutId,
   onOpen,
+  onOpenInBackground,
   onCreate,
   onNewChart,
   onToggleFavorite,
@@ -139,6 +142,12 @@ export function Superchart({
                   className="layout-card-open"
                   aria-label={`Open ${layout.name}`}
                   onClick={() => onOpen(layout)}
+                  onMouseDown={(event) => { if (event.button === 1) event.preventDefault() }}
+                  onAuxClick={(event) => {
+                    if (event.button !== 1) return
+                    event.preventDefault()
+                    onOpenInBackground(layout)
+                  }}
                 />
                 <button
                   type="button"
@@ -185,6 +194,7 @@ export function Superchart({
                   {menuId === layout.id && (
                     <div className="superchart-menu" role="menu">
                       <button type="button" role="menuitem" onClick={() => { setMenuId(undefined); onOpen(layout) }}>Open</button>
+                      <button type="button" role="menuitem" onClick={() => { setMenuId(undefined); onOpenInBackground(layout) }}>Open in new tab</button>
                       <button type="button" role="menuitem" onClick={() => startRename(layout)}>Rename</button>
                       <button type="button" role="menuitem" onClick={() => { setMenuId(undefined); onDuplicate(layout.id) }}>Make a copy</button>
                       <button
