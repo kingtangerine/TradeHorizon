@@ -309,6 +309,8 @@ export const DOMINANCE_UNAVAILABLE_MESSAGE =
   "CoinGecko did not answer (rate limit or offline). Dominance needs today's market caps; try again in a minute.";
 
 export interface FetchDominanceWeightsOptions {
+  /** Our own cached copy of the CoinGecko data (e.g. "/api/cg"); tried first, CoinGecko directly is the fallback. */
+  cachedBase?: string;
   fetcher?: (input: string, init?: RequestInit) => Promise<Response>;
   signal?: AbortSignal;
   sleep?: (ms: number) => Promise<void>;
@@ -326,7 +328,15 @@ export async function fetchDominanceWeights(
   const sleep = options.sleep ?? ((ms) => new Promise<void>((resolve) => globalThis.setTimeout(resolve, ms)));
 
   // CoinGecko's 429 responses carry no CORS header, so browsers surface them as network errors.
-  async function getJson(path: string): Promise<unknown> {
+  async function getJson(path: string, cachedName: "global" | "markets"): Promise<unknown> {
+    if (options.cachedBase) {
+      try {
+        const cached = await fetcher(`${options.cachedBase}/${cachedName}`, { headers: { Accept: "application/json" }, signal: options.signal });
+        if (cached.ok) return await cached.json();
+      } catch (error) {
+        if (options.signal?.aborted) throw error;
+      }
+    }
     for (let attempt = 0; ; attempt += 1) {
       options.signal?.throwIfAborted();
       let response: Response | undefined;
@@ -348,7 +358,7 @@ export async function fetchDominanceWeights(
     }
   }
 
-  const globalPayload = await getJson("/global");
-  const marketsPayload = await getJson("/coins/markets?vs_currency=usd&order=market_cap_desc&per_page=100&page=1");
+  const globalPayload = await getJson("/global", "global");
+  const marketsPayload = await getJson("/coins/markets?vs_currency=usd&order=market_cap_desc&per_page=100&page=1", "markets");
   return buildDominanceWeights(globalPayload, marketsPayload, availableSymbols, options.nowMs ?? Date.now());
 }

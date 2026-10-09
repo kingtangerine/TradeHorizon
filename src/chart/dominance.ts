@@ -95,7 +95,7 @@ export function loadDominanceWeights(): Promise<DominanceWeights> {
   if (inflightWeights) return inflightWeights
 
   const symbols = new Set(allMarkets().filter((item) => item.kind === 'spot').map((item) => item.symbol))
-  inflightWeights = fetchDominanceWeights(symbols)
+  inflightWeights = fetchDominanceWeights(symbols, { cachedBase: '/api/cg' })
     .then((weights) => {
       try {
         localStorage.setItem(WEIGHTS_CACHE_KEY, JSON.stringify(weights))

@@ -213,6 +213,25 @@ export function allMarkets(): CryptoMarket[] {
   return [...registry.values()]
 }
 
+async function fetchServerCatalog(fetcher: MarketDataFetch | undefined, signal?: AbortSignal): Promise<BinanceSpotListing[] | null> {
+  try {
+    const response = await (fetcher ?? ((input, init) => globalThis.fetch(input, init)))('/api/markets', { headers: { Accept: 'application/json' }, signal })
+    if (!response.ok) return null
+    const payload = await response.json() as { listings?: unknown }
+    const listings = Array.isArray(payload.listings) ? payload.listings.filter(isListing) : []
+    return listings.length > 100 ? listings : null
+  } catch {
+    return null
+  }
+}
+
+function isListing(item: unknown): item is BinanceSpotListing {
+  const value = item as BinanceSpotListing | null
+  return typeof value === 'object' && value !== null &&
+    /^[A-Z0-9]{2,30}$/.test(value.symbol) && typeof value.baseAsset === 'string' &&
+    Number.isInteger(value.pricePrecision) && Number.isInteger(value.volumePrecision)
+}
+
 export async function refreshMarketCatalog(
   fetcher?: MarketDataFetch,
   signal?: AbortSignal,
@@ -222,14 +241,17 @@ export async function refreshMarketCatalog(
   const cached = readCatalogCache()
   if (cached && nowMs - cached.fetchedAtMs < CATALOG_TTL_MS) return false
 
-  // Binance is the primary source. Bybit adds the USDT pairs Binance does not list; if it is
-  // unreachable the catalog still works with Binance alone.
-  const [binance, bybit] = await Promise.all([
-    fetchBinanceSpotListings(fetcher, signal),
-    fetchBybitSpotListings(fetcher, signal).catch(() => [] as BinanceSpotListing[]),
-  ])
-  const binanceSymbols = new Set(binance.map((item) => item.symbol))
-  const listings = [...binance, ...bybit.filter((item) => !binanceSymbols.has(item.symbol))]
+  // Our server keeps one merged, cached copy (Binance first, Bybit for pairs Binance lacks). If it is not
+  // reachable, fall back to asking the exchanges directly. Bybit is optional: without it the catalog is Binance only.
+  let listings = await fetchServerCatalog(fetcher, signal)
+  if (!listings) {
+    const [binance, bybit] = await Promise.all([
+      fetchBinanceSpotListings(fetcher, signal),
+      fetchBybitSpotListings(fetcher, signal).catch(() => [] as BinanceSpotListing[]),
+    ])
+    const binanceSymbols = new Set(binance.map((item) => item.symbol))
+    listings = [...binance, ...bybit.filter((item) => !binanceSymbols.has(item.symbol))]
+  }
   registerListings(listings)
   try {
     localStorage.setItem(CATALOG_CACHE_KEY, JSON.stringify({ fetchedAtMs: nowMs, listings }))
