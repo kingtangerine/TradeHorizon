@@ -22,6 +22,7 @@ import {
 import { MARKET_INTERVALS, MARKET_INTERVAL_SPECS, type MarketInterval } from '../market'
 import { alertReached, loadAlerts, saveAlerts, type AlertDirection, type PriceAlert } from './alerts'
 import { ColorPicker } from './ColorPicker'
+import { disablePush, enablePush, fetchAlertEvents, getPushStatus, type PushStatus } from './backgroundAlerts'
 import { ObjectList } from './ObjectList'
 import { Watchlist } from './Watchlist'
 import { addSymbol, loadWatchlists, saveWatchlists } from './watchlists'
@@ -168,6 +169,31 @@ function styleNumber(value: unknown, fallback: number): number {
   return typeof value === 'number' && Number.isFinite(value) ? value : fallback
 }
 
+/** Sound plus a system notification for alerts that just fired while the app is open. */
+function announceAlerts(items: ReadonlyArray<{ symbol: string, targetPrice: number, price?: number }>): void {
+  try {
+    const AudioContextClass = globalThis.AudioContext
+    const audio = new AudioContextClass()
+    const oscillator = audio.createOscillator()
+    const gain = audio.createGain()
+    oscillator.frequency.value = 880
+    gain.gain.setValueAtTime(0.18, audio.currentTime)
+    gain.gain.exponentialRampToValueAtTime(0.001, audio.currentTime + 0.6)
+    oscillator.connect(gain).connect(audio.destination)
+    oscillator.start()
+    oscillator.stop(audio.currentTime + 0.6)
+  } catch {
+    // Audio may be blocked until the user interacts with the page.
+  }
+  for (const item of items) {
+    if ('Notification' in globalThis && Notification.permission === 'granted') {
+      new Notification(`${item.symbol} price alert`, {
+        body: `Price reached ${(item.price ?? item.targetPrice).toLocaleString()} (target ${item.targetPrice.toLocaleString()}).`,
+      })
+    }
+  }
+}
+
 function marketKindLabel(market: { kind: 'spot' | 'futures' | 'dominance' }): string {
   return market.kind === 'spot' ? 'Spot' : market.kind === 'futures' ? 'Perpetual' : 'Index'
 }
@@ -264,6 +290,9 @@ function WorkspaceApp({ user, onLogout }: WorkspaceAppProps) {
   const [layoutNotice, setLayoutNotice] = useState('')
   const [alerts, setAlerts] = useState<PriceAlert[]>(() => loadAlerts(user.id))
   const [alertDirection, setAlertDirection] = useState<AlertDirection>('above')
+  const [pushStatus, setPushStatus] = useState<PushStatus>('off')
+  const [pushBusy, setPushBusy] = useState(false)
+  const [pushError, setPushError] = useState('')
   const [alertPrice, setAlertPrice] = useState('')
   const previousPriceRef = useRef<number | undefined>(undefined)
   const profileMenuRef = useRef<HTMLDivElement>(null)
@@ -639,29 +668,58 @@ function WorkspaceApp({ user, onLogout }: WorkspaceAppProps) {
       triggered.some((item) => item.id === alert.id) ? { ...alert, triggeredAtMs: now, enabled: false } : alert
     )))
 
-    try {
-      const AudioContextClass = globalThis.AudioContext
-      const audio = new AudioContextClass()
-      const oscillator = audio.createOscillator()
-      const gain = audio.createGain()
-      oscillator.frequency.value = 880
-      gain.gain.setValueAtTime(0.18, audio.currentTime)
-      gain.gain.exponentialRampToValueAtTime(0.001, audio.currentTime + 0.6)
-      oscillator.connect(gain).connect(audio.destination)
-      oscillator.start()
-      oscillator.stop(audio.currentTime + 0.6)
-    } catch {
-      // Audio may be blocked until the user interacts with the page.
-    }
-
-    for (const alert of triggered) {
-      if ('Notification' in globalThis && Notification.permission === 'granted') {
-        new Notification(`${alert.symbol} price alert`, {
-          body: `Price reached ${price.toLocaleString()} (target ${alert.targetPrice.toLocaleString()}).`,
-        })
-      }
-    }
+    announceAlerts(triggered.map((alert) => ({ symbol: alert.symbol, targetPrice: alert.targetPrice, price })))
   }, [alerts, market.symbol, runtime.quote?.close, runtime.replay])
+
+  // The server also watches prices (even with the app closed). While the app is visible, pick up what it triggered.
+  const alertsRef = useRef(alerts)
+  alertsRef.current = alerts
+  useEffect(() => {
+    let live = true
+    let since = 0
+    let hiddenAtMs: number | undefined
+    const poll = async () => {
+      if (document.visibilityState !== 'visible') return
+      const events = await fetchAlertEvents(since)
+      if (!live || events.length === 0) return
+      since = Math.max(since, ...events.map((event) => event.triggeredAtMs))
+      const fresh = events.filter((event) => alertsRef.current.some((alert) => alert.id === event.id && !alert.triggeredAtMs))
+      if (fresh.length === 0) return
+      setAlerts((current) => current.map((alert) => {
+        const event = fresh.find((item) => item.id === alert.id)
+        return event && !alert.triggeredAtMs
+          ? { ...alert, enabled: false, triggeredAtMs: event.triggeredAtMs, triggeredPrice: event.triggeredPrice }
+          : alert
+      }))
+      // Alerts that fired while this tab was hidden were already announced by the push notification.
+      const announce = fresh.filter((event) => hiddenAtMs === undefined || event.triggeredAtMs >= hiddenAtMs)
+      if (announce.length > 0) announceAlerts(announce.map((event) => ({ symbol: event.symbol, targetPrice: event.targetPrice, price: event.triggeredPrice })))
+    }
+    const onVisibility = () => {
+      if (document.visibilityState === 'hidden') hiddenAtMs = Date.now()
+      else { void poll(); hiddenAtMs = undefined }
+    }
+    document.addEventListener('visibilitychange', onVisibility)
+    const timer = globalThis.setInterval(() => void poll(), 15_000)
+    void poll()
+    return () => { live = false; document.removeEventListener('visibilitychange', onVisibility); globalThis.clearInterval(timer) }
+  }, [])
+
+  useEffect(() => {
+    if (alertsOpen) void getPushStatus().then(setPushStatus)
+  }, [alertsOpen])
+
+  const togglePush = async () => {
+    setPushBusy(true)
+    setPushError('')
+    try {
+      setPushStatus(pushStatus === 'on' ? await disablePush() : await enablePush())
+    } catch (error) {
+      setPushError(error instanceof Error ? error.message : 'Could not change notifications.')
+    } finally {
+      setPushBusy(false)
+    }
+  }
 
   const quote = runtime.quote
   const activeIndicatorCount =
@@ -1726,8 +1784,26 @@ function WorkspaceApp({ user, onLogout }: WorkspaceAppProps) {
                 onChange={(event) => setAlertPrice(event.target.value)}
               />
             </label>
+            {market.kind === 'dominance' && <small className="alert-note">Index alerts only fire while TradeHorizon is open in a browser tab.</small>}
             <button type="submit"><BellIcon /> Create alert</button>
           </form>
+          <div className="alert-background">
+            <div>
+              <strong>Alerts when TradeHorizon is closed</strong>
+              <small>
+                {pushStatus === 'on' && 'On for this device. The server watches prices and notifies you even with the browser closed.'}
+                {pushStatus === 'off' && 'Get a notification on this device when a price alert triggers, even with TradeHorizon closed.'}
+                {pushStatus === 'blocked' && 'Notifications are blocked for this site. Allow them in your browser settings, then try again.'}
+                {pushStatus === 'unsupported' && 'This browser does not support background notifications. On iPhone, add TradeHorizon to the Home Screen first.'}
+              </small>
+              {pushError && <small className="alert-error" role="alert">{pushError}</small>}
+            </div>
+            {pushStatus !== 'unsupported' && pushStatus !== 'blocked' && (
+              <button type="button" onClick={() => void togglePush()} disabled={pushBusy}>
+                {pushBusy ? 'Please wait…' : pushStatus === 'on' ? 'Turn off' : 'Turn on'}
+              </button>
+            )}
+          </div>
           <div className="alerts-list">
             {alerts.map((alert) => (
               <div className={alert.triggeredAtMs ? 'alert-row triggered' : 'alert-row'} key={alert.id}>

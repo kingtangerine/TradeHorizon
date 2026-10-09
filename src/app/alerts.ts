@@ -8,6 +8,8 @@ export interface PriceAlert {
   readonly enabled: boolean
   readonly createdAtMs: number
   readonly triggeredAtMs?: number
+  /** Price at the moment the server saw the alert trigger. */
+  readonly triggeredPrice?: number
 }
 
 function key(userId: string): string {

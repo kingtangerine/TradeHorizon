@@ -597,7 +597,7 @@ button:focus-visible {
   right: 46px;
   bottom: 30px;
   display: grid;
-  grid-template-rows: auto auto minmax(0, 1fr);
+  grid-template-rows: auto auto auto minmax(0, 1fr);
   width: min(340px, calc(100% - 60px));
   border: 1px solid var(--k-303c4b);
   background: var(--k-0d131b);
@@ -3058,3 +3058,17 @@ button:disabled {
 .watchlist-flag.flag-purple { background: #9c27b0; border-color: #9c27b0; }
 .watchlist-empty { display: grid; gap: 6px; padding: 36px 20px; text-align: center; color: var(--muted); font-size: .76rem; }
 .watchlist-empty strong { color: var(--text); font-size: .82rem; }
+
+/* Alerts: background notifications */
+.alert-background { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; padding: 12px 14px; border-bottom: 1px solid var(--border); }
+.alert-background > div { display: grid; gap: 4px; min-width: 0; }
+.alert-background strong { font-size: .78rem; }
+.alert-background small { color: var(--muted); font-size: .7rem; line-height: 1.45; }
+.alert-background small.alert-error { color: var(--red); }
+.alert-background button {
+  flex: none; height: 32px; padding: 0 12px; border: 1px solid var(--border-strong); border-radius: 6px;
+  background: transparent; color: var(--text); font: inherit; font-size: .76rem; cursor: pointer;
+}
+.alert-background button:hover:not(:disabled) { border-color: var(--blue); }
+.alert-background button:disabled { opacity: .5; cursor: wait; }
+.alert-note { color: var(--muted); font-size: .68rem; line-height: 1.4; }

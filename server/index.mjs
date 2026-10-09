@@ -1,13 +1,16 @@
-// TradeHorizon auth server: accounts and sessions shared across devices.
-// Dependency-free (node:http + node:crypto). Accounts live in server/data/users.json.
+// TradeHorizon server: accounts, synced user data, cached market data and server-side price alerts.
 // Dev:  `npm run server` (Vite proxies /api to it).  Prod: `npm run build && npm start`
 // serves dist/ and /api from one port.
+//   Environment: PORT, HOST, TH_DATA_DIR, TH_TRUST_PROXY=1 (behind nginx/Cloudflare), TH_VAPID_SUBJECT.
 import { createServer } from 'node:http'
 import { randomBytes, randomUUID, scrypt, timingSafeEqual, createHash } from 'node:crypto'
-import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs'
-import { readFile } from 'node:fs/promises'
-import { dirname, extname, join, normalize, resolve } from 'node:path'
+import { accessSync, constants as fsConstants, existsSync, mkdirSync, readdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs'
+import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { ALERTS_KEY, createAlertService, createPushService } from './alerts.mjs'
+import { applySecurityHeaders, clientIp, createThrottle, readBody, send, sendCompressed } from './http.mjs'
+import { createMarketService } from './markets.mjs'
+import { createStaticHandler } from './static.mjs'
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const dataDir = process.env.TH_DATA_DIR ?? join(root, 'server', 'data')
@@ -16,6 +19,10 @@ const distDir = join(root, 'dist')
 const port = Number(process.env.PORT ?? 8787)
 const host = process.env.HOST ?? '0.0.0.0'
 const SESSION_TTL_MS = 30 * 24 * 60 * 60 * 1000
+const version = (() => {
+  try { return JSON.parse(readFileSync(join(root, 'package.json'), 'utf8')).version } catch { return 'unknown' }
+})()
+const startedAtMs = Date.now()
 
 mkdirSync(dataDir, { recursive: true })
 let db = { users: [], sessions: [] }
@@ -63,37 +70,11 @@ function sessionUser(req) {
   return session ? db.users.find((u) => u.id === session.userId) : undefined
 }
 
-// Simple per-IP throttle for credential endpoints.
-const attempts = new Map()
-function throttled(req) {
-  const ip = req.socket.remoteAddress ?? 'unknown'
-  const now = Date.now()
-  const recent = (attempts.get(ip) ?? []).filter((t) => now - t < 60_000)
-  recent.push(now)
-  attempts.set(ip, recent)
-  return recent.length > 20
-}
-
-function send(res, status, body) {
-  res.writeHead(status, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' })
-  res.end(JSON.stringify(body))
-}
-
-function readBody(req, limit = 10_000) {
-  return new Promise((ok, fail) => {
-    let size = 0
-    const chunks = []
-    req.on('data', (chunk) => {
-      size += chunk.length
-      if (size > limit) { fail(new Error('Request too large.')); req.destroy(); return }
-      chunks.push(chunk)
-    })
-    req.on('end', () => {
-      try { ok(JSON.parse(Buffer.concat(chunks).toString('utf8') || '{}')) } catch { fail(new Error('Invalid request.')) }
-    })
-    req.on('error', fail)
-  })
-}
+// Credential endpoints: 20 attempts per minute per client IP.
+const isThrottled = createThrottle(20, 60_000)
+const throttled = (req) => isThrottled(clientIp(req))
+// Browser error reports: a handful per minute per IP.
+const errorReportThrottled = createThrottle(10, 60_000)
 
 // Per-user synced data (layouts, drawings, alerts, workspace): one JSON file per user, last write wins.
 const userDataDir = join(dataDir, 'userdata')
@@ -103,10 +84,14 @@ const DATA_KEY = /^[a-z0-9:_-]{1,64}$/i
 const MAX_VALUE_BYTES = 5_000_000
 const MAX_KEYS = 50
 
+function readUserFile(userId) {
+  try { return JSON.parse(readFileSync(join(userDataDir, `${userId}.json`), 'utf8')) } catch { return {} }
+}
+
 function loadUserData(userId) {
   let data = userData.get(userId)
   if (!data) {
-    try { data = JSON.parse(readFileSync(join(userDataDir, `${userId}.json`), 'utf8')) } catch { data = {} }
+    data = readUserFile(userId)
     userData.set(userId, data)
   }
   return data
@@ -118,11 +103,31 @@ function saveUserData(userId) {
   renameSync(`${file}.tmp`, file)
 }
 
+// Services
+const markets = createMarketService({ dataDir })
+const push = createPushService({
+  dataDir,
+  subject: process.env.TH_VAPID_SUBJECT ?? 'https://github.com/kingtangerine/TradeHorizon',
+})
+const alerts = createAlertService({
+  store: {
+    listUserIds: () => readdirSync(userDataDir).filter((name) => name.endsWith('.json')).map((name) => name.slice(0, -5)),
+    // Reads without caching, so scanning every user at start-up does not keep every user's data in memory.
+    getAlertsValue: (userId) => (userData.get(userId) ?? readUserFile(userId))[ALERTS_KEY]?.value,
+    setAlertsValue: (userId, value) => {
+      loadUserData(userId)[ALERTS_KEY] = { value, updatedAtMs: Date.now() }
+      saveUserData(userId)
+    },
+  },
+  exchangeOf: (symbol) => markets.exchangeOf(symbol),
+  notify: (userId, payload) => push.send(userId, payload),
+})
+
 async function handleData(req, res) {
   const user = sessionUser(req)
   if (!user) return send(res, 401, { error: 'Session expired.' })
   const data = loadUserData(user.id)
-  if (req.method === 'GET') return send(res, 200, { items: data })
+  if (req.method === 'GET') return sendCompressed(req, res, 200, { items: data })
   if (req.method === 'PUT') {
     const body = await readBody(req, MAX_VALUE_BYTES + 1000)
     const key = String(body.key ?? '')
@@ -132,6 +137,7 @@ async function handleData(req, res) {
     const updatedAtMs = Date.now()
     data[key] = { value: body.value, updatedAtMs }
     saveUserData(user.id)
+    if (key === ALERTS_KEY) alerts.updateUserAlerts(user.id, body.value)
     return send(res, 200, { updatedAtMs })
   }
   return send(res, 404, { error: 'Not found.' })
@@ -139,6 +145,53 @@ async function handleData(req, res) {
 
 async function handleApi(req, res, path) {
   if (path === '/api/data') return handleData(req, res)
+
+  // Public market data, cached here so browsers do not each download it from the exchanges.
+  if (path === '/api/markets' && req.method === 'GET') {
+    const catalog = markets.getCatalog()
+    if (catalog.listings.length === 0) return send(res, 503, { error: 'Market list is still loading.' })
+    return sendCompressed(req, res, 200, catalog, 'public, max-age=300')
+  }
+  if ((path === '/api/cg/global' || path === '/api/cg/markets') && req.method === 'GET') {
+    try {
+      return await sendCompressed(req, res, 200, await markets.coingecko(path.slice('/api/cg/'.length)), 'public, max-age=60')
+    } catch {
+      return send(res, 502, { error: 'Market-cap data is unavailable right now.' })
+    }
+  }
+
+  // Web push for server-side alerts
+  if (path === '/api/push/key' && req.method === 'GET') return send(res, 200, { publicKey: push.publicKey })
+  if (path === '/api/push/subscribe' && req.method === 'POST') {
+    const user = sessionUser(req)
+    if (!user) return send(res, 401, { error: 'Session expired.' })
+    const body = await readBody(req, 5_000)
+    const problem = push.subscribe(user.id, body.subscription)
+    return problem ? send(res, 400, { error: problem }) : send(res, 200, { ok: true })
+  }
+  if (path === '/api/push/unsubscribe' && req.method === 'POST') {
+    const user = sessionUser(req)
+    if (!user) return send(res, 401, { error: 'Session expired.' })
+    const body = await readBody(req, 5_000)
+    if (typeof body.endpoint === 'string') push.unsubscribe(user.id, body.endpoint)
+    return send(res, 200, { ok: true })
+  }
+  if (path === '/api/alerts/events' && req.method === 'GET') {
+    const user = sessionUser(req)
+    if (!user) return send(res, 401, { error: 'Session expired.' })
+    const since = Number(new URL(req.url, 'http://localhost').searchParams.get('since')) || 0
+    return send(res, 200, { events: alerts.eventsSince(user.id, since), pushDevices: push.count(user.id) })
+  }
+
+  // Lightweight browser error reports (written to the server log).
+  if (path === '/api/client-error' && req.method === 'POST') {
+    if (errorReportThrottled(clientIp(req))) return send(res, 429, { error: 'Too many reports.' })
+    const body = await readBody(req, 4_000)
+    const clip = (value, max) => String(value ?? '').replace(/[\r\n]+/g, ' ').slice(0, max)
+    console.error(`[client-error] ${clip(body.message, 300)} | ${clip(body.source, 200)} | v${clip(body.version, 20)} | ${clip(body.stack, 600)}`)
+    return send(res, 204, {})
+  }
+
   if (path === '/api/auth/me' && req.method === 'GET') {
     const user = sessionUser(req)
     return user ? send(res, 200, { user: publicUser(user) }) : send(res, 401, { error: 'Session expired.' })
@@ -201,33 +254,49 @@ async function handleApi(req, res, path) {
   return send(res, 200, { user: publicUser(user), token })
 }
 
-const MIME = {
-  '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8',
-  '.svg': 'image/svg+xml', '.json': 'application/json', '.png': 'image/png', '.ico': 'image/x-icon', '.map': 'application/json',
-}
-
-async function serveStatic(res, path) {
-  let file = normalize(join(distDir, decodeURIComponent(path)))
-  if (!file.startsWith(distDir)) file = join(distDir, 'index.html')
-  let data
-  try { data = await readFile(file) } catch {
-    file = join(distDir, 'index.html')
-    try { data = await readFile(file) } catch {
-      res.writeHead(404); res.end('Run `npm run build` first.'); return
-    }
+function health() {
+  let dataWritable = true
+  try { accessSync(dataDir, fsConstants.W_OK) } catch { dataWritable = false }
+  const catalog = markets.getCatalog()
+  return {
+    ok: dataWritable,
+    version,
+    uptimeSec: Math.round((Date.now() - startedAtMs) / 1000),
+    dataWritable,
+    marketsLoaded: catalog.listings.length > 0,
+    marketsAgeMin: catalog.fetchedAtMs ? Math.round((Date.now() - catalog.fetchedAtMs) / 60_000) : null,
   }
-  res.writeHead(200, { 'Content-Type': MIME[extname(file)] ?? 'application/octet-stream' })
-  res.end(data)
 }
 
-createServer(async (req, res) => {
+const serveStatic = createStaticHandler(distDir)
+
+const server = createServer(async (req, res) => {
+  applySecurityHeaders(req, res)
   const path = new URL(req.url ?? '/', 'http://localhost').pathname
   try {
+    if (path === '/healthz') {
+      const status = health()
+      return send(res, status.ok ? 200 : 503, status)
+    }
     if (path.startsWith('/api/')) await handleApi(req, res, path)
-    else await serveStatic(res, path)
+    else if (req.method === 'GET' || req.method === 'HEAD') await serveStatic(req, res, path)
+    else send(res, 405, { error: 'Method not allowed.' })
   } catch (error) {
     if (!res.headersSent) send(res, 400, { error: error instanceof Error ? error.message : 'Request failed.' })
   }
-}).listen(port, host, () => {
-  console.log(`TradeHorizon server listening on http://${host}:${port}  (accounts: ${dataFile})`)
 })
+
+server.listen(port, host, () => {
+  console.log(`TradeHorizon ${version} listening on http://${host}:${port}  (data: ${dataDir})`)
+  markets.start()
+  alerts.start()
+})
+
+for (const signal of ['SIGINT', 'SIGTERM']) {
+  process.on(signal, () => {
+    markets.stop()
+    alerts.stop()
+    server.close(() => process.exit(0))
+    setTimeout(() => process.exit(0), 2000).unref()
+  })
+}
