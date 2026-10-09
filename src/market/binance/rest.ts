@@ -5,6 +5,8 @@ import { parseBinanceRestKlines } from "./parsers";
 
 export const BINANCE_MARKET_DATA_REST_ENDPOINT = "https://data-api.binance.vision/api/v3/klines";
 
+export const BINANCE_FUTURES_REST_ENDPOINT = "https://fapi.binance.com/fapi/v1/klines";
+
 export interface FetchBinanceKlinesOptions {
   symbol?: string;
   interval: MarketInterval;

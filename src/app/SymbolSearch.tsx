@@ -47,7 +47,7 @@ export function SymbolSearch({ markets, current, onSelect, onClose }: SymbolSear
   const [highlight, setHighlight] = useState(0)
   const inputRef = useRef<HTMLInputElement>(null)
   const results = useMemo(() => matchMarkets(query, markets).filter((item) => (
-    category === 'All' || (category === 'Crypto' ? item.kind === 'spot' : item.kind === 'dominance')
+    category === 'All' || (category === 'Crypto' ? item.kind !== 'dominance' : item.kind === 'dominance')
   )), [query, markets, category])
   const activeIndex = Math.min(highlight, Math.max(0, results.length - 1))
 
@@ -142,8 +142,8 @@ export function SymbolSearch({ markets, current, onSelect, onClose }: SymbolSear
             >
               <span className="symbol-row-badge" style={{ background: badgeColor(item) }}>{item.mark}</span>
               <strong>{item.symbol}</strong>
-              <span className="symbol-row-name">{item.kind === 'spot' ? `${item.name} / TetherUS` : item.name}</span>
-              <small>{item.kind === 'spot' ? 'spot crypto' : 'index · estimated'}</small>
+              <span className="symbol-row-name">{item.kind === 'spot' ? `${item.name} / ${item.quoteAsset === 'BTC' ? 'Bitcoin' : 'TetherUS'}` : item.name}</span>
+              <small>{item.kind === 'spot' ? `${item.venue.toLowerCase()} spot` : item.kind === 'futures' ? 'perpetual · futures' : 'index · estimated'}</small>
             </button>
           ))}
           {results.length === 0 && (

@@ -6,6 +6,8 @@ export const BINANCE_EXCHANGE_INFO_ENDPOINT = "https://data-api.binance.vision/a
 export interface BinanceSpotListing {
   /** Where the pair trades; missing means Binance (older cached catalogs). */
   exchange?: "binance" | "bybit";
+  /** Quote currency; missing means USDT. */
+  quoteAsset?: "USDT" | "BTC";
   symbol: string;
   baseAsset: string;
   pricePrecision: number;
@@ -42,7 +44,7 @@ export function parseBinanceExchangeInfo(payload: unknown): BinanceSpotListing[]
     const entry = item as Record<string, unknown>;
     if (
       entry.status !== "TRADING" ||
-      entry.quoteAsset !== "USDT" ||
+      (entry.quoteAsset !== "USDT" && entry.quoteAsset !== "BTC") ||
       entry.isSpotTradingAllowed === false ||
       typeof entry.symbol !== "string" ||
       typeof entry.baseAsset !== "string" ||
@@ -50,6 +52,7 @@ export function parseBinanceExchangeInfo(payload: unknown): BinanceSpotListing[]
     ) continue;
 
     listings.push({
+      ...(entry.quoteAsset === "BTC" ? { quoteAsset: "BTC" as const } : {}),
       symbol: entry.symbol,
       baseAsset: entry.baseAsset,
       pricePrecision: precisionFromStep(filterValue(entry.filters, "PRICE_FILTER", "tickSize"), 2),

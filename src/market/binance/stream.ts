@@ -5,6 +5,8 @@ import { parseBinanceWebSocketKline } from "./parsers";
 
 export const BINANCE_MARKET_DATA_WS_ENDPOINT = "wss://data-stream.binance.vision/ws";
 
+export const BINANCE_FUTURES_WS_ENDPOINT = "wss://fstream.binance.com/ws";
+
 export type KlineStreamState = "connecting" | "open" | "reconnecting" | "stopped";
 
 export interface KlineStreamStatus {

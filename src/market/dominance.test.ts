@@ -23,7 +23,7 @@ const MARKETS = [
 const AVAILABLE = new Set(["BTCUSDT", "ETHUSDT", "ONEUSDT"]);
 
 function bars(values: Array<[number, number]>, start = 0, step = 60_000): PriceBar[] {
-  return values.map(([open, close], index) => ({ timestamp: start + index * step, open, close }));
+  return values.map(([open, close], index) => ({ timestamp: start + index * step, open, high: Math.max(open, close), low: Math.min(open, close), close }));
 }
 
 describe("buildDominanceWeights", () => {
@@ -62,9 +62,11 @@ describe("computeDominanceRows", () => {
     totalCap: 1000,
     bitcoinCap: 500,
     tetherCap: 100,
+    ethereumCap: 200,
     stableCap: 50,
     trackedCaps: { ETHUSDT: 250 },
     tailCap: 100,
+    topTen: { stableCap: 150, trackedCaps: { ETHUSDT: 250 }, untrackedCap: 0 },
   };
 
   it("reproduces today's exact shares at the reference prices", () => {
@@ -113,6 +115,72 @@ describe("computeDominanceRows", () => {
 
   it("returns nothing without bitcoin bars", () => {
     expect(computeDominanceRows(weights, { ETHUSDT: bars([[1, 1]]) }, { ETHUSDT: 1 })).toEqual([]);
+  });
+});
+
+describe("market-cap indices and wicks", () => {
+  const weights: DominanceWeights = {
+    fetchedAtMs: 60_000,
+    totalCap: 2e12,
+    bitcoinCap: 1e12,
+    ethereumCap: 2e11,
+    tetherCap: 1.5e11,
+    stableCap: 5e10,
+    trackedCaps: { ETHUSDT: 3e11 },
+    tailCap: 5e11,
+    topTen: { stableCap: 2e11, trackedCaps: { ETHUSDT: 3e11 }, untrackedCap: 0 },
+  };
+  const reference = { BTCUSDT: 100, ETHUSDT: 10 };
+
+  it("reports today's totals in billions at the reference prices", () => {
+    const series = { BTCUSDT: bars([[100, 100]]), ETHUSDT: bars([[10, 10]]) };
+    const [row] = computeDominanceRows(weights, series, reference);
+    expect(row.close.total).toBeCloseTo(2000);
+    expect(row.close.total2).toBeCloseTo(1000);
+    expect(row.close.total3).toBeCloseTo(800);
+    // total minus bitcoin (1000) minus top-ten stables (200) minus top-ten ETH (300)
+    expect(row.close.others).toBeCloseTo(500);
+    expect(row.close.eth).toBeCloseTo(10);
+    expect(row.close.stable).toBeCloseTo(10);
+  });
+
+  it("shrinks the stablecoin share when the market rises and grows it when the market falls", () => {
+    const series = { BTCUSDT: bars([[50, 50], [200, 200]]), ETHUSDT: bars([[5, 5], [20, 20]]) };
+    const [down, up] = computeDominanceRows(weights, series, reference);
+    expect(down.close.stable).toBeGreaterThan(10);
+    expect(up.close.stable).toBeLessThan(10);
+  });
+
+  it("draws wicks from each coin's own high and low", () => {
+    const series = {
+      BTCUSDT: [{ timestamp: 0, open: 100, high: 120, low: 90, close: 105 }],
+      ETHUSDT: [{ timestamp: 0, open: 10, high: 12, low: 9, close: 10.5 }],
+    };
+    const [row] = computeDominanceRows(weights, series, reference);
+    for (const key of ["btc", "eth", "usdt", "total", "others"] as const) {
+      expect(row.high[key]).toBeGreaterThanOrEqual(Math.max(row.open[key], row.close[key]));
+      expect(row.low[key]).toBeLessThanOrEqual(Math.min(row.open[key], row.close[key]));
+    }
+    expect(row.high.total).toBeGreaterThan(Math.max(row.open.total, row.close.total));
+    expect(row.low.total).toBeLessThan(Math.min(row.open.total, row.close.total));
+    expect(row.high.btc).toBeGreaterThan(Math.max(row.open.btc, row.close.btc));
+  });
+});
+
+describe("buildDominanceWeights: ethereum and the top ten", () => {
+  const markets = [
+    { id: "bitcoin", symbol: "btc", market_cap: 500, current_price: 80000, market_cap_rank: 1 },
+    { id: "ethereum", symbol: "eth", market_cap: 200, current_price: 2500, market_cap_rank: 2 },
+    { id: "tether", symbol: "usdt", market_cap: 100, current_price: 1, market_cap_rank: 3 },
+    { id: "ripple", symbol: "xrp", market_cap: 60, current_price: 2, market_cap_rank: 4 },
+    { id: "small-coin", symbol: "sml", market_cap: 5, current_price: 2, market_cap_rank: 40 },
+  ];
+  const weights = buildDominanceWeights(GLOBAL, markets, new Set(["BTCUSDT", "ETHUSDT", "XRPUSDT", "SMLUSDT"]), 1);
+
+  it("keeps ethereum on its own and records which tracked coins are in the top ten", () => {
+    expect(weights.ethereumCap).toBe(200);
+    expect(weights.topTen).toEqual({ stableCap: 100, trackedCaps: { ETHUSDT: 200, XRPUSDT: 60 }, untrackedCap: 0 });
+    expect(weights.trackedCaps.SMLUSDT).toBe(5);
   });
 });
 

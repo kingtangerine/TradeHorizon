@@ -34,17 +34,19 @@ describe("parseBinanceExchangeInfo", () => {
     ]);
   });
 
-  it("drops non-USDT, halted, and non-spot symbols", () => {
+  it("keeps USDT and BTC pairs and drops other quotes, halted, and non-spot symbols", () => {
     const result = parseBinanceExchangeInfo({
       symbols: [
         entry({ symbol: "ETHBTC", baseAsset: "ETH", quoteAsset: "BTC" }),
+        entry({ symbol: "ETHEUR", baseAsset: "ETH", quoteAsset: "EUR" }),
         entry({ symbol: "LUNAUSDT", baseAsset: "LUNA", status: "BREAK" }),
         entry({ symbol: "XUSDT", baseAsset: "X", isSpotTradingAllowed: false }),
         entry({ symbol: "ETHUSDT", baseAsset: "ETH" }),
       ],
     });
 
-    expect(result.map((item) => item.symbol)).toEqual(["ETHUSDT"]);
+    expect(result.map((item) => item.symbol)).toEqual(["ETHBTC", "ETHUSDT"]);
+    expect(result.find((item) => item.symbol === "ETHBTC")?.quoteAsset).toBe("BTC");
   });
 
   it("falls back to default precision when filters are missing and rejects bad payloads", () => {
