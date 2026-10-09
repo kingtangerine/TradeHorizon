@@ -40,12 +40,28 @@ npm run dev
 # Production: build, then serve app + API from one port (PORT, HOST, TH_DATA_DIR are configurable)
 npm run build && npm start
 
-# Run unit tests
-npm test
+# Lint, type-check and run the tests (what CI runs on every push)
+npm run check
 
 # Build production bundle
 npm run build
 ```
+
+### Running in production
+
+`npm start` serves the built app and the API from one Node process. Settings (environment variables):
+
+| Variable | Purpose |
+|---|---|
+| `PORT`, `HOST` | Where to listen (default `0.0.0.0:8787`). |
+| `TH_DATA_DIR` | Where accounts, user data, push keys and the market cache live (default `server/data`). **Back this folder up.** |
+| `TH_TRUST_PROXY=1` | Set when running behind nginx/Cloudflare so login limits use the real visitor IP and HTTPS is detected. |
+| `TH_VAPID_SUBJECT` | Contact URL or `mailto:` sent to browser push services (optional). |
+
+- **HTTPS is required** for the service worker, installing the app, and background alert notifications (browsers only allow them on HTTPS; `localhost` is exempt). Terminate TLS in nginx/Cloudflare and forward `X-Forwarded-For` and `X-Forwarded-Proto`.
+- `GET /healthz` returns `{"ok":true,...}` for uptime monitors.
+- The server caches Binance/Bybit coin lists and CoinGecko market caps for all users, and watches prices for **price alerts**, sending a web-push notification when one triggers (indices such as BTC.D are only evaluated while the app is open).
+- `server/data/` holds `users.json`, `userdata/`, `vapid.json` (push keys; losing it silently disconnects every device's notifications), `push.json` and `catalog.json`.
 
 ---
 

@@ -1330,6 +1330,8 @@ export class KLineChartController {
       return typeof value === 'number' ? value : fallback
     }
 
+    // Finger-sized grab handles on touch screens.
+    const coarse = globalThis.matchMedia?.('(pointer: coarse)').matches ?? false
     const color = text('color', '#f4b860')
     const lineWidth = number('lineWidth', 2)
     const lineStyle = style.lineStyle === 'dashed' ? 'dashed' : 'solid'
@@ -1382,11 +1384,11 @@ export class KLineChartController {
           color,
           borderColor: '#131722',
           borderSize: 2,
-          radius: 4,
+          radius: coarse ? 9 : 4,
           activeColor: '#ffffff',
           activeBorderColor: color,
           activeBorderSize: 2,
-          activeRadius: 5,
+          activeRadius: coarse ? 11 : 5,
         },
       },
       onPressedMoveStart: (event) => this.#beginOverlayMove(event),

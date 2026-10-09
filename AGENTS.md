@@ -29,7 +29,13 @@ TradeHorizon/
 ├── CHANGELOG.md                 # Version history & change logs
 ├── AGENTS.md                    # Instructions for AI assistants
 ├── README.md                    # User-facing overview & quickstart
-├── server/index.mjs             # Auth server (accounts + sessions, JSON file store)
+├── server/                      # Node server (no framework)
+│   ├── index.mjs                #   routes: auth, synced user data, markets, push, health
+│   ├── static.mjs / http.mjs    #   static files (compression, cache), security headers, helpers
+│   ├── markets.mjs              #   cached coin catalog + CoinGecko
+│   └── alerts.mjs               #   server-side price alerts + web-push subscriptions
+├── public/                      # sw.js (push), manifest.webmanifest, icons
+├── eslint.config.js             # lint rules (`npm run lint`); CI in .github/workflows/ci.yml
 └── src/
     ├── app/                     # React application UI layer
     │   ├── App.tsx              # Main application root & UI layout

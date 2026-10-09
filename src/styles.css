@@ -3072,3 +3072,98 @@ button:disabled {
 .alert-background button:hover:not(:disabled) { border-color: var(--blue); }
 .alert-background button:disabled { opacity: .5; cursor: wait; }
 .alert-note { color: var(--muted); font-size: .68rem; line-height: 1.4; }
+
+/* Watchlist panel: a flex column so a long list scrolls inside the panel instead of overflowing it. */
+.watchlist-panel { display: flex; flex-direction: column; }
+.watchlist-rows { flex: 1 1 auto; }
+
+/* ===================================================================================
+   Mobile layout (phones and small tablets)
+   - the chart takes the full width; drawing tools and panel buttons move to a bottom dock
+   - panels (watchlist, alerts, object tree) become bottom sheets
+   - menus become full-width sheets under the toolbar
+   - touch-sized buttons, safe-area padding for notches, no iOS input zoom
+   =================================================================================== */
+@media (max-width: 760px) {
+  html, body { overscroll-behavior: none; }
+  input, select, textarea { font-size: 16px; }
+
+  .terminal-shell {
+    grid-template-rows: 42px 46px minmax(0, 1fr);
+    padding-top: env(safe-area-inset-top);
+  }
+  .chart-tabs { grid-row: 1; }
+  .market-toolbar { grid-row: 2; }
+  .workspace { grid-row: 3; }
+  .statusbar { display: none; }
+
+  /* Toolbar: one swipeable row, symbol name visible */
+  .market-toolbar {
+    display: flex; flex-wrap: nowrap; align-items: center; gap: 2px; padding: 0 6px;
+    overflow-x: auto; overflow-y: hidden; scrollbar-width: none; -webkit-overflow-scrolling: touch;
+  }
+  .market-toolbar::-webkit-scrollbar { display: none; }
+  .market-toolbar > * { flex: none; }
+  .market-toolbar .symbol-button strong { display: inline; }
+  .market-toolbar .toolbar-divider { display: block; }
+  .market-toolbar .toolbar-spacer { display: none; }
+  .timeframe-group { overflow: visible; }
+  .timeframe-button { min-width: 40px; min-height: 36px; }
+  .more-timeframes-button, .indicators-button, .live-button, .market-toolbar button { min-height: 36px; }
+
+  /* Workspace: chart on top, dock at the bottom */
+  .workspace, .workspace.object-tree-visible {
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-rows: minmax(0, 1fr) calc(54px + env(safe-area-inset-bottom));
+  }
+  .chart-workspace { grid-column: 1 / -1; grid-row: 1; }
+  .tool-rail, .panel-rail {
+    grid-row: 2; flex-direction: row; align-items: center; gap: 2px;
+    padding: 0 4px env(safe-area-inset-bottom); border-top: 1px solid var(--border); border-right: 0; border-left: 0;
+  }
+  .tool-rail { grid-column: 1; overflow-x: auto; overflow-y: hidden; scrollbar-width: none; -webkit-overflow-scrolling: touch; }
+  .tool-rail::-webkit-scrollbar { display: none; }
+  .panel-rail { grid-column: 2; border-left: 1px solid var(--border); }
+  .tool-rail > *, .panel-rail > * { flex: none; }
+  .tool-divider { width: 1px; height: 26px; margin: 0 4px; }
+  .tool-button { width: 44px; height: 44px; border-radius: 8px; }
+  .tool-button svg { width: 22px; height: 22px; }
+  .tool-button.active { box-shadow: inset 0 -2px var(--amber); }
+
+  /* Panels become bottom sheets */
+  .object-tree, .alerts-panel, .watchlist-panel {
+    position: fixed; z-index: 70; top: auto; right: 0; bottom: 0; left: 0;
+    width: auto; height: min(74dvh, 580px); max-height: none;
+    border-radius: 14px 14px 0 0; padding-bottom: env(safe-area-inset-bottom);
+    box-shadow: 0 -12px 40px rgb(0 0 0 / 45%);
+  }
+  .object-tree { grid-column: 1 / -1; grid-row: 1 / -1; }
+
+  /* Menus open as full-width sheets under the toolbar instead of being clipped by the scrolling toolbar */
+  .market-toolbar .top-menu, .chart-tabs .top-menu {
+    position: fixed; top: calc(env(safe-area-inset-top) + 92px); right: 8px; left: 8px; width: auto;
+    max-width: none; max-height: calc(100dvh - 130px); overflow-y: auto; z-index: 80;
+  }
+
+  /* Selected-drawing toolbar spans the chart and scrolls sideways */
+  .floating-object-toolbar { top: 6px; right: 6px; left: 6px; max-width: none; transform: none; }
+  .floating-object-toolbar .toolbar-action, .floating-object-toolbar .toolbar-color-control { min-width: 38px; min-height: 38px; }
+  .drawing-hint { bottom: 10px; max-width: calc(100% - 20px); }
+  .drawing-hint kbd { display: none; }
+
+  /* Pages and dialogs */
+  .superchart-page { top: calc(env(safe-area-inset-top) + 42px); bottom: 0; }
+  .modal-backdrop { padding: 0; align-items: end; }
+  .profile-dialog { width: 100%; max-height: 92dvh; border-radius: 14px 14px 0 0; }
+  .template-popover { width: min(288px, calc(100vw - 16px)); }
+  .color-popover { max-width: calc(100vw - 16px); }
+  .watchlist-columns, .watchlist-row { grid-template-columns: 18px minmax(0, 1fr) 84px 68px 30px; }
+  .watchlist-remove { opacity: 1; width: 30px; height: 30px; }
+  .watchlist-row { min-height: 52px; }
+  .layout-card-grid { grid-template-columns: 1fr; }
+}
+
+@media (max-width: 760px) {
+  /* An earlier rule hid the Indicators menu on small screens; phones need it. */
+  .market-toolbar .toolbar-popover-control:has(.indicators-button) { display: block; }
+}
