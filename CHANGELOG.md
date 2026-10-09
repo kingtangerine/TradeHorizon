@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [0.8.0] - 2026-10-09
+
+### Added
+- **Mobile layout.** On phones the chart uses the full screen width; drawing tools and the watchlist / object tree / alerts buttons move to a swipeable bottom dock; panels open as bottom sheets; menus open as full-width sheets; buttons are touch-sized; safe areas (notches, home bar) and iOS input zoom are handled; drawing handles are larger on touch screens. The app can be installed to the home screen (web app manifest and icons).
+- **Alerts that work with the app closed.** The server watches prices for every user's alerts and sends a web-push notification when one triggers. Turn it on per device in the alerts panel. Alerts the server triggered show up in the open app within 15 seconds. Index alerts (BTC.D etc.) still need the app open.
+- **Server-side market data cache.** `/api/markets` serves one merged Binance + Bybit coin list (a few KB instead of a 145 KB download that took seconds), and `/api/cg/*` serves cached CoinGecko caps so the free-tier limit is no longer per visitor. The app falls back to the exchanges directly if the server cannot answer.
+- **Production hardening:** gzip/Brotli compression (the 636 KB script is now 169 KB on the wire), long-lived caching for hashed assets, ETags, security headers (strict Content-Security-Policy listing only the data hosts the app uses, nosniff, frame protection, HSTS over HTTPS), `/healthz`, a browser error report endpoint, and `TH_TRUST_PROXY` support so login limits work behind a reverse proxy.
+- **Developer tooling:** ESLint (`npm run lint`, `npm run check`), `.editorconfig`, `.gitattributes` (LF everywhere), and a GitHub Actions workflow that lints, type-checks, tests, builds and starts the server on every push and pull request.
+
+### Fixed
+- A long watchlist now scrolls inside its panel instead of running off it.
+- The Indicators menu was hidden on small screens.
+
 ## [0.7.1] - 2026-10-09
 
 ### Added
