@@ -8,13 +8,14 @@ import {
   referencePrices,
   type DominanceRow,
   type DominanceWeights,
+  type IndexKey,
   type MarketInterval,
   type PriceBar,
 } from '../market'
 import { DOMINANCE_LABELS, type DominanceKey } from './indicators'
 import { allMarkets } from './markets'
 
-const WEIGHTS_CACHE_KEY = 'trade-horizon:dominance-weights:v1'
+const WEIGHTS_CACHE_KEY = 'trade-horizon:dominance-weights:v2'
 const WEIGHTS_TTL_MS = 30 * 60 * 1000
 const PAGE_SIZE = 1000
 
@@ -51,11 +52,18 @@ export function dominanceCalc(key: DominanceKey, rows: readonly DominanceRow[]) 
   })
 }
 
-export function dominanceCandles(rows: readonly DominanceRow[], key: DominanceKey): KLineData[] {
+export function dominanceCandles(rows: readonly DominanceRow[], key: IndexKey): KLineData[] {
   return rows.map((row) => {
     const open = row.open[key]
     const close = row.close[key]
-    return { timestamp: row.timestamp, open, high: Math.max(open, close), low: Math.min(open, close), close, volume: 0 }
+    return {
+      timestamp: row.timestamp,
+      open,
+      high: Math.max(row.high[key], open, close),
+      low: Math.min(row.low[key], open, close),
+      close,
+      volume: 0,
+    }
   })
 }
 
@@ -69,6 +77,8 @@ function readCachedWeights(): DominanceWeights | null {
       !(typeof value.bitcoinCap === 'number' && value.bitcoinCap > 0) ||
       !(typeof value.tetherCap === 'number' && value.tetherCap > 0) ||
       typeof value.stableCap !== 'number' ||
+      typeof value.ethereumCap !== 'number' ||
+      typeof value.topTen !== 'object' || value.topTen === null ||
       typeof value.tailCap !== 'number' ||
       typeof value.trackedCaps !== 'object' || value.trackedCaps === null
     ) return null
@@ -128,6 +138,8 @@ export async function fetchDominancePage(
       const bars: PriceBar[] = candles.map((candle) => ({
         timestamp: candle.openTimeMs,
         open: Number(candle.open),
+        high: Number(candle.high),
+        low: Number(candle.low),
         close: Number(candle.close),
       }))
       return [symbol, bars] as const

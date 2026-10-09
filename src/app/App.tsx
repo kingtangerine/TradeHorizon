@@ -163,6 +163,10 @@ function styleNumber(value: unknown, fallback: number): number {
   return typeof value === 'number' && Number.isFinite(value) ? value : fallback
 }
 
+function marketKindLabel(market: { kind: 'spot' | 'futures' | 'dominance' }): string {
+  return market.kind === 'spot' ? 'Spot' : market.kind === 'futures' ? 'Perpetual' : 'Index'
+}
+
 function colorInputValue(value: unknown, fallback: string): string {
   if (typeof value !== 'string') return fallback
   if (/^#[0-9a-f]{6}$/i.test(value)) return value
@@ -1119,7 +1123,7 @@ function WorkspaceApp({ user, onLogout }: WorkspaceAppProps) {
               <span><b>C</b>{formatPrice(quote?.close, market.pricePrecision)}</span>
               <span className={isPositive ? 'price-up' : 'price-down'}>{quote ? `${isPositive ? '+' : ''}${quote.changePercent.toFixed(2)}%` : '—'}</span>
             </div>
-            {market.kind === 'spot' && <button
+            {market.kind !== 'dominance' && <button
               type="button"
               className={workspace.volumeVisible ? 'chart-indicator-row' : 'chart-indicator-row muted'}
               onClick={() => setWorkspace((current) => ({ ...current, volumeVisible: !current.volumeVisible }))}
@@ -1569,7 +1573,7 @@ function WorkspaceApp({ user, onLogout }: WorkspaceAppProps) {
               <span className="object-market-symbol">{market.mark}</span>
               <div>
                 <strong>{market.symbol}</strong>
-                <span>{market.venue} {market.kind === 'spot' ? 'Spot' : 'Index'} · {interval}</span>
+                <span>{market.venue} {marketKindLabel(market)} · {interval}</span>
               </div>
             </div>
 
@@ -1656,7 +1660,7 @@ function WorkspaceApp({ user, onLogout }: WorkspaceAppProps) {
               </select>
             </label>
             <label>
-              <span>Target {market.kind === 'spot' ? 'price (USDT)' : 'level (%)'}</span>
+              <span>Target {market.kind === 'dominance' ? (market.quoteAsset === '%' ? 'level (%)' : 'level (USD billions)') : `price (${market.quoteAsset})`}</span>
               <input
                 type="number"
                 min="0"
@@ -1752,7 +1756,7 @@ function WorkspaceApp({ user, onLogout }: WorkspaceAppProps) {
       )}
 
       <footer className="statusbar">
-        <span>{market.venue.toUpperCase()} {market.kind === 'spot' ? 'SPOT' : 'INDEX'}</span>
+        <span>{market.venue.toUpperCase()} {marketKindLabel(market).toUpperCase()}</span>
         <span>UTC</span>
         <span className="status-separator" />
         <span>{marketDrawings.length} saved drawing{marketDrawings.length === 1 ? '' : 's'} for {market.symbol}</span>

@@ -20,6 +20,8 @@ import {
 } from '../drawings'
 import {
   BinanceKlineSubscription,
+  BINANCE_FUTURES_REST_ENDPOINT,
+  BINANCE_FUTURES_WS_ENDPOINT,
   BybitKlineSubscription,
   fetchBybitKlines,
   LatestBinanceKlinesLoader,
@@ -339,16 +341,15 @@ export class KLineChartController {
       const epoch = this.#dataEpoch
       let hasOpened = false
 
-      const Subscription = this.#market.exchange === 'bybit' ? BybitKlineSubscription : BinanceKlineSubscription
-      this.#stream = new Subscription({
+      const streamOptions = {
         symbol: this.#market.symbol,
         interval,
-        onCandle: (candle) => {
+        onCandle: (candle: Candle) => {
           if (this.#disposed || epoch !== this.#dataEpoch || interval !== this.#interval) return
           callback(candleToKLineData(candle))
           this.#patchRuntime({ quote: candleToQuote(candle), error: null })
         },
-        onStatus: (status) => {
+        onStatus: (status: KlineStreamStatus) => {
           if (this.#disposed || epoch !== this.#dataEpoch || interval !== this.#interval) return
           this.#handleStreamStatus(status)
           if (status.state === 'open') {
@@ -356,11 +357,15 @@ export class KLineChartController {
             hasOpened = true
           }
         },
-        onError: (error) => {
+        onError: (error: Error) => {
           if (this.#disposed || epoch !== this.#dataEpoch) return
           this.#patchRuntime({ error: error.message })
         },
-      })
+      }
+      const exchange = this.#market.exchange
+      this.#stream = exchange === 'bybit'
+        ? new BybitKlineSubscription(streamOptions)
+        : new BinanceKlineSubscription(exchange === 'binance-futures' ? { ...streamOptions, endpoint: BINANCE_FUTURES_WS_ENDPOINT } : streamOptions)
     },
 
     unsubscribeBar: () => {
@@ -674,7 +679,7 @@ export class KLineChartController {
   public setVolumeVisible(requested: boolean): void {
     if (this.#disposed) return
     // An index has no traded volume, so its pane would always be empty.
-    const visible = requested && this.#market.kind === 'spot'
+    const visible = requested && this.#market.kind !== 'dominance'
 
     if (visible && !this.#volumeIndicatorId) {
       const id = this.#chart.createIndicator({
@@ -1150,7 +1155,9 @@ export class KLineChartController {
 
   /** Candle history from the exchange this market trades on. */
   #fetchKlines(options: FetchBinanceKlinesOptions): Promise<Candle[]> {
-    return this.#market.exchange === 'bybit' ? fetchBybitKlines(options) : fetchBinanceKlines(options)
+    const { exchange } = this.#market
+    if (exchange === 'bybit') return fetchBybitKlines(options)
+    return fetchBinanceKlines(exchange === 'binance-futures' ? { ...options, endpoint: BINANCE_FUTURES_REST_ENDPOINT } : options)
   }
 
   async #backfillAfterReconnect(

@@ -1,27 +1,28 @@
 import {
+  type IndexKey,
   fetchBinanceSpotListings,
   fetchBybitSpotListings,
   marketIdFor,
   type BinanceSpotListing,
   type MarketDataFetch,
 } from '../market'
-import { DOMINANCE_DESCRIPTIONS, DOMINANCE_LABELS, type DominanceKey } from './indicators'
 
 export interface CryptoMarket {
   readonly symbol: string
   readonly baseAsset: string
-  readonly quoteAsset: 'USDT' | '%'
+  readonly quoteAsset: 'USDT' | 'BTC' | '%' | 'USD'
   readonly name: string
   readonly mark: string
   readonly pricePrecision: number
   readonly volumePrecision: number
   /** Stable key for drawings and alerts. */
   readonly marketId: string
-  /** Exchange that serves candles for a spot pair. */
-  readonly exchange: 'binance' | 'bybit'
+  /** Exchange that serves candles for this market. */
+  readonly exchange: 'binance' | 'bybit' | 'binance-futures'
   /** Spot pair, or a market-wide dominance index built from CoinGecko data. */
-  readonly kind: 'spot' | 'dominance'
-  readonly dominanceKey?: DominanceKey
+  readonly kind: 'spot' | 'futures' | 'dominance'
+  /** Which engine-built index a `dominance` market shows. */
+  readonly dominanceKey?: IndexKey
   /** Data source shown in the UI. */
   readonly venue: string
   /** Display form such as "BTC / USDT" or "BTC.D". */
@@ -67,14 +68,34 @@ export const CRYPTO_MARKETS: readonly CryptoMarket[] = [
 
 export const DEFAULT_CRYPTO_MARKET = CRYPTO_MARKETS[0]
 
-function dominanceMarket(key: DominanceKey, baseAsset: string, mark: string): CryptoMarket {
-  const symbol = DOMINANCE_LABELS[key]
+interface IndexInfo {
+  readonly label: string
+  readonly description: string
+  readonly mark: string
+  /** '%' for dominance lines, 'USD' for market-cap indices (shown in billions). */
+  readonly unit: '%' | 'USD'
+}
+
+export const INDEX_INFO: Readonly<Record<IndexKey, IndexInfo>> = {
+  btc: { label: 'BTC.D', description: 'Bitcoin dominance', mark: '₿', unit: '%' },
+  eth: { label: 'ETH.D', description: 'Ethereum dominance', mark: 'Ξ', unit: '%' },
+  usdt: { label: 'USDT.D', description: 'Tether dominance', mark: '₮', unit: '%' },
+  stable: { label: 'STABLE.D', description: 'Stablecoin dominance (USDT, USDC and other dollar coins)', mark: '$', unit: '%' },
+  alt: { label: 'ALT.D', description: 'Altcoin dominance', mark: 'A', unit: '%' },
+  total: { label: 'TOTAL', description: 'Crypto total market cap', mark: 'T', unit: 'USD' },
+  total2: { label: 'TOTAL2', description: 'Crypto total market cap excluding Bitcoin', mark: '2', unit: 'USD' },
+  total3: { label: 'TOTAL3', description: 'Crypto total market cap excluding Bitcoin and Ethereum', mark: '3', unit: 'USD' },
+  others: { label: 'OTHERS', description: 'Crypto total market cap excluding the top 10', mark: 'O', unit: 'USD' },
+}
+
+function dominanceMarket(key: IndexKey): CryptoMarket {
+  const info = INDEX_INFO[key]
   return {
-    symbol,
-    baseAsset,
-    quoteAsset: '%',
-    name: DOMINANCE_DESCRIPTIONS[key],
-    mark,
+    symbol: info.label,
+    baseAsset: info.label.replace(/\.D$/, ''),
+    quoteAsset: info.unit,
+    name: info.description,
+    mark: info.mark,
     pricePrecision: 2,
     volumePrecision: 0,
     marketId: `index:dominance:${key}`,
@@ -82,15 +103,30 @@ function dominanceMarket(key: DominanceKey, baseAsset: string, mark: string): Cr
     kind: 'dominance',
     dominanceKey: key,
     venue: 'Market cap',
-    pair: symbol,
+    pair: info.label,
   }
 }
 
-export const DOMINANCE_MARKETS: readonly CryptoMarket[] = [
-  dominanceMarket('btc', 'BTC', '₿'),
-  dominanceMarket('usdt', 'USDT', '₮'),
-  dominanceMarket('alt', 'ALT', 'A'),
-]
+/** Dominance lines first, then the market-cap indices; all are rebuilt from CoinGecko caps and Binance prices. */
+export const DOMINANCE_MARKETS: readonly CryptoMarket[] = (
+  ['btc', 'eth', 'usdt', 'stable', 'alt', 'total', 'total2', 'total3', 'others'] as const
+).map(dominanceMarket)
+
+/** Binance's own Bitcoin-dominance index perpetual (a price-like index, not a percentage). */
+export const BTCDOM_MARKET: CryptoMarket = {
+  symbol: 'BTCDOMUSDT',
+  baseAsset: 'BTCDOM',
+  quoteAsset: 'USDT',
+  name: 'Bitcoin dominance index perpetual',
+  mark: '₿',
+  pricePrecision: 1,
+  volumePrecision: 3,
+  marketId: 'binance:futures:BTCDOMUSDT',
+  exchange: 'binance-futures',
+  kind: 'futures',
+  venue: 'Binance Futures',
+  pair: 'BTCDOMUSDT.P',
+}
 
 const COIN_NAMES: Readonly<Record<string, string>> = {
   TRX: 'TRON', POL: 'Polygon', MATIC: 'Polygon', LTC: 'Litecoin', BCH: 'Bitcoin Cash',
@@ -110,9 +146,9 @@ const COIN_NAMES: Readonly<Record<string, string>> = {
 }
 
 const registry = new Map<string, CryptoMarket>(
-  [...CRYPTO_MARKETS, ...DOMINANCE_MARKETS].map((item) => [item.symbol, item]),
+  [...CRYPTO_MARKETS, BTCDOM_MARKET, ...DOMINANCE_MARKETS].map((item) => [item.symbol, item]),
 )
-const CATALOG_CACHE_KEY = 'trade-horizon:markets:v2'
+const CATALOG_CACHE_KEY = 'trade-horizon:markets:v3'
 const CATALOG_TTL_MS = 12 * 60 * 60 * 1000
 let cacheRestored = false
 
@@ -121,16 +157,16 @@ function marketFromListing(listing: BinanceSpotListing): CryptoMarket {
   return {
     symbol: listing.symbol,
     baseAsset: listing.baseAsset,
-    quoteAsset: 'USDT',
     name: COIN_NAMES[listing.baseAsset] ?? listing.baseAsset,
     mark: listing.baseAsset.charAt(0),
     pricePrecision: listing.pricePrecision,
     volumePrecision: listing.volumePrecision,
+    quoteAsset: listing.quoteAsset ?? 'USDT',
     marketId: marketIdFor(listing.symbol, exchange),
     exchange,
     kind: 'spot',
     venue: exchange === 'bybit' ? 'Bybit' : 'Binance',
-    pair: `${listing.baseAsset} / USDT`,
+    pair: `${listing.baseAsset} / ${listing.quoteAsset ?? 'USDT'}`,
   }
 }
 
