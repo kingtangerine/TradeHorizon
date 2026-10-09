@@ -457,6 +457,16 @@ function WorkspaceApp({ user, onLogout }: WorkspaceAppProps) {
     setLayoutMenuOpen(false)
   }, [])
 
+  /** Middle-click on a layout card: add its tabs to the tab bar and stay where we are. */
+  const openSavedLayoutInBackground = useCallback((layout: SavedLayout) => {
+    const openedTabs: ChartTab[] = layout.tabs.map((tab) => ({ ...tab, id: crypto.randomUUID(), layoutId: layout.id }))
+    setWorkspace((current) => ({
+      ...current,
+      tabs: [...current.tabs, ...openedTabs],
+      customIntervals: [...new Set([...current.customIntervals, ...layout.customIntervals])],
+    }))
+  }, [])
+
   const createNewLayout = useCallback(() => {
     const layout = createLayout(DEFAULT_LAYOUT_NAME, Date.now())
     setSavedLayouts((current) => [layout, ...current])
@@ -1792,6 +1802,7 @@ function WorkspaceApp({ user, onLogout }: WorkspaceAppProps) {
           layouts={savedLayouts}
           activeLayoutId={activeTab.layoutId}
           onOpen={openSavedLayout}
+          onOpenInBackground={openSavedLayoutInBackground}
           onCreate={createNewLayout}
           onNewChart={() => setSymbolSearch('new')}
           onToggleFavorite={toggleLayoutFavorite}

@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [0.7.1] - 2026-10-09
+
+### Added
+- **Middle-click a saved layout** to open it in new tabs without switching to them. The layout card's menu also has "Open in new tab".
+
 ## [0.7.0] - 2026-10-09
 
 ### Added
