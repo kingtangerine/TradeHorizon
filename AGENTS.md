@@ -39,6 +39,8 @@ TradeHorizon/
     │   ├── ColorPicker.tsx      # Preset-palette color popover
     │   ├── ProfileDialog.tsx    # Account window: info, password, theme, export/import
     │   ├── ObjectList.tsx       # Object tree body with user folders (groups.ts holds the data)
+    │   ├── Watchlist.tsx        # Watchlist panel (data in watchlists.ts, quotes in quotes.ts)
+    │   ├── RectangleTemplates.tsx # Saved rectangle looks (data in templates.ts)
     │   ├── userSync.ts          # Mirrors per-user localStorage to the server
     │   ├── theme.ts             # Dark/light theme; colors are CSS variables in styles.css
     │   └── workspace.ts         # Multi-tab workspace persistence

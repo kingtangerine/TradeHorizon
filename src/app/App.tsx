@@ -23,6 +23,10 @@ import { MARKET_INTERVALS, MARKET_INTERVAL_SPECS, type MarketInterval } from '..
 import { alertReached, loadAlerts, saveAlerts, type AlertDirection, type PriceAlert } from './alerts'
 import { ColorPicker } from './ColorPicker'
 import { ObjectList } from './ObjectList'
+import { Watchlist } from './Watchlist'
+import { addSymbol, loadWatchlists, saveWatchlists } from './watchlists'
+import { RectangleTemplates } from './RectangleTemplates'
+import { defaultTemplateStyle, loadTemplates, rectangleStyleOf, saveTemplates } from './templates'
 import { ProfileDialog } from './ProfileDialog'
 import { applyTheme, loadUserTheme, saveUserTheme, type Theme } from './theme'
 import { loadGroups, saveGroups } from './groups'
@@ -96,6 +100,7 @@ import {
   UserIcon,
   TextIcon,
   FolderIcon,
+  StarIcon,
   MidlineIcon,
 } from './Icons'
 
@@ -233,9 +238,12 @@ function WorkspaceApp({ user, onLogout }: WorkspaceAppProps) {
   const [groupState, setGroupState] = useState(() => loadGroups(user.id))
   const [theme, setTheme] = useState<Theme>(() => loadUserTheme(user.id))
   const [groupSelectMode, setGroupSelectMode] = useState(false)
+  const [templateState, setTemplateState] = useState(() => loadTemplates(user.id))
+  const [watchlistState, setWatchlistState] = useState(() => loadWatchlists(user.id))
+  const [watchlistOpen, setWatchlistOpen] = useState(false)
   const [positionSettingsOpen, setPositionSettingsOpen] = useState(false)
   const [superchartOpen, setSuperchartOpen] = useState(false)
-  const [symbolSearch, setSymbolSearch] = useState<'change' | 'new' | null>(null)
+  const [symbolSearch, setSymbolSearch] = useState<'change' | 'new' | 'watchlist' | null>(null)
   const [markets, setMarkets] = useState(() => allMarkets())
   const [alertsOpen, setAlertsOpen] = useState(false)
   const [profileOpen, setProfileOpen] = useState(false)
@@ -290,10 +298,13 @@ function WorkspaceApp({ user, onLogout }: WorkspaceAppProps) {
       createdAtMs: Date.now(),
     }, ...current])
     setAlertsOpen(true)
+    setWatchlistOpen(false)
     if ('Notification' in globalThis && Notification.permission === 'default') {
       void Notification.requestPermission()
     }
   }, [market.symbol, runtime.quote?.close])
+
+  const findWatchMarket = useCallback((symbol: string) => markets.find((item) => item.symbol === symbol), [markets])
 
   const handleSelectionChange = useCallback((id?: string) => {
     setSelectedDrawingId(id)
@@ -573,6 +584,12 @@ function WorkspaceApp({ user, onLogout }: WorkspaceAppProps) {
   useEffect(() => saveSavedLayouts(user.id, savedLayouts), [savedLayouts, user.id])
   useEffect(() => saveAlerts(user.id, alerts), [alerts, user.id])
   useEffect(() => saveGroups(user.id, groupState), [groupState, user.id])
+  useEffect(() => saveTemplates(user.id, templateState), [templateState, user.id])
+  useEffect(() => saveWatchlists(user.id, watchlistState), [watchlistState, user.id])
+  useEffect(() => {
+    const style = defaultTemplateStyle(templateState)
+    controller?.setToolDefaultStyle('rectangle', style ? { ...style } : undefined)
+  }, [controller, templateState])
   useEffect(() => {
     applyTheme(theme)
     saveUserTheme(user.id, theme)
@@ -1349,6 +1366,12 @@ function WorkspaceApp({ user, onLogout }: WorkspaceAppProps) {
                       >
                         <MidlineIcon />
                       </button>
+                      <RectangleTemplates
+                        state={templateState}
+                        current={rectangleStyleOf(selectedDrawing.style)}
+                        onApply={(style) => updateSelectedStyle({ ...style })}
+                        onChange={setTemplateState}
+                      />
                       <label className="toolbar-color-control fill-control" title="Fill color">
                         <ColorPicker label="Rectangle fill color" value={colorInputValue(selectedDrawing.style.fillColor, '#3aa9ff')} onChange={(color) => updateSelectedStyle({ fillColor: color })} />
                       </label>
@@ -1600,6 +1623,16 @@ function WorkspaceApp({ user, onLogout }: WorkspaceAppProps) {
         <aside className="panel-rail" aria-label="Panels">
           <button
             type="button"
+            className={watchlistOpen ? 'tool-button active' : 'tool-button'}
+            aria-label="Watchlist"
+            aria-pressed={watchlistOpen}
+            title="Watchlist"
+            onClick={() => { setWatchlistOpen((open) => !open); setAlertsOpen(false) }}
+          >
+            <StarIcon />
+          </button>
+          <button
+            type="button"
             className={objectTreeOpen ? 'tool-button active' : 'tool-button'}
             aria-label="Toggle object tree"
             aria-pressed={objectTreeOpen}
@@ -1614,7 +1647,7 @@ function WorkspaceApp({ user, onLogout }: WorkspaceAppProps) {
             aria-label="Price alerts"
             aria-pressed={alertsOpen}
             title="Price alerts"
-            onClick={() => setAlertsOpen((open) => !open)}
+            onClick={() => { setAlertsOpen((open) => !open); setWatchlistOpen(false) }}
           >
             <BellIcon />
             {alerts.filter((alert) => alert.enabled).length > 0 && (
@@ -1623,6 +1656,18 @@ function WorkspaceApp({ user, onLogout }: WorkspaceAppProps) {
           </button>
         </aside>
       </main>
+
+      {watchlistOpen && (
+        <Watchlist
+          state={watchlistState}
+          findMarket={findWatchMarket}
+          currentSymbol={market.symbol}
+          onState={setWatchlistState}
+          onOpen={changeMarket}
+          onAdd={() => setSymbolSearch('watchlist')}
+          onClose={() => setWatchlistOpen(false)}
+        />
+      )}
 
       {alertsOpen && (
         <aside className="alerts-panel" aria-label="Price alerts">
@@ -1707,6 +1752,7 @@ function WorkspaceApp({ user, onLogout }: WorkspaceAppProps) {
           current={market}
           onSelect={(next) => {
             if (symbolSearch === 'new') createChartTab(next.symbol)
+            else if (symbolSearch === 'watchlist') setWatchlistState((current) => addSymbol(current, next.symbol))
             else changeMarket(next)
             setSymbolSearch(null)
           }}

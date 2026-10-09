@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [0.7.0] - 2026-10-09
+
+### Added
+- **Watchlist** (star button on the right rail). Named lists of symbols with live last price and 24h change, click a symbol to open it on the chart, add with +, remove, color flags, sort by symbol, price or change, and multiple lists you can create, rename and delete. Works for Binance, Bybit, futures and the dominance/market-cap indices. Saved and synced with your account.
+- **Rectangle templates.** Save a rectangle's fill color, fill amount, line color, width, style and middle line under a name, apply it to any rectangle, and optionally make one the default look for new rectangles.
+- **New charts for analysis:** OTHERS (market cap excluding the top 10), TOTAL, TOTAL2 (excluding Bitcoin), TOTAL3 (excluding Bitcoin and Ethereum), ETH.D, STABLE.D (all stablecoins), and Binance's BTCDOMUSDT.P Bitcoin-dominance index perpetual. Also the 38 Binance BTC-quoted pairs such as ETH/BTC.
+
+### Fixed
+- **Dominance candles had no wicks.** Dominance and market-cap candles now carry highs and lows, estimated from each coin's own high and low during the bar.
+
+### Changed
+- Dominance engine now computes all indices in one pass (ETH share, stablecoins, caps in billions of USD). Cached caps refresh once (`dominance-weights:v2`).
+- Alerts and the watchlist share the right-hand overlay; opening one closes the other.
+
 ## [0.6.0] - 2026-10-08
 
 ### Added

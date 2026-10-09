@@ -15,6 +15,7 @@ import {
   updateDrawing,
   type Anchor,
   type Drawing,
+  type DrawingStyle,
   type DrawingType,
   type DrawingStore,
 } from '../drawings'
@@ -188,6 +189,7 @@ export class KLineChartController {
   #interval: MarketInterval
   #runtimeState: ChartRuntimeState
   #stream?: { stop(): void }
+  readonly #toolStyles = new Map<DrawingType, DrawingStyle>()
   #drawingStoreUnsubscribe: () => void
   #dataEpoch = 0
   #disposed = false
@@ -821,6 +823,12 @@ export class KLineChartController {
     }
   }
 
+  /** Style that new drawings of a type start with, e.g. the user's default rectangle template. */
+  public setToolDefaultStyle(type: DrawingType, style: DrawingStyle | undefined): void {
+    if (style) this.#toolStyles.set(type, style)
+    else this.#toolStyles.delete(type)
+  }
+
   public startTool(type: DrawingType): boolean {
     if (this.#disposed) return false
     this.cancelActiveTool()
@@ -964,10 +972,12 @@ export class KLineChartController {
 
   #finishDraft(tool: ToolSession): void {
     const overlay = tool.draftId ? this.#chart.getOverlays({ id: tool.draftId })[0] : undefined
-    const drawing = overlay
+    let drawing = overlay
       ? drawingFromOverlay(overlay, this.#market.marketId, undefined, tool.type)
       : null
     if (!drawing) return
+    const startStyle = this.#toolStyles.get(tool.type)
+    if (startStyle) drawing = { ...drawing, style: { ...drawing.style, ...startStyle } }
 
     if (DRAWING_TOOLS[tool.type].placement === 'twoPoint') {
       const first = drawing.anchors[0]
@@ -1310,7 +1320,7 @@ export class KLineChartController {
     drawing: Drawing | undefined,
     type: DrawingType,
   ): OverlayCreate {
-    const style = { ...DRAWING_TOOLS[type].defaultStyle, ...drawing?.style }
+    const style = { ...DRAWING_TOOLS[type].defaultStyle, ...this.#toolStyles.get(type), ...drawing?.style }
     const text = (key: string, fallback: string): string => {
       const value = style[key]
       return typeof value === 'string' ? value : fallback
