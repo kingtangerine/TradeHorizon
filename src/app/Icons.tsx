@@ -372,3 +372,11 @@ export function ChevronIcon(props: IconProps) {
     </IconBase>
   )
 }
+
+export function TemplateIcon(props: IconProps) {
+  return (
+    <IconBase {...props}>
+      <path d="M6 3h12a1 1 0 0 1 1 1v17l-7-4-7 4V4a1 1 0 0 1 1-1Z" />
+    </IconBase>
+  )
+}
