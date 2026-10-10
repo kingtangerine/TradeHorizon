@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [0.9.0] - 2026-10-10
+
+### Added
+- **Split view.** The new layout button in the toolbar shows 2, 3 or 4 charts in one tab. Each chart has its own symbol and timeframe (new ones start on the same symbol with longer timeframes). Click a chart to make it active: the toolbar, drawing tools, object tree, alerts and watchlist act on it, and it is outlined. Drawings are shared by symbol, the tab shows a ▦ badge, and the split is saved with the workspace and with saved layouts. On phones the charts stack.
+- **Instant reopen.** The newest candles of every chart you view are kept in the browser, so reopening a chart (or the whole app) paints immediately and catches up in the background. On a reload this cut the time to a visible chart from about 1.7 s to 0.2 s.
+
+### Fixed
+- **Price-axis zoom jumped.** klinecharts scales the price axis by the ratio of absolute screen positions, so the same drag zoomed wildly near the top of the screen and barely at the bottom, and a drag toward the top collapsed the range (worst on phones). Dragging the price axis now zooms by drag distance (equal drags, equal zoom), with a bounded range, mouse-wheel zoom over the axis, and a double-click or double-tap to return to the automatic fit.
+- **"Loading" and "Connecting" every time you came back to the app.** Connections that died in the background are now replaced immediately when you return (and on reconnecting to the network), brief drops are no longer shown, returning users open their workspace from the local copy instead of waiting on a loading screen (the server copy is checked in the background and the page reloads once only if another device saved newer data).
+- Clicking a saved layout that is already open switches to it instead of opening it again. Middle-click on an open layout does nothing; "Open in new tab" in its menu still makes a copy.
+
 ## [0.8.0] - 2026-10-09
 
 ### Added

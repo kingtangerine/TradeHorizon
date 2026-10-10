@@ -3167,3 +3167,54 @@ button:disabled {
   /* An earlier rule hid the Indicators menu on small screens; phones need it. */
   .market-toolbar .toolbar-popover-control:has(.indicators-button) { display: block; }
 }
+
+/* ===== Split view: a tab can show 1, 2, 3 or 4 charts ===== */
+.split-grid {
+  position: absolute; inset: 0; z-index: 0; display: grid; gap: 1px; background: var(--border);
+}
+.split-grid.count-1 { grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(0, 1fr); gap: 0; }
+.split-grid.count-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); grid-template-rows: minmax(0, 1fr); }
+.split-grid.count-3 { grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr); grid-template-rows: repeat(2, minmax(0, 1fr)); }
+.split-grid.count-3 > .chart-pane:first-child { grid-row: 1 / span 2; }
+.split-grid.count-4 { grid-template-columns: repeat(2, minmax(0, 1fr)); grid-template-rows: repeat(2, minmax(0, 1fr)); }
+
+.chart-pane { position: relative; min-width: 0; min-height: 0; overflow: hidden; background: var(--k-0b0f15); container-type: inline-size; }
+.chart-pane.framed { cursor: default; }
+/* The active chart in a split view gets a frame; it must not block clicks on the chart. */
+.chart-pane.framed.active::after {
+  content: ''; position: absolute; inset: 0; z-index: 6; pointer-events: none;
+  border: 2px solid var(--tv-blue, #2962ff);
+}
+
+/* Small panes keep the price line and drop the indicator rows. */
+@container (max-width: 520px) {
+  .chart-pane .chart-indicator-row { display: none; }
+  .chart-pane .chart-ohlc-row { gap: 6px; font-size: .68rem; }
+  .chart-pane .chart-watermark { top: 6px; left: 10px; }
+  .chart-pane .chart-legend { top: 26px; left: 10px; }
+}
+@container (max-width: 340px) {
+  .chart-pane .chart-watermark span { display: none; }
+  .chart-pane .chart-ohlc-row span:nth-child(-n+3) { display: none; }
+}
+
+.split-menu { left: 0; width: 290px; padding: 12px; display: grid; gap: 10px; }
+.split-menu > strong { font-size: .76rem; }
+.split-menu > small { color: var(--muted); font-size: .68rem; line-height: 1.45; }
+.split-menu-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
+.split-menu-grid button {
+  display: grid; place-items: center; gap: 5px; height: 66px; padding: 6px 2px;
+  border: 1px solid var(--border-strong); border-radius: 7px; background: transparent; color: var(--muted);
+  font: inherit; font-size: .66rem; cursor: pointer;
+}
+.split-menu-grid button svg { width: 30px; height: 26px; }
+.split-menu-grid button:hover { color: var(--text); border-color: var(--blue); }
+.split-menu-grid button.active { color: var(--tv-blue, #2962ff); border-color: var(--tv-blue, #2962ff); background: rgb(var(--kr-41-98-255) / 14%); }
+.chart-tab-split { margin-left: 5px; color: var(--tv-blue, #2962ff); font-size: .66rem; }
+
+@media (max-width: 760px) {
+  .split-grid.count-2 { grid-template-columns: minmax(0, 1fr); grid-template-rows: repeat(2, minmax(0, 1fr)); }
+  .split-grid.count-3 { grid-template-columns: minmax(0, 1fr); grid-template-rows: repeat(3, minmax(0, 1fr)); }
+  .split-grid.count-3 > .chart-pane:first-child { grid-row: auto; }
+  .market-toolbar .split-menu { left: 8px; right: 8px; width: auto; }
+}
