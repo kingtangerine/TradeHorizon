@@ -22,6 +22,16 @@ const PULL_TIMEOUT_MS = 5000
 
 let stopActive: (() => void) | undefined
 
+export interface SyncResult {
+  /** True when the server had newer data that was written into this browser (the app should reload to show it). */
+  readonly changed: boolean
+}
+
+/** True once this browser has synced this account before, so its local copy is a good starting point. */
+export function hasSyncedBefore(userId: string): boolean {
+  return Object.keys(readMeta(userId)).length > 0
+}
+
 function userPrefix(userId: string): string {
   return `trade-horizon:user:${userId}:`
 }
@@ -48,10 +58,10 @@ function authHeaders(token: string): Record<string, string> {
  * lacks, then keeps pushing local changes. Resolves once the initial pull is done (or
  * failed/timed out, in which case the app simply works from local data).
  */
-export async function startUserSync(userId: string): Promise<void> {
+export async function startUserSync(userId: string): Promise<SyncResult> {
   stopActive?.()
   const token = getSessionToken()
-  if (!token) return
+  if (!token) return { changed: false }
 
   const prefix = userPrefix(userId)
   const meta = readMeta(userId)
@@ -113,8 +123,9 @@ export async function startUserSync(userId: string): Promise<void> {
     const response = await fetch('/api/data', { headers: authHeaders(token), signal: AbortSignal.timeout(PULL_TIMEOUT_MS) })
     if (response.ok) items = (await response.json() as { items: Record<string, ServerItem> }).items
   } catch { /* offline or server down: use local data */ }
-  if (!items || stopped) return
+  if (!items || stopped) return { changed: false }
 
+  let applied = 0
   const remote = new Map(Object.entries(items).map(([suffix, item]) => [prefix + suffix, item]))
   for (const [key, item] of remote) {
     const local = localStorage.getItem(key)
@@ -130,6 +141,7 @@ export async function startUserSync(userId: string): Promise<void> {
     }
     originalSetItem.call(localStorage, key, item.value)
     meta[key] = { syncedAtMs: item.updatedAtMs, dirty: false }
+    applied += 1
   }
 
   // Local keys the server does not have yet (first run after this feature) and unsynced edits.
@@ -142,6 +154,7 @@ export async function startUserSync(userId: string): Promise<void> {
     }
   }
   saveMeta()
+  return { changed: applied > 0 }
 }
 
 export function stopUserSync(): void {

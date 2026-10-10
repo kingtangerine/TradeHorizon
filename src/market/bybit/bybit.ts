@@ -217,6 +217,22 @@ export class BybitKlineSubscription {
     return this.#active;
   }
 
+  /** See BinanceKlineSubscription.nudge: replace a connection that died in the background. */
+  nudge(force = false): void {
+    if (!this.#active || AGGREGATED[this.interval]) return;
+    const socket = this.#socket;
+    if (socket && socket.readyState === WebSocket.OPEN && !force) return;
+    clearTimeout(this.#timer);
+    clearInterval(this.#ping);
+    if (socket) {
+      socket.onopen = socket.onmessage = socket.onerror = socket.onclose = null;
+      this.#socket = undefined;
+      try { socket.close(1000, "refreshing connection"); } catch { /* already closed */ }
+    }
+    this.#attempt = 0;
+    this.#connect();
+  }
+
   stop(): void {
     if (!this.#active) return;
     this.#active = false;

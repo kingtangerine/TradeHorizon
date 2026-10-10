@@ -31,7 +31,7 @@ import { defaultTemplateStyle, loadTemplates, rectangleStyleOf, saveTemplates } 
 import { ProfileDialog } from './ProfileDialog'
 import { applyTheme, loadUserTheme, saveUserTheme, type Theme } from './theme'
 import { loadGroups, saveGroups } from './groups'
-import { startUserSync, stopUserSync } from './userSync'
+import { hasSyncedBefore, startUserSync, stopUserSync } from './userSync'
 import { logIn, logOut, restoreSession, signUp, verifySession, type AppUser } from './auth'
 import { Superchart } from './Superchart'
 import {
@@ -464,6 +464,15 @@ function WorkspaceApp({ user, onLogout }: WorkspaceAppProps) {
   }, [activeTab.layoutId, currentLayout, layoutDraftName, workspace])
 
   const openSavedLayout = useCallback((layout: SavedLayout) => {
+    // A layout that is already open in the tab bar is switched to, not opened a second time.
+    const alreadyOpen = workspace.tabs.filter((tab) => tab.layoutId === layout.id)
+    if (alreadyOpen.length > 0) {
+      const savedIndex = Math.max(0, layout.tabs.findIndex((tab) => tab.id === layout.activeTabId))
+      activateTab(alreadyOpen[Math.min(savedIndex, alreadyOpen.length - 1)])
+      setLayoutDraftName(layout.name)
+      setLayoutMenuOpen(false)
+      return
+    }
     const openedTabs: ChartTab[] = layout.tabs.map((tab) => ({ ...tab, id: crypto.randomUUID(), layoutId: layout.id }))
     const index = Math.max(0, layout.tabs.findIndex((tab) => tab.id === layout.activeTabId))
     const focused = openedTabs[index]
@@ -480,17 +489,19 @@ function WorkspaceApp({ user, onLogout }: WorkspaceAppProps) {
     setInterval(focused.interval)
     setSuperchartOpen(false)
     setLayoutMenuOpen(false)
-  }, [])
+  }, [workspace.tabs, activateTab])
 
   /** Middle-click on a layout card: add its tabs to the tab bar and stay where we are. */
-  const openSavedLayoutInBackground = useCallback((layout: SavedLayout) => {
+  const openSavedLayoutInBackground = useCallback((layout: SavedLayout, forceCopy = false) => {
+    // Middle-click on a layout that is already open does nothing; the menu's "Open in new tab" always makes a copy.
+    if (!forceCopy && workspace.tabs.some((tab) => tab.layoutId === layout.id)) return
     const openedTabs: ChartTab[] = layout.tabs.map((tab) => ({ ...tab, id: crypto.randomUUID(), layoutId: layout.id }))
     setWorkspace((current) => ({
       ...current,
       tabs: [...current.tabs, ...openedTabs],
       customIntervals: [...new Set([...current.customIntervals, ...layout.customIntervals])],
     }))
-  }, [])
+  }, [workspace.tabs])
 
   const createNewLayout = useCallback(() => {
     const layout = createLayout(DEFAULT_LAYOUT_NAME, Date.now())
@@ -1961,13 +1972,22 @@ export function App() {
     if (!user) return
     let live = true
     void (async () => {
+      // A browser that has synced this account before already holds a good copy, so open the workspace from it
+      // right away (no loading screen when you come back to the app) and check with the server in the background.
+      // A first visit on a new device waits for the server copy instead.
+      const returning = hasSyncedBefore(user.id)
+      if (returning) setSyncedUserId(user.id)
+      const sync = startUserSync(user.id)
       if (!await verifySession()) {
+        stopUserSync()
         if (live) setUser(null)
         return
       }
-      // Pull this user's layouts, drawings, alerts and workspace from the server before the workspace reads them.
-      await startUserSync(user.id)
-      if (live) setSyncedUserId(user.id)
+      const { changed } = await sync
+      if (!live) return
+      if (!returning) setSyncedUserId(user.id)
+      // Another device saved newer data: reload once so the app shows it instead of silently overwriting it later.
+      else if (changed) window.location.reload()
     })()
     return () => { live = false }
   }, [user?.id])

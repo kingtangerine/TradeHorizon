@@ -4,11 +4,13 @@ import {
   type Chart,
   type Coordinate,
   type DataLoader,
+  type AxisCreateRangeCallback,
   type KLineData,
   type OverlayCreate,
   type OverlayEvent,
   type Point,
 } from 'klinecharts'
+import { MAX_CACHE_GAP_BARS, loadCachedBars, saveCachedBars } from './candleCache'
 import {
   createDrawing,
   deleteDrawing,
@@ -76,6 +78,16 @@ import { DRAWING_TOOLS } from './tools'
 import { candleToQuote, type ChartQuote, type ChartRuntimeState, type ChartType } from './types'
 
 const HISTORY_PAGE_SIZE = 1000
+/** Coming back after this long, replace the live connection even if it looks open. */
+const RESUME_RECONNECT_AFTER_MS = 10_000
+/** A dropped live connection is only shown to the user if it has not recovered after this long. */
+const STATUS_GRACE_MS = 1500
+const PRICE_SCALE_MIN = 0.05
+const PRICE_SCALE_MAX = 20
+/** Pixels of drag (or wheel) for the price range to change by a factor of e (about 2.7). */
+const AXIS_DRAG_PIXELS_PER_E = 160
+const AXIS_WHEEL_PIXELS_PER_E = 500
+const AXIS_DOUBLE_PRESS_MS = 320
 /** Extra history pages fetched so a timeframe switch can keep the part of the chart you were looking at. */
 const MAX_VIEWPORT_BACKFILL_PAGES = 10
 const VIEWPORT_BACKFILL_MARGIN_BARS = 200
@@ -188,8 +200,16 @@ export class KLineChartController {
 
   #interval: MarketInterval
   #runtimeState: ChartRuntimeState
-  #stream?: { stop(): void }
+  #stream?: { stop(): void; nudge?(force?: boolean): void }
+  #hiddenAtMs?: number
+  #statusTimer?: ReturnType<typeof globalThis.setTimeout>
+  /** True when the chart was painted from the local candle cache and still has to catch up with the exchange. */
+  #catchUpPending = false
   readonly #toolStyles = new Map<DrawingType, DrawingStyle>()
+  /** Price-axis zoom: 1 is the automatic fit, above 1 zooms out, below 1 zooms in. Reset by double-click/tap on the axis. */
+  #priceScale = 1
+  #axisGesture?: { pointerId: number; startY: number; startScale: number }
+  #lastAxisPressMs = 0
   #drawingStoreUnsubscribe: () => void
   #dataEpoch = 0
   #disposed = false
@@ -254,6 +274,21 @@ export class KLineChartController {
       }
 
       const epoch = this.#dataEpoch
+
+      // Reopening a chart (or the app) paints from the local cache at once; the live feed then fills in what is new.
+      if (type === 'init' && !this.#pendingViewport) {
+        const cached = await loadCachedBars(this.#market.marketId, interval)
+        if (this.#disposed || epoch !== this.#dataEpoch || interval !== this.#interval) return
+        const newest = cached?.at(-1)
+        if (cached && newest && cached.length >= 200 && Date.now() - newest.timestamp < MAX_CACHE_GAP_BARS * this.#intervalMs()) {
+          this.#catchUpPending = true
+          callback(cached, { forward: true, backward: false })
+          this.#patchRuntime({ interval, connection: 'connecting', quote: barToQuote(newest), error: null })
+          this.#afterInitialData()
+          return
+        }
+      }
+
       if (type === 'init') {
         this.#patchRuntime({ interval, connection: 'loading', error: null })
       }
@@ -310,6 +345,7 @@ export class KLineChartController {
             quote: latest ? candleToQuote(latest) : null,
             error: latest ? null : 'No candles were returned for this market.',
           })
+          saveCachedBars(this.#market.marketId, interval, bars)
           this.#afterInitialData()
         }
       } catch (error) {
@@ -342,6 +378,10 @@ export class KLineChartController {
       this.#stream?.stop()
       const epoch = this.#dataEpoch
       let hasOpened = false
+      if (this.#catchUpPending) {
+        this.#catchUpPending = false
+        void this.#backfillAfterReconnect(interval, epoch, callback)
+      }
 
       const streamOptions = {
         symbol: this.#market.symbol,
@@ -474,6 +514,10 @@ export class KLineChartController {
 
     if (!chart) throw new Error('The chart could not be initialized.')
     this.#chart = chart
+    chart.overrideYAxis({ paneId: 'candle_pane', createRange: this.#createPriceRange })
+    // Without this a finger dragging on the price axis would be taken by the browser as a page gesture.
+    const axisElement = chart.getDom('candle_pane', 'yAxis')
+    if (axisElement) axisElement.style.touchAction = 'none'
     if (import.meta.env.DEV) (globalThis as { __tradeHorizonChart?: Chart }).__tradeHorizonChart = chart
 
     chart.setSymbol({
@@ -490,6 +534,18 @@ export class KLineChartController {
     // Capture-phase listeners let a drawing tool own the pointer before the chart starts panning.
     host.addEventListener('pointerdown', this.#handleToolPointerDown, true)
     host.addEventListener('pointerdown', this.#handleDeselectPointerDown, true)
+    host.addEventListener('pointerdown', this.#handleAxisPointerDown, true)
+    host.addEventListener('mousedown', this.#blockLibraryAxisGesture, true)
+    host.addEventListener('touchstart', this.#blockLibraryAxisGesture, true)
+    host.addEventListener('dblclick', this.#blockLibraryAxisGesture, true)
+    host.addEventListener('wheel', this.#handleAxisWheel, { capture: true, passive: false })
+    document.addEventListener('visibilitychange', this.#handleVisibilityChange)
+    globalThis.addEventListener('pagehide', this.#handlePageHide)
+    globalThis.addEventListener('pageshow', this.#handleResumeNow)
+    globalThis.addEventListener('online', this.#handleResumeNow)
+    globalThis.addEventListener('pointermove', this.#handleAxisPointerMove, true)
+    globalThis.addEventListener('pointerup', this.#handleAxisPointerEnd, true)
+    globalThis.addEventListener('pointercancel', this.#handleAxisPointerEnd, true)
     host.addEventListener('mousedown', this.#blockChartWhileDrawing, true)
     host.addEventListener('touchstart', this.#blockChartWhileDrawing, true)
     host.addEventListener('contextmenu', this.#handleToolContextMenu, true)
@@ -994,6 +1050,98 @@ export class KLineChartController {
     this.#selectOverlay(drawing.id)
   }
 
+  // --- Price axis zoom ---------------------------------------------------------------------------
+  // klinecharts scales the price axis by (current page Y / page Y where the press started). That ratio depends
+  // on where on the screen you press, so the same drag zooms wildly near the top and barely near the bottom,
+  // and a drag toward the top of the page collapses the range. We take over presses on the price axis and scale
+  // by the drag distance instead, feeding the result through the library's own createRange hook.
+
+  readonly #createPriceRange: AxisCreateRangeCallback = ({ defaultRange }) => {
+    const k = this.#priceScale
+    if (k === 1) return defaultRange
+    const grow = (from: number, to: number): [number, number] => {
+      const middle = (from + to) / 2
+      const half = ((to - from) / 2) * k
+      return [middle - half, middle + half]
+    }
+    const [from, to] = grow(defaultRange.from, defaultRange.to)
+    const [realFrom, realTo] = grow(defaultRange.realFrom, defaultRange.realTo)
+    const [displayFrom, displayTo] = grow(defaultRange.displayFrom, defaultRange.displayTo)
+    return { from, to, range: to - from, realFrom, realTo, realRange: realTo - realFrom, displayFrom, displayTo, displayRange: displayTo - displayFrom }
+  }
+
+  #setPriceScale(next: number): void {
+    const clamped = Math.min(PRICE_SCALE_MAX, Math.max(PRICE_SCALE_MIN, next))
+    if (clamped === this.#priceScale) return
+    this.#priceScale = clamped
+    this.#chart.overrideYAxis({ paneId: 'candle_pane', createRange: this.#createPriceRange })
+  }
+
+  #onPriceAxis(clientX: number, clientY: number): boolean {
+    const rect = this.#chart.getDom('candle_pane', 'yAxis')?.getBoundingClientRect()
+    return !!rect && clientX >= rect.left && clientX <= rect.right && clientY >= rect.top && clientY <= rect.bottom
+  }
+
+  /** Keeps the library's own (flawed) axis handling from seeing presses on the price axis. */
+  readonly #blockLibraryAxisGesture = (event: Event): void => {
+    const point = 'touches' in event ? (event as TouchEvent).touches[0] : (event as MouseEvent)
+    if (point && this.#onPriceAxis(point.clientX, point.clientY)) event.stopPropagation()
+  }
+
+  readonly #handleAxisPointerDown = (event: PointerEvent): void => {
+    if (event.button !== 0 || !this.#onPriceAxis(event.clientX, event.clientY)) return
+    event.preventDefault()
+    // A quick second press (double-click or double-tap) goes back to the automatic fit.
+    const now = performance.now()
+    if (now - this.#lastAxisPressMs < AXIS_DOUBLE_PRESS_MS) {
+      this.#lastAxisPressMs = 0
+      this.#axisGesture = undefined
+      this.#setPriceScale(1)
+      return
+    }
+    this.#lastAxisPressMs = now
+    this.#axisGesture = { pointerId: event.pointerId, startY: event.clientY, startScale: this.#priceScale }
+  }
+
+  readonly #handleAxisPointerMove = (event: PointerEvent): void => {
+    const gesture = this.#axisGesture
+    if (!gesture || event.pointerId !== gesture.pointerId) return
+    // Dragging down zooms out, up zooms in; the curve is exponential so equal drags always change the range by equal ratios.
+    this.#setPriceScale(gesture.startScale * Math.exp((event.clientY - gesture.startY) / AXIS_DRAG_PIXELS_PER_E))
+  }
+
+  readonly #handleAxisPointerEnd = (event: PointerEvent): void => {
+    if (this.#axisGesture?.pointerId === event.pointerId) this.#axisGesture = undefined
+  }
+
+  /** Leaving the page saves the chart; coming back replaces a live connection that died in the background. */
+  readonly #handleVisibilityChange = (): void => {
+    if (document.visibilityState === 'hidden') {
+      this.#hiddenAtMs = Date.now()
+      this.#persistBars()
+      return
+    }
+    const away = this.#hiddenAtMs === undefined ? 0 : Date.now() - this.#hiddenAtMs
+    this.#hiddenAtMs = undefined
+    this.#stream?.nudge?.(away > RESUME_RECONNECT_AFTER_MS)
+  }
+
+  readonly #handlePageHide = (): void => this.#persistBars()
+  readonly #handleResumeNow = (): void => { this.#stream?.nudge?.(true) }
+
+  #persistBars(): void {
+    if (this.#disposed || this.#replay || this.#market.kind === 'dominance') return
+    const bars = this.#chart.getDataList()
+    if (bars.length >= 50) saveCachedBars(this.#market.marketId, this.#interval, bars)
+  }
+
+  readonly #handleAxisWheel = (event: WheelEvent): void => {
+    if (!this.#onPriceAxis(event.clientX, event.clientY)) return
+    event.preventDefault()
+    event.stopPropagation()
+    this.#setPriceScale(this.#priceScale * Math.exp(Math.max(-100, Math.min(100, event.deltaY)) / AXIS_WHEEL_PIXELS_PER_E))
+  }
+
   /** klinecharts never deselects on empty space, so a press that is not on the selected drawing clears the selection. */
   readonly #handleDeselectPointerDown = (event: PointerEvent): void => {
     if (event.button !== 0 || this.#tool || this.#replayPicking || !this.#selectedDrawingId) return
@@ -1137,6 +1285,19 @@ export class KLineChartController {
     if (this.#dominanceIndicatorPoll !== undefined) globalThis.clearInterval(this.#dominanceIndicatorPoll)
     this.#host.removeEventListener('pointerdown', this.#handleToolPointerDown, true)
     this.#host.removeEventListener('pointerdown', this.#handleDeselectPointerDown, true)
+    this.#host.removeEventListener('pointerdown', this.#handleAxisPointerDown, true)
+    this.#host.removeEventListener('mousedown', this.#blockLibraryAxisGesture, true)
+    this.#host.removeEventListener('touchstart', this.#blockLibraryAxisGesture, true)
+    this.#host.removeEventListener('dblclick', this.#blockLibraryAxisGesture, true)
+    this.#host.removeEventListener('wheel', this.#handleAxisWheel, true)
+    document.removeEventListener('visibilitychange', this.#handleVisibilityChange)
+    globalThis.removeEventListener('pagehide', this.#handlePageHide)
+    globalThis.removeEventListener('pageshow', this.#handleResumeNow)
+    globalThis.removeEventListener('online', this.#handleResumeNow)
+    globalThis.clearTimeout(this.#statusTimer)
+    globalThis.removeEventListener('pointermove', this.#handleAxisPointerMove, true)
+    globalThis.removeEventListener('pointerup', this.#handleAxisPointerEnd, true)
+    globalThis.removeEventListener('pointercancel', this.#handleAxisPointerEnd, true)
     this.#host.removeEventListener('mousedown', this.#blockChartWhileDrawing, true)
     this.#host.removeEventListener('touchstart', this.#blockChartWhileDrawing, true)
     this.#host.removeEventListener('contextmenu', this.#handleToolContextMenu, true)
@@ -1154,12 +1315,20 @@ export class KLineChartController {
   }
 
   #handleStreamStatus(status: KlineStreamStatus): void {
-    if (status.state === 'connecting') {
-      this.#patchRuntime({ connection: 'connecting' })
-    } else if (status.state === 'open') {
+    globalThis.clearTimeout(this.#statusTimer)
+    if (status.state === 'open') {
       this.#patchRuntime({ connection: 'live', error: null })
-    } else if (status.state === 'reconnecting') {
-      this.#patchRuntime({ connection: 'reconnecting' })
+    } else if (status.state === 'connecting' || status.state === 'reconnecting') {
+      const connection = status.state
+      // A connection that was live usually recovers within a moment (for example right after you return to the
+      // tab), so only tell the user if it has not come back after a short grace period.
+      if (this.#runtimeState.connection === 'live') {
+        this.#statusTimer = globalThis.setTimeout(() => {
+          if (!this.#disposed) this.#patchRuntime({ connection })
+        }, STATUS_GRACE_MS)
+      } else {
+        this.#patchRuntime({ connection })
+      }
     }
   }
 
