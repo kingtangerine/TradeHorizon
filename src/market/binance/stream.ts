@@ -23,6 +23,8 @@ export interface ReconnectPolicy {
 }
 
 export interface WebSocketConnection {
+  /** 1 when open. Optional because test doubles do not have it. */
+  readonly readyState?: number;
   onopen: ((event: unknown) => void) | null;
   onmessage: ((event: { data: unknown }) => void) | null;
   onerror: ((event: unknown) => void) | null;
@@ -163,6 +165,46 @@ export class BinanceKlineSubscription {
     }
 
     this.#emitStatus("stopped", this.#retryAttempt);
+  }
+
+  /**
+   * Called when the page becomes visible again or the network returns. A connection that died while the page was in
+   * the background (common on phones) is replaced immediately instead of waiting for the retry timer. With
+   * `force` the connection is replaced even if it looks open, because a long sleep can leave it silently dead.
+   */
+  nudge(force = false): void {
+    if (!this.#active) {
+      return;
+    }
+
+    const socket = this.#socket;
+    const open = socket !== undefined && (socket.readyState === undefined || socket.readyState === 1);
+
+    if (open && !force) {
+      return;
+    }
+
+    if (this.#retryTimer !== undefined) {
+      this.#scheduler.clearTimeout(this.#retryTimer);
+      this.#retryTimer = undefined;
+    }
+
+    if (socket) {
+      socket.onopen = null;
+      socket.onmessage = null;
+      socket.onerror = null;
+      socket.onclose = null;
+      this.#socket = undefined;
+
+      try {
+        socket.close(1000, "refreshing connection");
+      } catch {
+        // Already closed.
+      }
+    }
+
+    this.#retryAttempt = 0;
+    this.#connect(this.#generation);
   }
 
   readonly #handleAbort = (): void => this.stop();
