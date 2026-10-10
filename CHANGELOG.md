@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [0.10.0] - 2026-10-10
+
+### Added
+- **Combine saved layouts into a split view.** On the layouts page, press Combine, tick 2 to 4 layouts (numbers show the order the charts will appear in), and press Open split view. Each layout contributes the chart it was saved with. A bar at the bottom lists the picks, names the result (a name is suggested), and has Keep for later, on by default.
+- **Saved splits.** Keeping a split saves it as a normal layout card with a ▦ chart-count badge; clicking it opens the split again (or switches to it if it is already open). The toolbar's layout menu also has Save split to keep the split you are looking at.
+- A short confirmation message appears when a split is opened or saved.
+
 ## [0.9.0] - 2026-10-10
 
 ### Added

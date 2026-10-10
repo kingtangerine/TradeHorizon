@@ -1,6 +1,6 @@
 import { normalizeIndicators, type IndicatorSettings } from '../chart/indicators'
 import { isMarketInterval, type MarketInterval } from '../market'
-import { parseSplit, type TabSplit } from './panes'
+import { panesOf, parseSplit, type PaneSpec, type SplitCount, type TabSplit } from './panes'
 
 export interface ChartTab {
   readonly id: string
@@ -71,9 +71,71 @@ export function duplicateLayout(layout: SavedLayout, nowMs: number): SavedLayout
   }
 }
 
-export function layoutSummary(layout: SavedLayout): { symbol: string; interval: MarketInterval } {
+export function layoutSummary(layout: SavedLayout): { symbol: string; interval: MarketInterval; charts: number } {
   const tab = layout.tabs.find((item) => item.id === layout.activeTabId) ?? layout.tabs[0]
-  return { symbol: tab.symbol, interval: tab.interval }
+  return { symbol: tab.symbol, interval: tab.interval, charts: tab.split?.count ?? 1 }
+}
+
+export const MAX_COMBINED_LAYOUTS = 4
+
+/** "BTCUSDT" -> "BTC". Pairs quoted in something else keep their full name. */
+export function shortSymbol(symbol: string): string {
+  return symbol.replace(/USDT$/, '')
+}
+
+/** A readable default name for a split: "BTC · ETH · SOL", or "BTC 15m · 1h · 4h" when every chart is the same symbol. */
+export function defaultSplitName(panes: readonly PaneSpec[]): string {
+  const labels = [...new Set(panes.map((pane) => shortSymbol(pane.symbol)))]
+  const name = labels.length === 1
+    ? `${labels[0]} ${panes.map((pane) => pane.interval).join(' · ')}`
+    : labels.join(' · ')
+  return name.slice(0, 48)
+}
+
+/**
+ * The chart each saved layout contributes when layouts are combined: the chart that was active
+ * when it was saved. A layout that is itself a split contributes its main chart.
+ */
+export function combinedPanes(layouts: readonly SavedLayout[]): PaneSpec[] {
+  return layouts.map((layout) => {
+    const { symbol, interval } = layoutSummary(layout)
+    return { symbol, interval }
+  })
+}
+
+/** A tab that shows the given charts as one split view. Needs 2 to 4 charts. */
+export function splitTabFromPanes(panes: readonly PaneSpec[], id: string, nowMs: number): ChartTab {
+  const count = Math.min(MAX_COMBINED_LAYOUTS, Math.max(2, panes.length)) as SplitCount
+  const [main, ...rest] = panes
+  return {
+    id,
+    symbol: main.symbol,
+    interval: main.interval,
+    createdAtMs: nowMs,
+    split: { count, panes: rest.slice(0, count - 1), active: 0 },
+  }
+}
+
+/** Saves one split tab as a layout of its own, so it can be reopened later from the layouts page. */
+export function createSplitLayout(
+  name: string,
+  tab: ChartTab,
+  base: Pick<SavedLayout, 'volumeVisible' | 'customIntervals' | 'indicators'>,
+  nowMs: number,
+): SavedLayout {
+  const { layoutId: _layoutId, ...rest } = tab
+  const tabId = crypto.randomUUID()
+  return {
+    id: crypto.randomUUID(),
+    name: name.trim().slice(0, 48) || defaultSplitName(panesOf(tab)),
+    tabs: [{ ...rest, id: tabId }],
+    activeTabId: tabId,
+    volumeVisible: base.volumeVisible,
+    customIntervals: base.customIntervals,
+    ...(base.indicators ? { indicators: base.indicators } : {}),
+    createdAtMs: nowMs,
+    updatedAtMs: nowMs,
+  }
 }
 
 export function filterAndSortLayouts(
