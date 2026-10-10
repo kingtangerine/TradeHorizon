@@ -3,11 +3,11 @@ import {
   type FormEvent,
   useCallback,
   useEffect,
+  useMemo,
   useRef,
   useState,
   useSyncExternalStore,
 } from 'react'
-import { CryptoChartSurface } from '../chart/CryptoChartSurface'
 import { DISPLAY_INTERVALS } from '../chart/intervals'
 import type { KLineChartController } from '../chart/KLineChartController'
 import { allMarkets, getMarket, refreshMarketCatalog } from '../chart/markets'
@@ -23,7 +23,9 @@ import { MARKET_INTERVALS, MARKET_INTERVAL_SPECS, type MarketInterval } from '..
 import { alertReached, loadAlerts, saveAlerts, type AlertDirection, type PriceAlert } from './alerts'
 import { ColorPicker } from './ColorPicker'
 import { disablePush, enablePush, fetchAlertEvents, getPushStatus, type PushStatus } from './backgroundAlerts'
+import { ChartPane } from './ChartPane'
 import { ObjectList } from './ObjectList'
+import { activePaneIndex, panesOf, withActivePane, withPaneChange, withPaneCount, type PaneSpec, type SplitCount } from './panes'
 import { Watchlist } from './Watchlist'
 import { addSymbol, loadWatchlists, saveWatchlists } from './watchlists'
 import { RectangleTemplates } from './RectangleTemplates'
@@ -101,6 +103,7 @@ import {
   UserIcon,
   TextIcon,
   FolderIcon,
+  SplitIcon,
   StarIcon,
   MidlineIcon,
 } from './Icons'
@@ -128,22 +131,6 @@ const DEFAULT_LAYOUT_NAME = 'Main layout'
 function formatReplayTime(valueMs: number | null): string {
   if (valueMs === null) return '—'
   return `${new Date(valueMs).toISOString().slice(0, 16).replace('T', ' ')} UTC`
-}
-
-function formatPrice(value?: number, precision = 2): string {
-  if (value === undefined || !Number.isFinite(value)) return '—'
-  return new Intl.NumberFormat('en-US', {
-    minimumFractionDigits: precision,
-    maximumFractionDigits: precision,
-  }).format(value)
-}
-
-function formatCompact(value?: number): string {
-  if (value === undefined || !Number.isFinite(value)) return '—'
-  return new Intl.NumberFormat('en-US', {
-    notation: 'compact',
-    maximumFractionDigits: 2,
-  }).format(value)
 }
 
 function connectionCopy(state: ChartRuntimeState): string {
@@ -235,8 +222,6 @@ interface WorkspaceAppProps {
 
 function WorkspaceApp({ user, onLogout }: WorkspaceAppProps) {
   const [workspace, setWorkspace] = useState(() => adoptActiveLayout(loadWorkspace(user.id)))
-  const initialTab = workspace.tabs.find((tab) => tab.id === workspace.activeTabId) ?? workspace.tabs[0]
-  const initialMarket = getMarket(initialTab.symbol)
   const [drawingStore] = useState(
     () =>
       new DrawingStore({
@@ -251,8 +236,6 @@ function WorkspaceApp({ user, onLogout }: WorkspaceAppProps) {
     drawingStore.getSnapshot,
     drawingStore.getSnapshot,
   )
-  const [interval, setInterval] = useState<MarketInterval>(initialTab.interval)
-  const [market, setMarket] = useState(initialMarket)
   const [controller, setController] = useState<KLineChartController | null>(null)
   const [activeTool, setActiveTool] = useState<'cursor' | DrawingType>('cursor')
   const [selectedDrawingId, setSelectedDrawingId] = useState<string>()
@@ -273,6 +256,7 @@ function WorkspaceApp({ user, onLogout }: WorkspaceAppProps) {
   const [saveAsOpen, setSaveAsOpen] = useState(false)
   const [timeframeMenuOpen, setTimeframeMenuOpen] = useState(false)
   const [indicatorMenuOpen, setIndicatorMenuOpen] = useState(false)
+  const [splitMenuOpen, setSplitMenuOpen] = useState(false)
   const [maDraft, setMaDraft] = useState<Record<MovingAverageKind, string>>({ sma: '', ema: '' })
   const [maError, setMaError] = useState<{ kind: MovingAverageKind; message: string } | null>(null)
   const [layoutDraftName, setLayoutDraftName] = useState(workspace.layoutName)
@@ -283,6 +267,13 @@ function WorkspaceApp({ user, onLogout }: WorkspaceAppProps) {
   const indicators = workspace.indicators ?? DEFAULT_INDICATORS
   const activeTab = workspace.tabs.find((tab) => tab.id === workspace.activeTabId) ?? workspace.tabs[0]
   const currentLayout = savedLayouts.find((layout) => layout.id === activeTab.layoutId)
+  // A tab shows one chart or a split of 2 to 4. The active pane's symbol and timeframe drive the toolbar, tools and panels.
+  const activePaneIdx = activePaneIndex(activeTab)
+  const panes = useMemo(() => panesOf(activeTab), [activeTab])
+  const paneMarkets = useMemo(() => panes.map((pane) => getMarket(pane.symbol)), [panes, markets])
+  const paneTotal = panes.length
+  const market = paneMarkets[activePaneIdx]
+  const interval = panes[activePaneIdx].interval
   const [layoutNotice, setLayoutNotice] = useState('')
   const [alerts, setAlerts] = useState<PriceAlert[]>(() => loadAlerts(user.id))
   const [alertDirection, setAlertDirection] = useState<AlertDirection>('above')
@@ -295,6 +286,7 @@ function WorkspaceApp({ user, onLogout }: WorkspaceAppProps) {
   const layoutMenuRef = useRef<HTMLDivElement>(null)
   const timeframeMenuRef = useRef<HTMLDivElement>(null)
   const indicatorMenuRef = useRef<HTMLDivElement>(null)
+  const splitMenuRef = useRef<HTMLDivElement>(null)
   const [runtime, setRuntime] = useState<ChartRuntimeState>({
     interval: INITIAL_INTERVAL,
     connection: 'loading',
@@ -312,11 +304,10 @@ function WorkspaceApp({ user, onLogout }: WorkspaceAppProps) {
     [],
   )
   const handleToolSettled = useCallback(() => setActiveTool('cursor'), [])
-  const addAlertAtPrice = useCallback((targetPrice: number) => {
-    const last = runtime.quote?.close
+  const addAlertAtPrice = useCallback((targetPrice: number, symbol: string, last: number | undefined) => {
     setAlerts((current) => [{
       id: crypto.randomUUID(),
-      symbol: market.symbol,
+      symbol,
       targetPrice,
       direction: last !== undefined && targetPrice < last ? 'below' : 'above',
       enabled: true,
@@ -327,7 +318,7 @@ function WorkspaceApp({ user, onLogout }: WorkspaceAppProps) {
     if ('Notification' in globalThis && Notification.permission === 'default') {
       void Notification.requestPermission()
     }
-  }, [market.symbol, runtime.quote?.close])
+  }, [])
 
   const findWatchMarket = useCallback((symbol: string) => markets.find((item) => item.symbol === symbol), [markets])
 
@@ -378,28 +369,26 @@ function WorkspaceApp({ user, onLogout }: WorkspaceAppProps) {
     updateIndicators((current) => ({ ...current, dominance: { ...current.dominance, [key]: !current.dominance[key] } }))
   }, [updateIndicators])
 
-  const updateActiveTab = useCallback((changes: Partial<Pick<ChartTab, 'symbol' | 'interval'>>) => {
+  /** Changes the symbol or timeframe of the active chart (the main chart of the tab, or one of its split panes). */
+  const updateActivePane = useCallback((changes: Partial<PaneSpec>) => {
     setWorkspace((current) => ({
       ...current,
-      tabs: current.tabs.map((tab) => tab.id === current.activeTabId ? { ...tab, ...changes } : tab),
+      tabs: current.tabs.map((tab) => (
+        tab.id === current.activeTabId ? withPaneChange(tab, activePaneIndex(tab), changes) : tab
+      )),
     }))
   }, [])
 
   const changeMarket = useCallback((nextMarket: typeof market) => {
-    setMarket(nextMarket)
-    updateActiveTab({ symbol: nextMarket.symbol })
-  }, [updateActiveTab])
+    updateActivePane({ symbol: nextMarket.symbol })
+  }, [updateActivePane])
 
   const changeInterval = useCallback((nextInterval: MarketInterval) => {
-    setInterval(nextInterval)
-    updateActiveTab({ interval: nextInterval })
-  }, [updateActiveTab])
+    updateActivePane({ interval: nextInterval })
+  }, [updateActivePane])
 
   const activateTab = useCallback((tab: ChartTab) => {
-    const nextMarket = getMarket(tab.symbol)
     setWorkspace((current) => ({ ...current, activeTabId: tab.id }))
-    setMarket(nextMarket)
-    setInterval(tab.interval)
     setSuperchartOpen(false)
   }, [])
 
@@ -411,9 +400,6 @@ function WorkspaceApp({ user, onLogout }: WorkspaceAppProps) {
       createdAtMs: Date.now(),
     }
     setWorkspace((current) => ({ ...current, tabs: [...current.tabs, tab], activeTabId: tab.id }))
-    const nextMarket = getMarket(symbol)
-    setMarket(nextMarket)
-    setInterval(tab.interval)
     setSuperchartOpen(false)
   }, [])
 
@@ -424,11 +410,28 @@ function WorkspaceApp({ user, onLogout }: WorkspaceAppProps) {
       const tabs = current.tabs.filter((tab) => tab.id !== id)
       if (current.activeTabId !== id) return { ...current, tabs }
       const next = tabs[Math.max(0, index - 1)] ?? tabs[0]
-      const nextMarket = getMarket(next.symbol)
-      setMarket(nextMarket)
-      setInterval(next.interval)
       return { ...current, tabs, activeTabId: next.id }
     })
+  }, [])
+
+  /** Clicking another chart in a split view makes it the one the toolbar and tools act on. */
+  const handleActivatePane = useCallback((index: number) => {
+    controller?.cancelActiveTool()
+    controller?.clearDrawingSelection()
+    setActiveTool('cursor')
+    setSelectedDrawingId(undefined)
+    setWorkspace((current) => ({
+      ...current,
+      tabs: current.tabs.map((tab) => (tab.id === current.activeTabId ? withActivePane(tab, index) : tab)),
+    }))
+  }, [controller])
+
+  const setPaneCount = useCallback((count: 1 | SplitCount) => {
+    setWorkspace((current) => ({
+      ...current,
+      tabs: current.tabs.map((tab) => (tab.id === current.activeTabId ? withPaneCount(tab, count) : tab)),
+    }))
+    setSplitMenuOpen(false)
   }, [])
 
   const saveCurrentLayout = useCallback((name = layoutDraftName, forceNew = false) => {
@@ -485,8 +488,6 @@ function WorkspaceApp({ user, onLogout }: WorkspaceAppProps) {
       customIntervals: [...new Set([...current.customIntervals, ...layout.customIntervals])],
     }))
     setLayoutDraftName(layout.name)
-    setMarket(getMarket(focused.symbol))
-    setInterval(focused.interval)
     setSuperchartOpen(false)
     setLayoutMenuOpen(false)
   }, [workspace.tabs, activateTab])
@@ -649,6 +650,7 @@ function WorkspaceApp({ user, onLogout }: WorkspaceAppProps) {
       if (!layoutMenuRef.current?.contains(target)) setLayoutMenuOpen(false)
       if (!timeframeMenuRef.current?.contains(target)) setTimeframeMenuOpen(false)
       if (!indicatorMenuRef.current?.contains(target)) setIndicatorMenuOpen(false)
+      if (!splitMenuRef.current?.contains(target)) setSplitMenuOpen(false)
     }
     globalThis.addEventListener('mousedown', closeDetachedMenus)
     return () => globalThis.removeEventListener('mousedown', closeDetachedMenus)
@@ -735,8 +737,6 @@ function WorkspaceApp({ user, onLogout }: WorkspaceAppProps) {
     (movingAverageActive(indicators.sma) ? 1 : 0) +
     (movingAverageActive(indicators.ema) ? 1 : 0) +
     Object.values(indicators.dominance).filter(Boolean).length
-  const isPositive = (quote?.changePercent ?? 0) >= 0
-  const blockingLoad = !quote && runtime.connection !== 'error'
   const connectionLabel = connectionCopy(runtime)
   const marketDrawings = drawingSnapshot.drawings.filter((drawing) => drawing.marketId === market.marketId)
   const selectedDrawing = drawingSnapshot.drawings.find((drawing) => drawing.id === selectedDrawingId)
@@ -767,6 +767,7 @@ function WorkspaceApp({ user, onLogout }: WorkspaceAppProps) {
                   <span className="chart-tab-mark">{tabMarket.mark}</span>
                   <span>{tabMarket.pair}</span>
                   <small>{tab.interval}</small>
+                  {tab.split && <small className="chart-tab-split" title={`${tab.split.count} charts`}>▦{tab.split.count}</small>}
                 </button>
                 <button
                   type="button"
@@ -940,6 +941,41 @@ function WorkspaceApp({ user, onLogout }: WorkspaceAppProps) {
           >
             <LineChartIcon />
           </button>
+        </div>
+
+        <div className="toolbar-popover-control" ref={splitMenuRef}>
+          <button
+            type="button"
+            className={paneTotal > 1 ? 'indicators-button active' : 'indicators-button'}
+            aria-label="Chart layout"
+            aria-haspopup="menu"
+            aria-expanded={splitMenuOpen}
+            title="Chart layout: show 2, 3 or 4 charts in this tab"
+            onClick={() => setSplitMenuOpen((open) => !open)}
+          >
+            <SplitIcon count={paneTotal} />
+          </button>
+          {splitMenuOpen && (
+            <div className="top-menu split-menu" role="menu" aria-label="Chart layout">
+              <strong>Charts in this tab</strong>
+              <div className="split-menu-grid">
+                {([1, 2, 3, 4] as const).map((count) => (
+                  <button
+                    type="button"
+                    role="menuitemradio"
+                    aria-checked={paneTotal === count}
+                    className={paneTotal === count ? 'active' : ''}
+                    key={count}
+                    onClick={() => setPaneCount(count)}
+                  >
+                    <SplitIcon count={count} />
+                    <span>{count === 1 ? 'Single' : `${count} charts`}</span>
+                  </button>
+                ))}
+              </div>
+              {paneTotal > 1 && <small>Click a chart to make it active. The toolbar, drawing tools and panels act on the active chart.</small>}
+            </div>
+          )}
         </div>
 
         <span className="toolbar-divider" />
@@ -1202,62 +1238,32 @@ function WorkspaceApp({ user, onLogout }: WorkspaceAppProps) {
         </aside>
 
         <section className={replayActive ? 'chart-workspace replay-active' : 'chart-workspace'} aria-label="Market chart workspace">
-          <div className="chart-watermark" aria-hidden="true">
-            <strong>{market.name}</strong>
-            <span>· {interval} · {market.venue}</span>
-            <i className={`legend-dot legend-dot-${runtime.connection}`} />
-          </div>
-
-          <div className="chart-legend" aria-label="Current market and indicators">
-            <div className="chart-ohlc-row">
-              <span><b>O</b>{formatPrice(quote?.open, market.pricePrecision)}</span>
-              <span><b>H</b>{formatPrice(quote?.high, market.pricePrecision)}</span>
-              <span><b>L</b>{formatPrice(quote?.low, market.pricePrecision)}</span>
-              <span><b>C</b>{formatPrice(quote?.close, market.pricePrecision)}</span>
-              <span className={isPositive ? 'price-up' : 'price-down'}>{quote ? `${isPositive ? '+' : ''}${quote.changePercent.toFixed(2)}%` : '—'}</span>
-            </div>
-            {market.kind !== 'dominance' && <button
-              type="button"
-              className={workspace.volumeVisible ? 'chart-indicator-row' : 'chart-indicator-row muted'}
-              onClick={() => setWorkspace((current) => ({ ...current, volumeVisible: !current.volumeVisible }))}
-              title={workspace.volumeVisible ? 'Hide Volume' : 'Show Volume'}
-            >
-              <span>Volume · {market.baseAsset}</span>
-              <b>{formatCompact(quote?.volume)}</b>
-              {workspace.volumeVisible ? <EyeIcon /> : <EyeOffIcon />}
-            </button>}
-            {(['sma', 'ema'] as const).filter((kind) => movingAverageActive(indicators[kind])).map((kind) => (
-              <button
-                type="button"
-                key={kind}
-                className="chart-indicator-row"
-                onClick={() => toggleMovingAverage(kind)}
-                title={`Hide ${MOVING_AVERAGE_LABELS[kind]}`}
-              >
-                <span>{MOVING_AVERAGE_LABELS[kind]}</span>
-                {indicators[kind].periods.map((period, index) => (
-                  <b key={period} style={{ color: MOVING_AVERAGE_COLORS[kind][index % MOVING_AVERAGE_COLORS[kind].length] }}>{period}</b>
-                ))}
-                <EyeIcon />
-              </button>
+          <div className={`split-grid count-${paneTotal}`} data-count={paneTotal}>
+            {panes.map((pane, index) => (
+              <ChartPane
+                key={`${activeTab.id}:${index}`}
+                index={index}
+                active={index === activePaneIdx}
+                framed={paneTotal > 1}
+                market={paneMarkets[index]}
+                interval={pane.interval}
+                drawingStore={drawingStore}
+                volumeVisible={workspace.volumeVisible}
+                indicators={indicators}
+                magnet={!!workspace.magnet}
+                chartType={workspace.chartType ?? 'candles'}
+                theme={theme}
+                onActivate={handleActivatePane}
+                onActiveRuntime={setRuntime}
+                onActiveController={handleControllerChange}
+                onToolSettled={handleToolSettled}
+                onSelectionChange={handleSelectionChange}
+                onAddAlert={addAlertAtPrice}
+                onToggleVolume={() => setWorkspace((current) => ({ ...current, volumeVisible: !current.volumeVisible }))}
+                onToggleMovingAverage={toggleMovingAverage}
+              />
             ))}
           </div>
-
-          <CryptoChartSurface
-            interval={interval}
-            market={market}
-            drawingStore={drawingStore}
-            volumeVisible={workspace.volumeVisible}
-            indicators={indicators}
-            magnet={!!workspace.magnet}
-            chartType={workspace.chartType ?? 'candles'}
-            onRuntimeState={setRuntime}
-            onControllerChange={handleControllerChange}
-            onToolSettled={handleToolSettled}
-            onSelectionChange={handleSelectionChange}
-            onAddAlert={addAlertAtPrice}
-            theme={theme}
-          />
 
           {replay?.status === 'picking' && (
             <div className="drawing-hint" role="status">
@@ -1316,26 +1322,6 @@ function WorkspaceApp({ user, onLogout }: WorkspaceAppProps) {
               </div>
             )
           })()}
-
-          {blockingLoad && (
-            <div className="chart-state" role="status">
-              <span className="loader-ring" />
-              <strong>Loading {market.symbol}</strong>
-              <span>Connecting to the {market.venue} data feed…</span>
-            </div>
-          )}
-
-          {!quote && runtime.connection === 'error' && (
-            <div className="chart-state error-state" role="alert">
-              <span className="error-symbol">!</span>
-              <strong>Market feed unavailable</strong>
-              <span>{runtime.error ?? 'Check your connection and try again.'}</span>
-              <button type="button" onClick={() => controller?.retry()}>
-                <RefreshIcon />
-                Retry
-              </button>
-            </div>
-          )}
 
           {selectedDrawing && (
             <div className="floating-object-toolbar" role="toolbar" aria-label="Selected object properties">

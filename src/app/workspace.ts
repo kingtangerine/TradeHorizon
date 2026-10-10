@@ -1,5 +1,6 @@
 import { normalizeIndicators, type IndicatorSettings } from '../chart/indicators'
 import { isMarketInterval, type MarketInterval } from '../market'
+import { parseSplit, type TabSplit } from './panes'
 
 export interface ChartTab {
   readonly id: string
@@ -7,6 +8,8 @@ export interface ChartTab {
   readonly interval: MarketInterval
   readonly createdAtMs: number
   readonly layoutId?: string
+  /** Present when the tab shows 2 to 4 charts. The tab's own symbol and interval are the first chart. */
+  readonly split?: TabSplit
 }
 
 export interface UserWorkspace {
@@ -129,7 +132,11 @@ function validTabs(value: unknown): ChartTab[] {
     typeof (item as ChartTab).symbol === 'string' &&
     isMarketInterval((item as ChartTab).interval) &&
     typeof (item as ChartTab).createdAtMs === 'number'
-  ))
+  )).map((tab) => {
+    const { split, ...rest } = tab
+    const valid = parseSplit(split, { symbol: tab.symbol, interval: tab.interval })
+    return valid ? { ...rest, split: valid } : rest
+  })
 }
 
 function validCustomIntervals(value: unknown): MarketInterval[] {

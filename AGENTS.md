@@ -47,12 +47,15 @@ TradeHorizon/
     │   ├── ObjectList.tsx       # Object tree body with user folders (groups.ts holds the data)
     │   ├── Watchlist.tsx        # Watchlist panel (data in watchlists.ts, quotes in quotes.ts)
     │   ├── RectangleTemplates.tsx # Saved rectangle looks (data in templates.ts)
+    │   ├── ChartPane.tsx        # One chart + legend + loading state (a tab shows 1 to 4 of these)
+    │   ├── panes.ts             # Split-view model: pane 0 is the tab itself, extra panes live in tab.split
     │   ├── userSync.ts          # Mirrors per-user localStorage to the server
     │   ├── theme.ts             # Dark/light theme; colors are CSS variables in styles.css
     │   └── workspace.ts         # Multi-tab workspace persistence
     ├── chart/                   # Charting engine & controller
     │   ├── CryptoChartSurface.tsx # React wrapper for klinecharts
     │   ├── KLineChartController.ts # Bridge between chart engine & React/Store
+    │   ├── candleCache.ts       # IndexedDB cache of recent candles for instant reopen
     │   ├── intervals.ts         # Timeframe intervals and mappings
     │   ├── markets.ts           # Cryptocurrency market definitions
     │   ├── model.ts             # Chart adapter data conversions
@@ -112,6 +115,11 @@ When adding a new drawing tool (or modifying an existing one), follow these step
 - Free APIs do not serve historical global market cap and CoinGecko's public tier allows only a few requests per minute (its 429 responses carry no CORS header, so browsers report them as network errors).
 - `src/market/dominance.ts` therefore takes **today's** market caps from CoinGecko (two cached requests) and rebuilds history from **Binance prices**, holding supply constant. Values are exact now and are estimates further back. Keep the request count per timeframe change at zero CoinGecko calls.
 - The same engine feeds the dominance chart symbols (`kind: 'dominance'` markets) and the dominance indicator panes.
+
+### D. Chart interactions that override klinecharts (pinned at 10.0.3)
+- **Price-axis zoom** is handled by `KLineChartController` (capture-phase listeners, `createRange` hook, a `#priceScale` ratio). The library's own axis-drag scales by `pageY / startPageY`, which is wrong; its mouse/touch/dblclick events on the candle pane's y-axis are stopped before it sees them. Re-check this when upgrading klinecharts.
+- **Split view**: `App.tsx` derives `market`/`interval` from the active pane; only the active `ChartPane` reports its runtime and controller upward, so toolbar, tools and panels still talk to "the chart". Do not add per-pane state to `App` without going through `panes.ts`.
+- **Resume behaviour**: streams expose `nudge(force)`; the controller calls it when the page becomes visible again or the network returns, and it saves candles to `candleCache` when the page is hidden.
 
 ---
 

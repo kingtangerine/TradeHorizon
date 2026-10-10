@@ -380,3 +380,15 @@ export function TemplateIcon(props: IconProps) {
     </IconBase>
   )
 }
+
+/** Diagram of a chart layout: 1 single chart, 2 side by side, 3 one large and two small, 4 in a grid. */
+export function SplitIcon({ count, ...props }: IconProps & { count: number }) {
+  return (
+    <IconBase {...props}>
+      <rect x="3" y="4" width="18" height="16" rx="1.5" />
+      {count >= 2 && <line x1="12" y1="4" x2="12" y2="20" />}
+      {count === 3 && <line x1="12" y1="12" x2="21" y2="12" />}
+      {count >= 4 && <><line x1="3" y1="12" x2="21" y2="12" /></>}
+    </IconBase>
+  )
+}
