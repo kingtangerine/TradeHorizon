@@ -57,12 +57,16 @@ import { DRAWING_TOOLS, TOOL_ORDER } from '../chart/tools'
 import { SymbolSearch } from './SymbolSearch'
 import {
   adoptActiveLayout,
+  combinedPanes,
   createLayout,
+  createSplitLayout,
+  defaultSplitName,
   duplicateLayout,
   loadSavedLayouts,
   loadWorkspace,
   saveSavedLayouts,
   saveWorkspace,
+  splitTabFromPanes,
   type ChartTab,
   type SavedLayout,
 } from './workspace'
@@ -257,6 +261,8 @@ function WorkspaceApp({ user, onLogout }: WorkspaceAppProps) {
   const [timeframeMenuOpen, setTimeframeMenuOpen] = useState(false)
   const [indicatorMenuOpen, setIndicatorMenuOpen] = useState(false)
   const [splitMenuOpen, setSplitMenuOpen] = useState(false)
+  const [splitSaveName, setSplitSaveName] = useState('')
+  const [toast, setToast] = useState('')
   const [maDraft, setMaDraft] = useState<Record<MovingAverageKind, string>>({ sma: '', ema: '' })
   const [maError, setMaError] = useState<{ kind: MovingAverageKind; message: string } | null>(null)
   const [layoutDraftName, setLayoutDraftName] = useState(workspace.layoutName)
@@ -413,6 +419,35 @@ function WorkspaceApp({ user, onLogout }: WorkspaceAppProps) {
       return { ...current, tabs, activeTabId: next.id }
     })
   }, [])
+
+  const showToast = useCallback((message: string) => {
+    setToast(message)
+    globalThis.setTimeout(() => setToast((current) => (current === message ? '' : current)), 3600)
+  }, [])
+
+  /** Opens 2 to 4 saved layouts together: one tab, one chart per layout (the chart each was saved with). */
+  const openLayoutsTogether = useCallback((selected: SavedLayout[], options: { name: string, save: boolean }) => {
+    if (selected.length < 2) return
+    const now = Date.now()
+    const tab = splitTabFromPanes(combinedPanes(selected), crypto.randomUUID(), now)
+    const layout = options.save
+      ? createSplitLayout(options.name, tab, { volumeVisible: workspace.volumeVisible, customIntervals: workspace.customIntervals, indicators: workspace.indicators }, now)
+      : undefined
+    const openedTab: ChartTab = layout ? { ...tab, layoutId: layout.id } : tab
+    if (layout) setSavedLayouts((current) => [layout, ...current])
+    setWorkspace((current) => ({ ...current, tabs: [...current.tabs, openedTab], activeTabId: openedTab.id }))
+    setSuperchartOpen(false)
+    showToast(layout ? `Opened and saved “${layout.name}” to your layouts` : `Opened ${selected.length} layouts in a split view`)
+  }, [showToast, workspace.volumeVisible, workspace.customIntervals, workspace.indicators])
+
+  /** Keeps the split on screen as a layout of its own, so it can be reopened later from the layouts page. */
+  const saveSplitAsLayout = useCallback((name: string) => {
+    const layout = createSplitLayout(name, activeTab, { volumeVisible: workspace.volumeVisible, customIntervals: workspace.customIntervals, indicators: workspace.indicators }, Date.now())
+    setSavedLayouts((current) => [layout, ...current])
+    setSplitMenuOpen(false)
+    setSplitSaveName('')
+    showToast(`Saved “${layout.name}” to your layouts`)
+  }, [activeTab, showToast, workspace.volumeVisible, workspace.customIntervals, workspace.indicators])
 
   /** Clicking another chart in a split view makes it the one the toolbar and tools act on. */
   const handleActivatePane = useCallback((index: number) => {
@@ -974,6 +1009,22 @@ function WorkspaceApp({ user, onLogout }: WorkspaceAppProps) {
                 ))}
               </div>
               {paneTotal > 1 && <small>Click a chart to make it active. The toolbar, drawing tools and panels act on the active chart.</small>}
+              {paneTotal > 1 && (
+                <form
+                  className="split-save"
+                  onSubmit={(event) => { event.preventDefault(); saveSplitAsLayout(splitSaveName) }}
+                >
+                  <input
+                    value={splitSaveName}
+                    maxLength={48}
+                    placeholder={defaultSplitName(panes)}
+                    aria-label="Name for the saved split"
+                    onChange={(event) => setSplitSaveName(event.target.value)}
+                    onKeyDown={(event) => event.stopPropagation()}
+                  />
+                  <button type="submit" title="Save this split view to your layouts so you can open it again later">Save split</button>
+                </form>
+              )}
             </div>
           )}
         </div>
@@ -1840,6 +1891,8 @@ function WorkspaceApp({ user, onLogout }: WorkspaceAppProps) {
         />
       )}
 
+      {toast && <div className="toast" role="status">{toast}</div>}
+
       {saveAsOpen && (
         <div className="superchart-backdrop" role="presentation" onMouseDown={() => setSaveAsOpen(false)}>
           <form
@@ -1873,6 +1926,7 @@ function WorkspaceApp({ user, onLogout }: WorkspaceAppProps) {
           activeLayoutId={activeTab.layoutId}
           onOpen={openSavedLayout}
           onOpenInBackground={openSavedLayoutInBackground}
+          onOpenTogether={openLayoutsTogether}
           onCreate={createNewLayout}
           onNewChart={() => setSymbolSearch('new')}
           onToggleFavorite={toggleLayoutFavorite}

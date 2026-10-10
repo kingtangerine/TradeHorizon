@@ -18,7 +18,7 @@ describe('layout helpers', () => {
     const created = createLayout('  ', 5)
     expect(created.name).toBe('Untitled layout')
     expect(created.tabs).toHaveLength(1)
-    expect(layoutSummary(created)).toEqual({ symbol: 'BTCUSDT', interval: '15m' })
+    expect(layoutSummary(created)).toEqual({ symbol: 'BTCUSDT', interval: '15m', charts: 1 })
   })
 
   it('duplicates with fresh ids and a copy name while keeping the active tab mapping', () => {

@@ -3218,3 +3218,74 @@ button:disabled {
   .split-grid.count-3 > .chart-pane:first-child { grid-row: auto; }
   .market-toolbar .split-menu { left: 8px; right: 8px; width: auto; }
 }
+
+/* ===== Combine saved layouts into a split view ===== */
+.superchart-pill-button.active { color: var(--tv-blue, #2962ff); border-color: var(--tv-blue, #2962ff); background: rgb(var(--kr-41-98-255) / 14%); }
+.superchart-pill-button svg { width: 18px; height: 16px; }
+.layout-card-pick {
+  position: absolute; z-index: 2; top: 12px; left: 12px; display: grid; place-items: center;
+  width: 26px; height: 26px; border: 2px solid var(--border-strong); border-radius: 50%;
+  background: var(--bg); color: #fff; font-size: .8rem; font-weight: 700; pointer-events: none;
+}
+.layout-card-pick.on { border-color: var(--tv-blue, #2962ff); background: var(--tv-blue, #2962ff); }
+.layout-card.picked { border-color: var(--tv-blue, #2962ff); box-shadow: 0 0 0 1px var(--tv-blue, #2962ff); }
+.layout-card.pick-disabled { opacity: .45; }
+.layout-card-split { display: inline-flex; align-items: center; gap: 3px; margin-right: 2px; color: var(--tv-blue, #2962ff); font-size: .78rem; font-weight: 600; }
+.layout-card-split svg { width: 16px; height: 14px; }
+
+.combine-bar {
+  position: sticky; bottom: 12px; z-index: 5; display: grid; gap: 10px; margin-top: 18px; padding: 14px 16px;
+  border: 1px solid var(--border-strong); border-radius: 12px; background: var(--panel-raised); color: var(--text);
+  box-shadow: 0 12px 40px rgb(0 0 0 / 45%);
+}
+.combine-info { display: flex; align-items: center; gap: 12px; }
+.combine-info > svg { flex: none; width: 34px; height: 30px; color: var(--tv-blue, #2962ff); }
+.combine-info > div { display: grid; gap: 2px; min-width: 0; }
+.combine-info strong { font-size: .92rem; }
+.combine-info span { color: var(--muted); font-size: .76rem; }
+.combine-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.combine-chip {
+  display: inline-flex; align-items: center; gap: 6px; height: 30px; padding: 0 8px 0 4px; border: 1px solid var(--border-strong);
+  border-radius: 15px; background: var(--bg); color: var(--text); font: inherit; font-size: .78rem; cursor: pointer;
+}
+.combine-chip b { display: grid; place-items: center; width: 20px; height: 20px; border-radius: 50%; background: var(--tv-blue, #2962ff); color: #fff; font-size: .7rem; }
+.combine-chip svg { width: 12px; height: 12px; color: var(--muted); }
+.combine-chip:hover svg { color: var(--red); }
+.combine-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
+.combine-actions > input[type="text"], .combine-actions > input:not([type]) {
+  flex: 1 1 200px; min-width: 0; height: 36px; padding: 0 10px; border: 1px solid var(--border-strong); border-radius: 8px;
+  background: var(--bg); color: var(--text); font: inherit; font-size: .85rem; outline: none;
+}
+.combine-actions > input:focus { border-color: var(--blue); }
+.combine-keep { display: inline-flex; align-items: center; gap: 6px; color: var(--muted); font-size: .8rem; cursor: pointer; }
+.combine-keep input { width: 16px; height: 16px; accent-color: #2962ff; }
+.combine-open, .combine-cancel { height: 36px; padding: 0 16px; border-radius: 8px; font: inherit; font-size: .85rem; font-weight: 600; cursor: pointer; }
+.combine-open { border: 0; background: var(--tv-blue, #2962ff); color: #fff; }
+.combine-open:disabled { opacity: .4; cursor: not-allowed; }
+.combine-cancel { border: 1px solid var(--border-strong); background: transparent; color: var(--text); }
+
+.split-save { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 6px; padding-top: 10px; border-top: 1px solid var(--border); }
+.split-save input {
+  height: 32px; min-width: 0; padding: 0 8px; border: 1px solid var(--border-strong); border-radius: 6px;
+  background: var(--bg); color: var(--text); font: inherit; font-size: 13px; outline: none;
+}
+.split-save button {
+  height: 32px; padding: 0 12px; border: 0; border-radius: 6px; background: var(--tv-blue, #2962ff); color: #fff;
+  font: inherit; font-size: 13px; font-weight: 600; cursor: pointer;
+}
+
+.toast {
+  position: fixed; z-index: 3000; left: 50%; bottom: 44px; transform: translateX(-50%); max-width: min(520px, calc(100vw - 24px));
+  padding: 11px 16px; border: 1px solid var(--border-strong); border-radius: 10px; background: var(--panel-raised); color: var(--text);
+  font-size: .84rem; box-shadow: 0 12px 40px rgb(0 0 0 / 50%);
+}
+@media (max-width: 760px) {
+  .toast { bottom: calc(70px + env(safe-area-inset-bottom)); }
+  .combine-bar { bottom: 8px; padding: 12px; }
+  .combine-actions > input:not([type]) { flex-basis: 100%; }
+  .combine-open { flex: 1; }
+}
+
+/* Combine mode: the pick badge takes the star's place, and the card meta leaves room for the menu button. */
+.layout-card:has(.layout-card-pick) .layout-card-star { visibility: hidden; }
+.layout-card-meta { padding-right: 40px; }
