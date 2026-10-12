@@ -57,6 +57,8 @@ import {
 import { VWAP_ANCHORS, VWAP_ANCHOR_LABELS, type VwapAnchor } from '../chart/vwap'
 import { REPLAY_SPEEDS } from '../chart/replay'
 import { DRAWING_TOOLS, TOOL_ORDER } from '../chart/tools'
+import { decimalString } from '../chart/model'
+import { clampDcaPrice } from '../chart/geometry'
 import { SymbolSearch } from './SymbolSearch'
 import {
   adoptActiveLayout,
@@ -893,6 +895,24 @@ function WorkspaceApp({ user, onLogout }: WorkspaceAppProps) {
   const selectedDrawing = drawingSnapshot.drawings.find((drawing) => drawing.id === selectedDrawingId)
   const allDrawingsHidden = marketDrawings.length > 0 && marketDrawings.every((drawing) => drawing.hidden)
 
+  const toggleDca = () => {
+    if (!selectedDrawing || !isPositionTool(selectedDrawing.type)) return
+    const [entry, target, stop] = selectedDrawing.anchors
+    if (selectedDrawing.anchors.length > 3) {
+      drawingStore.execute(updateDrawing(selectedDrawing.id, {
+        anchors: selectedDrawing.anchors.slice(0, 3),
+        style: { ...selectedDrawing.style, dcaTriggered: false },
+      }))
+      return
+    }
+    drawingStore.execute(updateDrawing(selectedDrawing.id, {
+      anchors: [...selectedDrawing.anchors, {
+        timeMs: Math.round(entry.timeMs + (target.timeMs - entry.timeMs) / 2),
+        price: decimalString(clampDcaPrice(Number(entry.price), Number(stop.price))),
+      }],
+    }))
+  }
+
   const updateSelectedStyle = (changes: Record<string, string | number | boolean>) => {
     if (!selectedDrawing) return
     drawingStore.execute(updateDrawing(selectedDrawing.id, {
@@ -1567,6 +1587,25 @@ function WorkspaceApp({ user, onLogout }: WorkspaceAppProps) {
                   >
                     <SettingsIcon />
                   </button>
+                  <button
+                    type="button"
+                    className={selectedDrawing.anchors.length > 3 ? 'toolbar-action text-action active' : 'toolbar-action text-action'}
+                    aria-pressed={selectedDrawing.anchors.length > 3}
+                    title={selectedDrawing.anchors.length > 3 ? 'Remove the DCA line' : 'Add a DCA (second buy) line'}
+                    onClick={toggleDca}
+                  >
+                    DCA
+                  </button>
+                  {selectedDrawing.anchors.length > 3 && (
+                    <label className="toolbar-check" title="Tick when the DCA order has filled, to show the average entry">
+                      <input
+                        type="checkbox"
+                        checked={selectedDrawing.style.dcaTriggered === true}
+                        onChange={(event) => updateSelectedStyle({ dcaTriggered: event.target.checked })}
+                      />
+                      <span>Triggered</span>
+                    </label>
+                  )}
                 </>
               ) : selectedDrawing.type === 'text' ? (
                 <>
@@ -1761,6 +1800,21 @@ function WorkspaceApp({ user, onLogout }: WorkspaceAppProps) {
                       />
                     </label>
                   </div>
+                  {selectedDrawing.anchors.length > 3 && (
+                    <div className="position-settings-grid">
+                      <label>
+                        <span>DCA size <small>× entry order</small></span>
+                        <input
+                          type="number"
+                          min="0.1"
+                          max="20"
+                          step="0.1"
+                          value={styleNumber(selectedDrawing.style.dcaSize, 1)}
+                          onChange={(event) => updateSelectedStyle({ dcaSize: Math.max(0.1, Math.min(20, Number(event.target.value) || 1)) })}
+                        />
+                      </label>
+                    </div>
+                  )}
                   <p>Position quantity is calculated automatically from account size, risk percentage, entry, and stop distance.</p>
                 </div>
 

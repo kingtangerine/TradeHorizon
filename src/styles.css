@@ -3314,3 +3314,7 @@ button:disabled {
   width: 100%; height: 32px; padding: 0 8px; border: 1px solid var(--border-strong); border-radius: 6px;
   background: var(--bg); color: var(--text); font: inherit; font-size: .76rem;
 }
+
+.toolbar-action.text-action { width: auto; padding: 0 10px; font-size: .74rem; font-weight: 700; letter-spacing: .02em; }
+.toolbar-check { display: inline-flex; align-items: center; gap: 6px; padding: 0 8px; font-size: .74rem; color: var(--text); cursor: pointer; white-space: nowrap; }
+.toolbar-check input { accent-color: var(--accent, #2962ff); }
