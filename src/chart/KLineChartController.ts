@@ -82,6 +82,10 @@ const HISTORY_PAGE_SIZE = 1000
 const RESUME_RECONNECT_AFTER_MS = 10_000
 /** A dropped live connection is only shown to the user if it has not recovered after this long. */
 const STATUS_GRACE_MS = 1500
+/** Drag distance before a press on the chart counts as a pan rather than a click. */
+const PAN_START_PX = 6
+/** The library adds empty space above and below the candles (gap 0.16 + 0.12), so a pixel of drag is worth this many range fractions. */
+const PRICE_GAP_FACTOR = 1.28
 const PRICE_SCALE_MIN = 0.05
 const PRICE_SCALE_MAX = 20
 /** Pixels of drag (or wheel) for the price range to change by a factor of e (about 2.7). */
@@ -160,6 +164,8 @@ export interface KLineChartControllerCallbacks {
   onRuntimeState(state: ChartRuntimeState): void
   onToolSettled(): void
   onSelectionChange(selectedId?: string): void
+  /** The price scale was moved or zoomed by the user (true) or is back on automatic fit (false). */
+  onPriceViewChange?(manual: boolean): void
 }
 
 function isAbortError(error: unknown): boolean {
@@ -208,6 +214,10 @@ export class KLineChartController {
   readonly #toolStyles = new Map<DrawingType, DrawingStyle>()
   /** Price-axis zoom: 1 is the automatic fit, above 1 zooms out, below 1 zooms in. Reset by double-click/tap on the axis. */
   #priceScale = 1
+  /** Vertical pan of the price view, as a fraction of the automatic price range (positive shows higher prices). */
+  #priceOffset = 0
+  #pan?: { pointerId: number; startY: number; startOffset: number; active: boolean }
+  readonly #pointersDown = new Set<number>()
   #axisGesture?: { pointerId: number; startY: number; startScale: number }
   #lastAxisPressMs = 0
   #drawingStoreUnsubscribe: () => void
@@ -515,6 +525,8 @@ export class KLineChartController {
     if (!chart) throw new Error('The chart could not be initialized.')
     this.#chart = chart
     chart.overrideYAxis({ paneId: 'candle_pane', createRange: this.#createPriceRange })
+    // The chart area never scrolls the page, so every finger drag belongs to the chart (pan, pinch, price pan).
+    host.style.touchAction = 'none'
     // Without this a finger dragging on the price axis would be taken by the browser as a page gesture.
     const axisElement = chart.getDom('candle_pane', 'yAxis')
     if (axisElement) axisElement.style.touchAction = 'none'
@@ -535,6 +547,10 @@ export class KLineChartController {
     host.addEventListener('pointerdown', this.#handleToolPointerDown, true)
     host.addEventListener('pointerdown', this.#handleDeselectPointerDown, true)
     host.addEventListener('pointerdown', this.#handleAxisPointerDown, true)
+    host.addEventListener('pointerdown', this.#handlePanPointerDown, true)
+    globalThis.addEventListener('pointermove', this.#handlePanPointerMove, true)
+    globalThis.addEventListener('pointerup', this.#handlePanPointerEnd, true)
+    globalThis.addEventListener('pointercancel', this.#handlePanPointerEnd, true)
     host.addEventListener('mousedown', this.#blockLibraryAxisGesture, true)
     host.addEventListener('touchstart', this.#blockLibraryAxisGesture, true)
     host.addEventListener('dblclick', this.#blockLibraryAxisGesture, true)
@@ -567,6 +583,7 @@ export class KLineChartController {
 
     this.cancelActiveTool()
     this.#clearReplay()
+    this.resetPriceView()
     this.#pendingViewport = this.#captureViewport()
     this.#historyLoader.cancel()
     this.#stream?.stop()
@@ -1058,9 +1075,10 @@ export class KLineChartController {
 
   readonly #createPriceRange: AxisCreateRangeCallback = ({ defaultRange }) => {
     const k = this.#priceScale
-    if (k === 1) return defaultRange
+    const shift = this.#priceOffset
+    if (k === 1 && shift === 0) return defaultRange
     const grow = (from: number, to: number): [number, number] => {
-      const middle = (from + to) / 2
+      const middle = (from + to) / 2 + shift * (to - from)
       const half = ((to - from) / 2) * k
       return [middle - half, middle + half]
     }
@@ -1070,11 +1088,24 @@ export class KLineChartController {
     return { from, to, range: to - from, realFrom, realTo, realRange: realTo - realFrom, displayFrom, displayTo, displayRange: displayTo - displayFrom }
   }
 
-  #setPriceScale(next: number): void {
-    const clamped = Math.min(PRICE_SCALE_MAX, Math.max(PRICE_SCALE_MIN, next))
-    if (clamped === this.#priceScale) return
-    this.#priceScale = clamped
+  #applyPriceView(scale: number, offset: number): void {
+    const nextScale = Math.min(PRICE_SCALE_MAX, Math.max(PRICE_SCALE_MIN, scale))
+    if (nextScale === this.#priceScale && offset === this.#priceOffset) return
+    const wasManual = this.#priceScale !== 1 || this.#priceOffset !== 0
+    this.#priceScale = nextScale
+    this.#priceOffset = offset
     this.#chart.overrideYAxis({ paneId: 'candle_pane', createRange: this.#createPriceRange })
+    const manual = this.#priceScale !== 1 || this.#priceOffset !== 0
+    if (manual !== wasManual) this.#callbacks.onPriceViewChange?.(manual)
+  }
+
+  #setPriceScale(next: number): void {
+    this.#applyPriceView(next, this.#priceOffset)
+  }
+
+  /** Back to the automatic price fit (no zoom, no vertical pan). */
+  public resetPriceView(): void {
+    this.#applyPriceView(1, 0)
   }
 
   #onPriceAxis(clientX: number, clientY: number): boolean {
@@ -1096,7 +1127,7 @@ export class KLineChartController {
     if (now - this.#lastAxisPressMs < AXIS_DOUBLE_PRESS_MS) {
       this.#lastAxisPressMs = 0
       this.#axisGesture = undefined
-      this.#setPriceScale(1)
+      this.resetPriceView()
       return
     }
     this.#lastAxisPressMs = now
@@ -1133,6 +1164,45 @@ export class KLineChartController {
     if (this.#disposed || this.#replay || this.#market.kind === 'dominance') return
     const bars = this.#chart.getDataList()
     if (bars.length >= 50) saveCachedBars(this.#market.marketId, this.#interval, bars)
+  }
+
+  // --- Free vertical pan ------------------------------------------------------------------------
+  // With the price axis on automatic fit the chart only scrolls sideways, so after switching to a lower
+  // timeframe and going live you could never drag down to the area below the candles. Dragging on the chart now
+  // also moves the price view (the library keeps handling the sideways scroll). The move is stored as a fraction of
+  // the automatic range so it follows new candles; the Auto button or a double-click on the axis puts it back.
+
+  /** True while the library is dragging a drawing or one of its handles, in which case the chart must not pan. */
+  #drawingIsPressed(): boolean {
+    const store = (this.#chart as unknown as { _chartStore?: { getPressedOverlayInfo?(): { overlay?: unknown } } })._chartStore
+    return !!store?.getPressedOverlayInfo?.().overlay
+  }
+
+  readonly #handlePanPointerDown = (event: PointerEvent): void => {
+    this.#pointersDown.add(event.pointerId)
+    // A second finger means pinch-zoom, not a pan.
+    if (this.#pointersDown.size > 1) { this.#pan = undefined; return }
+    if (event.button !== 0 || this.#tool || this.#replayPicking || !this.#insidePane(event.clientX, event.clientY)) return
+    this.#pan = { pointerId: event.pointerId, startY: event.clientY, startOffset: this.#priceOffset, active: false }
+  }
+
+  readonly #handlePanPointerMove = (event: PointerEvent): void => {
+    const pan = this.#pan
+    if (!pan || event.pointerId !== pan.pointerId) return
+    if (!pan.active) {
+      if (Math.abs(event.clientY - pan.startY) < PAN_START_PX) return
+      if (this.#drawingIsPressed()) { this.#pan = undefined; return }
+      pan.active = true
+      pan.startY = event.clientY
+    }
+    const height = this.#paneRect()?.height
+    if (!height) return
+    this.#applyPriceView(this.#priceScale, pan.startOffset + ((event.clientY - pan.startY) / height) * this.#priceScale * PRICE_GAP_FACTOR)
+  }
+
+  readonly #handlePanPointerEnd = (event: PointerEvent): void => {
+    this.#pointersDown.delete(event.pointerId)
+    if (this.#pan?.pointerId === event.pointerId) this.#pan = undefined
   }
 
   readonly #handleAxisWheel = (event: WheelEvent): void => {
@@ -1286,6 +1356,10 @@ export class KLineChartController {
     this.#host.removeEventListener('pointerdown', this.#handleToolPointerDown, true)
     this.#host.removeEventListener('pointerdown', this.#handleDeselectPointerDown, true)
     this.#host.removeEventListener('pointerdown', this.#handleAxisPointerDown, true)
+    this.#host.removeEventListener('pointerdown', this.#handlePanPointerDown, true)
+    globalThis.removeEventListener('pointermove', this.#handlePanPointerMove, true)
+    globalThis.removeEventListener('pointerup', this.#handlePanPointerEnd, true)
+    globalThis.removeEventListener('pointercancel', this.#handlePanPointerEnd, true)
     this.#host.removeEventListener('mousedown', this.#blockLibraryAxisGesture, true)
     this.#host.removeEventListener('touchstart', this.#blockLibraryAxisGesture, true)
     this.#host.removeEventListener('dblclick', this.#blockLibraryAxisGesture, true)

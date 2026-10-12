@@ -48,9 +48,23 @@ export async function enablePush(): Promise<PushStatus> {
   const permission = await Notification.requestPermission()
   if (permission !== 'granted') return permission === 'denied' ? 'blocked' : 'off'
 
-  const keyResponse = await fetch('/api/push/key')
-  if (!keyResponse.ok) throw new Error('The server could not provide a notification key.')
-  const { publicKey } = await keyResponse.json() as { publicKey: string }
+  let keyResponse: Response
+  try {
+    keyResponse = await fetch('/api/push/key')
+  } catch {
+    throw new Error('Could not reach the TradeHorizon server. Check your connection and try again.')
+  }
+  if (!keyResponse.ok) {
+    // 404 means the running server predates background alerts: the new server files were not deployed or the Node process was not restarted.
+    throw new Error(keyResponse.status === 404 || keyResponse.status === 405
+      ? 'This server does not support background alerts yet. The server needs the latest TradeHorizon version, then a restart (administrator: see /healthz).'
+      : `The server could not provide a notification key (error ${keyResponse.status}). Try again in a moment.`)
+  }
+  const keyBody = await keyResponse.json().catch(() => undefined) as { publicKey?: string } | undefined
+  if (!keyBody?.publicKey) {
+    throw new Error('The server answered with something that is not a notification key. If a proxy sits in front of the app, it must pass /api/ requests to the Node server.')
+  }
+  const { publicKey } = keyBody
   await registration()
   const ready = await navigator.serviceWorker.ready
   const subscription = (await ready.pushManager.getSubscription()) ?? await ready.pushManager.subscribe({

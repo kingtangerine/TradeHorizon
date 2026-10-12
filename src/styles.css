@@ -3289,3 +3289,15 @@ button:disabled {
 /* Combine mode: the pick badge takes the star's place, and the card meta leaves room for the menu button. */
 .layout-card:has(.layout-card-pick) .layout-card-star { visibility: hidden; }
 .layout-card-meta { padding-right: 40px; }
+
+/* App version shown next to the logo */
+.brand-version { margin-left: 6px; color: var(--muted); font-size: .68rem; font-weight: 600; letter-spacing: .02em; white-space: nowrap; cursor: default; }
+@media (max-width: 760px) { .brand-version { display: none; } }
+
+/* "Auto" button shown while the price scale is panned or zoomed (like the A button on TradingView's price scale) */
+.chart-auto-reset {
+  position: absolute; z-index: 5; right: 8px; bottom: 34px; height: 24px; padding: 0 9px;
+  border: 1px solid var(--border-strong); border-radius: 5px; background: var(--panel-raised); color: var(--text);
+  font: 600 .7rem Inter, system-ui, sans-serif; cursor: pointer;
+}
+.chart-auto-reset:hover { background: var(--tv-blue, #2962ff); border-color: var(--tv-blue, #2962ff); color: #fff; }

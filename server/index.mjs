@@ -263,6 +263,7 @@ function health() {
     version,
     uptimeSec: Math.round((Date.now() - startedAtMs) / 1000),
     dataWritable,
+    pushReady: Boolean(push.publicKey),
     marketsLoaded: catalog.listings.length > 0,
     marketsAgeMin: catalog.fetchedAtMs ? Math.round((Date.now() - catalog.fetchedAtMs) / 60_000) : null,
   }

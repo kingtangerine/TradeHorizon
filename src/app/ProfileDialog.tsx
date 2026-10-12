@@ -4,6 +4,7 @@ import { changePassword, type AppUser } from './auth'
 import { backupFileName, buildBackup, parseBackup, restoreBackup, type BackupFile } from './dataTransfer'
 import { CloseIcon, UserIcon } from './Icons'
 import type { Theme } from './theme'
+import { versionDetails } from '../version'
 
 interface ProfileDialogProps {
   user: AppUser
@@ -102,6 +103,7 @@ export function ProfileDialog({ user, theme, tabCount, layoutCount, onTheme, onL
               <div><dt>Open chart tabs</dt><dd>{tabCount}</dd></div>
               <div><dt>Saved layouts</dt><dd>{layoutCount}</dd></div>
               <div><dt>Storage</dt><dd>TradeHorizon server, synced across devices</dd></div>
+              <div><dt>App version</dt><dd>{versionDetails()}</dd></div>
             </dl>
           </section>
 

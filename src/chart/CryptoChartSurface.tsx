@@ -39,6 +39,7 @@ export function CryptoChartSurface({
 }: CryptoChartSurfaceProps) {
   const themeRef = useRef(theme)
   themeRef.current = theme
+  const [priceViewManual, setPriceViewManual] = useState(false)
   const [alertHover, setAlertHover] = useState<{ top: number, left: number, price: number } | null>(null)
   const hostRef = useRef<HTMLDivElement>(null)
   const controllerRef = useRef<KLineChartController | null>(null)
@@ -59,6 +60,7 @@ export function CryptoChartSurface({
         onRuntimeState: (state) => callbacksRef.current.onRuntimeState(state),
         onToolSettled: () => callbacksRef.current.onToolSettled(),
         onSelectionChange: (selected) => callbacksRef.current.onSelectionChange(selected),
+        onPriceViewChange: setPriceViewManual,
       })
       controllerRef.current = controller
       controller.setVolumeVisible(volumeVisible)
@@ -139,6 +141,16 @@ export function CryptoChartSurface({
   return (
     <>
       <div ref={hostRef} className="chart-host" aria-label={`${market.pair} candlestick chart`} />
+      {priceViewManual && (
+        <button
+          type="button"
+          className="chart-auto-reset"
+          title="Price scale is moved or zoomed. Click to fit the candles automatically again."
+          onClick={() => controllerRef.current?.resetPriceView()}
+        >
+          Auto
+        </button>
+      )}
       {alertHover && onAddAlert && (
         <button
           type="button"
