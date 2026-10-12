@@ -52,7 +52,9 @@ import {
   type DominanceKey,
   type IndicatorSettings,
   type MovingAverageKind,
+  type VwapKind,
 } from '../chart/indicators'
+import { VWAP_ANCHORS, VWAP_ANCHOR_LABELS, type VwapAnchor } from '../chart/vwap'
 import { REPLAY_SPEEDS } from '../chart/replay'
 import { DRAWING_TOOLS, TOOL_ORDER } from '../chart/tools'
 import { SymbolSearch } from './SymbolSearch'
@@ -63,6 +65,7 @@ import {
   createSplitLayout,
   defaultSplitName,
   duplicateLayout,
+  moveTab,
   loadSavedLayouts,
   loadWorkspace,
   saveSavedLayouts,
@@ -365,6 +368,18 @@ function WorkspaceApp({ user, onLogout }: WorkspaceAppProps) {
     updateIndicators((current) => ({ ...current, [kind]: addMovingAveragePeriod(current[kind], period) }))
   }, [indicators, maDraft, updateIndicators])
 
+  const toggleVwap = useCallback((kind: VwapKind) => {
+    updateIndicators((current) => (
+      kind === 'vwap'
+        ? { ...current, vwap: { ...current.vwap, visible: !current.vwap.visible } }
+        : { ...current, qvwap: { visible: !current.qvwap.visible } }
+    ))
+  }, [updateIndicators])
+
+  const setVwapAnchor = useCallback((anchor: VwapAnchor) => {
+    updateIndicators((current) => ({ ...current, vwap: { visible: true, anchor } }))
+  }, [updateIndicators])
+
   const toggleMovingAverage = useCallback((kind: MovingAverageKind) => {
     updateIndicators((current) => ({
       ...current,
@@ -420,6 +435,104 @@ function WorkspaceApp({ user, onLogout }: WorkspaceAppProps) {
       return { ...current, tabs, activeTabId: next.id }
     })
   }, [])
+
+  // --- Reordering the open tabs by dragging ---------------------------------------------------
+  // Mouse: drag a tab. Touch: press and hold briefly, then drag (a quick swipe still scrolls the tab strip).
+  // Keyboard: Alt+Shift+Left or Right on a focused tab.
+  const tabStripRef = useRef<HTMLDivElement>(null)
+  const tabElements = useRef(new Map<string, HTMLDivElement>())
+  const tabDrag = useRef<{ id: string; pointerId: number; startX: number; grab: number; active: boolean; touch: boolean; timer?: ReturnType<typeof globalThis.setTimeout> } | null>(null)
+  const justDraggedTab = useRef(false)
+  const [draggingTabId, setDraggingTabId] = useState<string>()
+
+  const placeDraggedTab = useCallback((clientX: number) => {
+    const drag = tabDrag.current
+    const strip = tabStripRef.current
+    const element = drag && tabElements.current.get(drag.id)
+    if (!drag || !strip || !element) return
+    const bounds = strip.getBoundingClientRect()
+    // Keep the dragged tab under the pointer, and scroll the strip when the pointer reaches its edge.
+    if (clientX < bounds.left + 36) strip.scrollLeft -= 14
+    else if (clientX > bounds.right - 36) strip.scrollLeft += 14
+    const pointerInStrip = clientX - bounds.left + strip.scrollLeft
+    element.style.transform = `translateX(${pointerInStrip - drag.grab - element.offsetLeft}px)`
+    // Its new position is the number of other tabs whose centre is left of the pointer.
+    let toIndex = 0
+    for (const [id, other] of tabElements.current) {
+      if (id !== drag.id && other.offsetLeft + other.offsetWidth / 2 < pointerInStrip) toIndex += 1
+    }
+    setWorkspace((current) => {
+      if (current.tabs.findIndex((tab) => tab.id === drag.id) === toIndex) return current
+      return { ...current, tabs: moveTab(current.tabs, drag.id, toIndex) }
+    })
+  }, [])
+
+  const endTabDrag = useCallback(() => {
+    const drag = tabDrag.current
+    if (!drag) return
+    globalThis.clearTimeout(drag.timer)
+    if (drag.active) {
+      const element = tabElements.current.get(drag.id)
+      if (element) element.style.transform = ''
+      justDraggedTab.current = true
+      globalThis.setTimeout(() => { justDraggedTab.current = false }, 80)
+    }
+    tabDrag.current = null
+    setDraggingTabId(undefined)
+  }, [])
+
+  useEffect(() => {
+    const preventScroll = (event: TouchEvent) => { if (tabDrag.current?.active) event.preventDefault() }
+    const onMove = (event: PointerEvent) => {
+      const drag = tabDrag.current
+      if (!drag || event.pointerId !== drag.pointerId) return
+      if (!drag.active) {
+        const moved = Math.abs(event.clientX - drag.startX)
+        if (drag.touch) { if (moved > 8) { globalThis.clearTimeout(drag.timer); tabDrag.current = null } return }
+        if (moved < 5) return
+        drag.active = true
+        setDraggingTabId(drag.id)
+      }
+      placeDraggedTab(event.clientX)
+    }
+    const onUp = (event: PointerEvent) => { if (tabDrag.current?.pointerId === event.pointerId) endTabDrag() }
+    globalThis.addEventListener('pointermove', onMove)
+    globalThis.addEventListener('pointerup', onUp)
+    globalThis.addEventListener('pointercancel', onUp)
+    document.addEventListener('touchmove', preventScroll, { passive: false })
+    return () => {
+      globalThis.removeEventListener('pointermove', onMove)
+      globalThis.removeEventListener('pointerup', onUp)
+      globalThis.removeEventListener('pointercancel', onUp)
+      document.removeEventListener('touchmove', preventScroll)
+    }
+  }, [placeDraggedTab, endTabDrag])
+
+  const startTabDrag = (event: React.PointerEvent<HTMLDivElement>, id: string) => {
+    if (event.button !== 0 || (event.target as Element).closest('.chart-tab-close')) return
+    const element = tabElements.current.get(id)
+    if (!element) return
+    const touch = event.pointerType === 'touch'
+    const drag = { id, pointerId: event.pointerId, startX: event.clientX, grab: event.clientX - element.getBoundingClientRect().left, active: false, touch } as NonNullable<typeof tabDrag.current>
+    tabDrag.current = drag
+    if (touch) {
+      drag.timer = globalThis.setTimeout(() => {
+        if (tabDrag.current !== drag) return
+        drag.active = true
+        setDraggingTabId(id)
+        placeDraggedTab(drag.startX)
+      }, 350)
+    }
+  }
+
+  const moveTabByKey = (event: React.KeyboardEvent, id: string) => {
+    if (!event.altKey || !event.shiftKey || (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight')) return
+    event.preventDefault()
+    setWorkspace((current) => {
+      const index = current.tabs.findIndex((tab) => tab.id === id)
+      return { ...current, tabs: moveTab(current.tabs, id, index + (event.key === 'ArrowLeft' ? -1 : 1)) }
+    })
+  }
 
   const showToast = useCallback((message: string) => {
     setToast(message)
@@ -772,6 +885,8 @@ function WorkspaceApp({ user, onLogout }: WorkspaceAppProps) {
     (workspace.volumeVisible ? 1 : 0) +
     (movingAverageActive(indicators.sma) ? 1 : 0) +
     (movingAverageActive(indicators.ema) ? 1 : 0) +
+    (indicators.vwap.visible ? 1 : 0) +
+    (indicators.qvwap.visible ? 1 : 0) +
     Object.values(indicators.dominance).filter(Boolean).length
   const connectionLabel = connectionCopy(runtime)
   const marketDrawings = drawingSnapshot.drawings.filter((drawing) => drawing.marketId === market.marketId)
@@ -794,13 +909,24 @@ function WorkspaceApp({ user, onLogout }: WorkspaceAppProps) {
           <span className="preview-pill">ALPHA</span>
           <span className="brand-version" title={versionDetails()}>{versionLabel()}</span>
         </div>
-        <div className="chart-tabs-scroll">
+        <div className="chart-tabs-scroll" ref={tabStripRef}>
           {workspace.tabs.map((tab) => {
             const tabMarket = getMarket(tab.symbol)
             const active = tab.id === workspace.activeTabId && !superchartOpen
             return (
-              <div className={active ? 'chart-tab active' : 'chart-tab'} key={tab.id}>
-                <button type="button" className="chart-tab-main" onClick={() => activateTab(tab)}>
+              <div
+                className={['chart-tab', active ? 'active' : '', draggingTabId === tab.id ? 'dragging' : ''].filter(Boolean).join(' ')}
+                key={tab.id}
+                ref={(element) => { if (element) tabElements.current.set(tab.id, element); else tabElements.current.delete(tab.id) }}
+                onPointerDown={(event) => startTabDrag(event, tab.id)}
+              >
+                <button
+                  type="button"
+                  className="chart-tab-main"
+                  title="Drag to reorder (Alt+Shift+arrows with the keyboard)"
+                  onClick={() => { if (!justDraggedTab.current) activateTab(tab) }}
+                  onKeyDown={(event) => moveTabByKey(event, tab.id)}
+                >
                   <span className="chart-tab-mark">{tabMarket.mark}</span>
                   <span>{tabMarket.pair}</span>
                   <small>{tab.interval}</small>
@@ -1103,6 +1229,33 @@ function WorkspaceApp({ user, onLogout }: WorkspaceAppProps) {
                 )
               })}
 
+              <div className="indicator-group">
+                <button type="button" className="indicator-row" onClick={() => toggleVwap('vwap')}>
+                  <span>
+                    <b>VWAP</b>
+                    <small>Volume-weighted average price · restarts every {VWAP_ANCHOR_LABELS[indicators.vwap.anchor].toLowerCase()}</small>
+                  </span>
+                  {indicators.vwap.visible ? <EyeIcon /> : <EyeOffIcon />}
+                </button>
+                <div className="indicator-periods">
+                  <select
+                    className="vwap-anchor"
+                    aria-label="VWAP restarts every"
+                    value={indicators.vwap.anchor}
+                    onChange={(event) => setVwapAnchor(event.target.value as VwapAnchor)}
+                  >
+                    {VWAP_ANCHORS.map((anchor) => <option value={anchor} key={anchor}>Restarts every {VWAP_ANCHOR_LABELS[anchor].toLowerCase()} (UTC)</option>)}
+                  </select>
+                </div>
+              </div>
+              <button type="button" className="indicator-row" onClick={() => toggleVwap('qvwap')}>
+                <span>
+                  <b>QVWAP</b>
+                  <small>Quarterly VWAP · average price paid since the start of the quarter</small>
+                </span>
+                {indicators.qvwap.visible ? <EyeIcon /> : <EyeOffIcon />}
+              </button>
+
               <div className="indicator-section-title">
                 <b>Market dominance</b>
                 <small>CoinGecko caps, Binance prices · estimated</small>
@@ -1314,6 +1467,7 @@ function WorkspaceApp({ user, onLogout }: WorkspaceAppProps) {
                 onAddAlert={addAlertAtPrice}
                 onToggleVolume={() => setWorkspace((current) => ({ ...current, volumeVisible: !current.volumeVisible }))}
                 onToggleMovingAverage={toggleMovingAverage}
+                onToggleVwap={toggleVwap}
               />
             ))}
           </div>

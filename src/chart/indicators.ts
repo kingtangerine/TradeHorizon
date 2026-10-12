@@ -1,4 +1,7 @@
+import { VWAP_ANCHORS, type VwapAnchor } from './vwap'
+
 export type MovingAverageKind = 'sma' | 'ema'
+export type VwapKind = 'vwap' | 'qvwap'
 export type DominanceKey = 'btc' | 'usdt' | 'alt'
 
 export interface MovingAverageSettings {
@@ -10,6 +13,10 @@ export interface IndicatorSettings {
   readonly sma: MovingAverageSettings
   readonly ema: MovingAverageSettings
   readonly dominance: Readonly<Record<DominanceKey, boolean>>
+  /** Volume-weighted average price, restarting every day, week, month, quarter or year (UTC). */
+  readonly vwap: { readonly visible: boolean; readonly anchor: VwapAnchor }
+  /** Quarterly VWAP: the volume-weighted average price since the start of the quarter. */
+  readonly qvwap: { readonly visible: boolean }
 }
 
 export const MAX_MOVING_AVERAGE_PERIODS = 5
@@ -19,6 +26,8 @@ export const DEFAULT_INDICATORS: IndicatorSettings = {
   sma: { visible: false, periods: [20] },
   ema: { visible: false, periods: [20] },
   dominance: { btc: false, usdt: false, alt: false },
+  vwap: { visible: false, anchor: 'day' },
+  qvwap: { visible: false },
 }
 
 export const MOVING_AVERAGE_LABELS: Readonly<Record<MovingAverageKind, string>> = {
@@ -30,6 +39,8 @@ export const MOVING_AVERAGE_COLORS: Readonly<Record<MovingAverageKind, readonly 
   sma: ['#f7c948', '#26a69a', '#ab47bc', '#8d6e63', '#78909c'],
   ema: ['#2962ff', '#ff9800', '#e91e63', '#00bcd4', '#9ccc65'],
 }
+
+export const VWAP_COLORS: Readonly<Record<VwapKind, string>> = { vwap: '#e040fb', qvwap: '#26c6da' }
 
 export const DOMINANCE_LABELS: Readonly<Record<DominanceKey, string>> = {
   btc: 'BTC.D',
@@ -84,7 +95,7 @@ function normalizeMovingAverage(value: unknown, fallback: MovingAverageSettings)
 
 export function normalizeIndicators(value: unknown): IndicatorSettings {
   if (typeof value !== 'object' || value === null) return DEFAULT_INDICATORS
-  const candidate = value as { sma?: unknown; ema?: unknown; dominance?: unknown }
+  const candidate = value as { sma?: unknown; ema?: unknown; dominance?: unknown; vwap?: { visible?: unknown; anchor?: unknown }; qvwap?: { visible?: unknown } }
   const dominance = (typeof candidate.dominance === 'object' && candidate.dominance !== null
     ? candidate.dominance
     : {}) as Partial<Record<DominanceKey, unknown>>
@@ -96,5 +107,10 @@ export function normalizeIndicators(value: unknown): IndicatorSettings {
       usdt: dominance.usdt === true,
       alt: dominance.alt === true,
     },
+    vwap: {
+      visible: candidate.vwap?.visible === true,
+      anchor: VWAP_ANCHORS.includes(candidate.vwap?.anchor as VwapAnchor) ? (candidate.vwap?.anchor as VwapAnchor) : 'day',
+    },
+    qvwap: { visible: candidate.qvwap?.visible === true },
   }
 }

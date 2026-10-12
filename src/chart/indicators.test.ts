@@ -56,3 +56,14 @@ describe('normalizeIndicators', () => {
     expect(result.dominance).toEqual({ btc: true, usdt: false, alt: true })
   })
 })
+
+describe('VWAP settings', () => {
+  it('are off by default and fall back to a daily anchor', () => {
+    expect(DEFAULT_INDICATORS.vwap).toEqual({ visible: false, anchor: 'day' })
+    expect(DEFAULT_INDICATORS.qvwap).toEqual({ visible: false })
+    const parsed = normalizeIndicators({ vwap: { visible: true, anchor: 'fortnight' }, qvwap: { visible: true } })
+    expect(parsed.vwap).toEqual({ visible: true, anchor: 'day' })
+    expect(parsed.qvwap).toEqual({ visible: true })
+    expect(normalizeIndicators({ vwap: { visible: true, anchor: 'month' } }).vwap.anchor).toBe('month')
+  })
+})

@@ -10,6 +10,8 @@ import {
   type OverlayEvent,
   type Point,
 } from 'klinecharts'
+import { QVWAP_INDICATOR_NAME, VWAP_INDICATOR_NAME, registerVwapIndicators } from './vwapIndicator'
+import { VWAP_ANCHORS } from './vwap'
 import { MAX_CACHE_GAP_BARS, loadCachedBars, saveCachedBars } from './candleCache'
 import {
   createDrawing,
@@ -57,6 +59,7 @@ import {
 import {
   DOMINANCE_COLORS,
   MOVING_AVERAGE_COLORS,
+  VWAP_COLORS,
   movingAverageActive,
   type DominanceKey,
   type IndicatorSettings,
@@ -107,6 +110,7 @@ const HIDDEN_INDICATOR_TOOLTIP = { name: '', calcParamsText: '', features: [], l
 
 registerTradeHorizonOverlays()
 registerDominanceIndicators()
+registerVwapIndicators()
 
 interface ToolSession {
   type: DrawingType
@@ -207,6 +211,7 @@ export class KLineChartController {
   #interval: MarketInterval
   #runtimeState: ChartRuntimeState
   #stream?: { stop(): void; nudge?(force?: boolean): void }
+  readonly #vwapIds = new Map<'vwap' | 'qvwap', string>()
   #hiddenAtMs?: number
   #statusTimer?: ReturnType<typeof globalThis.setTimeout>
   /** True when the chart was painted from the local candle cache and still has to catch up with the exchange. */
@@ -785,7 +790,33 @@ export class KLineChartController {
     if (this.#disposed) return
     this.#applyMovingAverage('sma', settings.sma)
     this.#applyMovingAverage('ema', settings.ema)
+    this.#applyVwap('vwap', settings.vwap.visible, settings.vwap.anchor)
+    this.#applyVwap('qvwap', settings.qvwap.visible, 'quarter')
     this.#applyDominance(settings.dominance)
+  }
+
+  /** VWAP lines sit on the price pane. An index has no traded volume, so there is nothing to average. */
+  #applyVwap(kind: 'vwap' | 'qvwap', visible: boolean, anchor: (typeof VWAP_ANCHORS)[number]): void {
+    const id = this.#vwapIds.get(kind)
+    if (!visible || this.#market.kind === 'dominance') {
+      if (id) {
+        this.#chart.removeIndicator({ id })
+        this.#vwapIds.delete(kind)
+      }
+      return
+    }
+    const styles = { lines: [{ color: VWAP_COLORS[kind], size: 1.5 }] }
+    const calcParams = [VWAP_ANCHORS.indexOf(anchor)]
+    const name = kind === 'vwap' ? VWAP_INDICATOR_NAME : QVWAP_INDICATOR_NAME
+    if (id) {
+      this.#chart.overrideIndicator({ id, name, calcParams, styles })
+      return
+    }
+    const created = this.#chart.createIndicator(
+      { name, paneId: 'candle_pane', calcParams, styles, createTooltipDataSource: () => HIDDEN_INDICATOR_TOOLTIP },
+      true,
+    )
+    if (created) this.#vwapIds.set(kind, created)
   }
 
   #applyMovingAverage(kind: MovingAverageKind, settings: MovingAverageSettings): void {

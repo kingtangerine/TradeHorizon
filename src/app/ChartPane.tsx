@@ -3,10 +3,13 @@ import { CryptoChartSurface } from '../chart/CryptoChartSurface'
 import {
   MOVING_AVERAGE_COLORS,
   MOVING_AVERAGE_LABELS,
+  VWAP_COLORS,
   movingAverageActive,
   type IndicatorSettings,
   type MovingAverageKind,
+  type VwapKind,
 } from '../chart/indicators'
+import { VWAP_ANCHOR_LABELS } from '../chart/vwap'
 import type { KLineChartController } from '../chart/KLineChartController'
 import type { CryptoMarket } from '../chart/markets'
 import type { ChartRuntimeState, ChartType } from '../chart/types'
@@ -37,6 +40,7 @@ interface ChartPaneProps {
   onAddAlert(price: number, symbol: string, lastPrice: number | undefined): void
   onToggleVolume(): void
   onToggleMovingAverage(kind: MovingAverageKind): void
+  onToggleVwap(kind: VwapKind): void
 }
 
 const INITIAL_RUNTIME = (interval: MarketInterval): ChartRuntimeState => ({
@@ -72,6 +76,7 @@ export function ChartPane({
   onAddAlert,
   onToggleVolume,
   onToggleMovingAverage,
+  onToggleVwap,
 }: ChartPaneProps) {
   const [runtime, setRuntime] = useState<ChartRuntimeState>(() => INITIAL_RUNTIME(interval))
   const [controller, setController] = useState<KLineChartController | null>(null)
@@ -149,6 +154,20 @@ export function ChartPane({
             <EyeIcon />
           </button>
         ))}
+        {market.kind !== 'dominance' && indicators.vwap.visible && (
+          <button type="button" className="chart-indicator-row" onClick={() => onToggleVwap('vwap')} title="Hide VWAP">
+            <span>VWAP · {VWAP_ANCHOR_LABELS[indicators.vwap.anchor]}</span>
+            <b style={{ color: VWAP_COLORS.vwap }}>●</b>
+            <EyeIcon />
+          </button>
+        )}
+        {market.kind !== 'dominance' && indicators.qvwap.visible && (
+          <button type="button" className="chart-indicator-row" onClick={() => onToggleVwap('qvwap')} title="Hide QVWAP">
+            <span>QVWAP</span>
+            <b style={{ color: VWAP_COLORS.qvwap }}>●</b>
+            <EyeIcon />
+          </button>
+        )}
       </div>
 
       <CryptoChartSurface
