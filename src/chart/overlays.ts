@@ -1,5 +1,5 @@
 import { getSupportedOverlays, registerOverlay } from 'klinecharts'
-import { FIB_LEVELS, clampPositionLevels, fibLevelPrice, type PositionDirection } from './geometry'
+import { FIB_LEVELS, clampDcaPrice, clampPositionLevels, fibLevelPrice, type PositionDirection } from './geometry'
 import {
   FIB_RETRACEMENT_OVERLAY_NAME,
   HORIZONTAL_LINE_OVERLAY_NAME,
@@ -10,7 +10,7 @@ import {
   TEXT_OVERLAY_NAME,
   VERTICAL_LINE_OVERLAY_NAME,
 } from './overlayNames'
-import { calculateLongPositionMetrics } from './position'
+import { calculateDcaPositionMetrics, calculateLongPositionMetrics } from './position'
 
 export * from './overlayNames'
 
@@ -168,9 +168,9 @@ export function registerTradeHorizonOverlays(): void {
     needDefaultXAxisFigure: true,
     needDefaultYAxisFigure: true,
     createPointFigures: ({ coordinates, overlay }) => {
-      if (coordinates.length !== 3 || overlay.points.length !== 3) return []
+      if (coordinates.length < 3 || overlay.points.length < 3 || coordinates.length !== overlay.points.length) return []
 
-      const [entryCoordinate, targetCoordinate, stopCoordinate] = coordinates
+      const [entryCoordinate, targetCoordinate, stopCoordinate, dcaCoordinate] = coordinates
       const entry = overlay.points[0].value
       const target = overlay.points[1].value
       const stop = overlay.points[2].value
@@ -188,7 +188,14 @@ export function registerTradeHorizonOverlays(): void {
       const accountSize = numericStyle(overlay.styles, 'accountSize', 10_000)
       const riskPercent = numericStyle(overlay.styles, 'riskPercent', 1)
       const showValues = numericStyle(overlay.styles, 'showValues', 1) !== 0
-      const metrics = calculateLongPositionMetrics(entry, target, stop, accountSize, riskPercent)
+      const dca = overlay.points[3]?.value
+      const dcaTriggered = numericStyle(overlay.styles, 'dcaTriggered', 0) !== 0
+      const dcaSize = numericStyle(overlay.styles, 'dcaSize', 1)
+      const dcaMetrics = dca !== undefined && dcaCoordinate
+        ? calculateDcaPositionMetrics(entry, dca, target, stop, accountSize, riskPercent, dcaSize, dcaTriggered)
+        : undefined
+      const metrics = dcaMetrics ?? calculateLongPositionMetrics(entry, target, stop, accountSize, riskPercent)
+      const referenceEntry = dcaMetrics?.averageEntry ?? entry
       const lineStyles = { color: lineColor, size: lineWidth, style: 'solid' }
       const textStyles = {
         color: textColor,
@@ -204,6 +211,21 @@ export function registerTradeHorizonOverlays(): void {
         paddingBottom: 3,
       }
 
+      // Once the DCA fills, the entry label sits on the average entry instead.
+      const avgY = dcaMetrics && dcaTriggered && dcaCoordinate && dca !== undefined && dca !== entry
+        ? entryCoordinate.y + (dcaCoordinate.y - entryCoordinate.y) * ((referenceEntry - entry) / (dca - entry))
+        : entryCoordinate.y
+      const dcaLines = !dcaCoordinate ? [] : [
+        { type: 'line', attrs: { coordinates: [{ x: left, y: dcaCoordinate.y }, { x: right, y: dcaCoordinate.y }] }, styles: { ...lineStyles, style: 'dashed', dashedValue: [6, 4] } },
+        ...(dcaTriggered ? [{ type: 'line', attrs: { coordinates: [{ x: left, y: avgY }, { x: right, y: avgY }] }, styles: { ...lineStyles, color: '#f4b860', style: 'dashed', dashedValue: [2, 3] } }] : []),
+      ]
+      const dcaLabels = !showValues || !dcaMetrics || dca === undefined || !dcaCoordinate ? [] : [{
+        type: 'text',
+        attrs: { x: right - 5, y: dcaCoordinate.y, text: `DCA${dcaTriggered ? ' (filled)' : ''}: ${formatPositionNumber(dca)}  Qty: ${formatPositionNumber(dcaMetrics.baseQuantity * dcaSize, 6)}${dcaTriggered ? `  Avg: ${formatPositionNumber(dcaMetrics.averageEntry)}` : ''}`, align: 'right', baseline: direction === 'long' ? 'top' : 'bottom' },
+        styles: { ...textStyles, backgroundColor: '#8a6d1d' },
+        ignoreEvent: true,
+      }]
+
       const labels = !showValues ? [] : [
         {
           type: 'text',
@@ -213,7 +235,7 @@ export function registerTradeHorizonOverlays(): void {
         },
         {
           type: 'text',
-          attrs: { x: left + 5, y: entryCoordinate.y, text: `Entry: ${formatPositionNumber(entry)}  Risk/Reward: ${formatPositionNumber(metrics.riskReward)}`, align: 'left', baseline: 'bottom' },
+          attrs: { x: left + 5, y: avgY, text: `${dcaMetrics && dcaTriggered ? 'Avg entry' : 'Entry'}: ${formatPositionNumber(referenceEntry)}  Risk/Reward: ${formatPositionNumber(metrics.riskReward)}`, align: 'left', baseline: 'bottom' },
           styles: { ...textStyles, backgroundColor: '#3a4655' },
           ignoreEvent: true,
         },
@@ -249,7 +271,9 @@ export function registerTradeHorizonOverlays(): void {
         { type: 'line', attrs: { coordinates: [{ x: left, y: targetCoordinate.y }, { x: right, y: targetCoordinate.y }] }, styles: lineStyles },
         { type: 'line', attrs: { coordinates: [{ x: left, y: entryCoordinate.y }, { x: right, y: entryCoordinate.y }] }, styles: lineStyles },
         { type: 'line', attrs: { coordinates: [{ x: left, y: stopCoordinate.y }, { x: right, y: stopCoordinate.y }] }, styles: lineStyles },
+        ...dcaLines,
         ...labels,
+        ...dcaLabels,
       ]
     },
     performEventPressedMove: ({ points, performPointIndex }) => {
@@ -261,11 +285,15 @@ export function registerTradeHorizonOverlays(): void {
 
       if (performPointIndex === 0) {
         points[0].value = Math.min(Math.max(target, stop), Math.max(Math.min(target, stop), entry))
-        return
+      } else if (performPointIndex === 1 || performPointIndex === 2) {
+        const clamped = clampPositionLevels(direction, entry, target, stop)
+        points[1].value = clamped.target
+        points[2].value = clamped.stop
       }
-      const clamped = clampPositionLevels(direction, entry, target, stop)
-      points[1].value = clamped.target
-      points[2].value = clamped.stop
+      // The DCA stays inside the buy region, between entry and stop, whichever handle moved.
+      if (points.length > 3 && points[3].value !== undefined) {
+        points[3].value = clampDcaPrice(points[0].value ?? entry, points[2].value ?? stop, points[3].value)
+      }
     },
   })
 

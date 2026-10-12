@@ -73,7 +73,11 @@ export function drawingFromOverlay(
     const parsed = overlay.points.length >= 2 ? overlayAnchors(overlay, Math.min(overlay.points.length, 8)) : null
     anchors = parsed ? expandRectangleAnchors(parsed) : null
   } else {
-    anchors = overlayAnchors(overlay, anchorCountFor(type))
+    const count = anchorCountFor(type)
+    // Positions carry an optional fourth anchor: the DCA price.
+    anchors = (type === 'longPosition' || type === 'shortPosition') && overlay.points.length >= count + 1
+      ? overlayAnchors(overlay, count + 1)
+      : overlayAnchors(overlay, count)
   }
 
   if (!anchors) return null

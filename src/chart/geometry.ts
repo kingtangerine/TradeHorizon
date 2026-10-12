@@ -147,3 +147,10 @@ export function clampPositionLevels(
 export function fibLevelPrice(first: number, second: number, level: number): number {
   return second + (first - second) * level
 }
+
+/** A DCA price between entry and stop (the buy region); the midpoint by default. */
+export function clampDcaPrice(entry: number, stop: number, dca?: number): number {
+  const low = Math.min(entry, stop)
+  const high = Math.max(entry, stop)
+  return Math.min(high, Math.max(low, dca ?? (entry + stop) / 2))
+}

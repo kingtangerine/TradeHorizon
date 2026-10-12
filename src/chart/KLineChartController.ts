@@ -1652,6 +1652,8 @@ export class KLineChartController {
         positionFillOpacity: number('fillOpacity', 22),
         accountSize: number('accountSize', 10_000),
         riskPercent: number('riskPercent', 1),
+        dcaTriggered: style.dcaTriggered === true ? 1 : 0,
+        dcaSize: number('dcaSize', 1),
         // Position labels show while placing (no stored drawing yet) or while selected.
         showValues: !drawing || id === this.#selectedDrawingId ? 1 : 0,
         point: {
