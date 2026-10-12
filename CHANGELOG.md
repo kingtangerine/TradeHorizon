@@ -22,6 +22,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Turning on background alerts now explains why it failed (old server code, missing /api proxy, no HTTPS) instead of a generic "could not provide notification key".
 
 ### Fixed
+- **Sync no longer lets a stale device overwrite newer data.** A device that reopened the app marked its own unchanged data as an unsynced edit and pushed it over what another computer had saved. Unchanged writes are now ignored, and a newer server copy beats a stale local one (the replaced copy is kept as a backup in browser storage).
 - Vertical dragging no longer locks while the price axis is on auto-fit.
 
 ## [0.10.0] - 2026-10-10

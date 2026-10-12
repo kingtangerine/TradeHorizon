@@ -22,6 +22,25 @@ const PULL_TIMEOUT_MS = 5000
 
 let stopActive: (() => void) | undefined
 
+export type RemoteDecision = 'keep-local' | 'take-remote' | 'take-remote-backup'
+
+/**
+ * What to do with a key the server has. Unsynced local edits win only while the server copy is
+ * unchanged since this browser last synced; if another device saved in the meantime the server
+ * copy wins (the local one is backed up), so a stale device can never overwrite newer data.
+ */
+export function decideRemote(
+  local: string | null,
+  known: { readonly syncedAtMs: number; readonly dirty: boolean } | undefined,
+  remote: { readonly value: string; readonly updatedAtMs: number },
+): RemoteDecision {
+  if (local === remote.value) return 'keep-local'
+  if (local === null) return 'take-remote'
+  if (!known) return 'take-remote-backup'
+  if (known.dirty) return remote.updatedAtMs > known.syncedAtMs ? 'take-remote-backup' : 'keep-local'
+  return 'take-remote'
+}
+
 export interface SyncResult {
   /** True when the server had newer data that was written into this browser (the app should reload to show it). */
   readonly changed: boolean
@@ -97,8 +116,10 @@ export async function startUserSync(userId: string): Promise<SyncResult> {
   // Watch writes from the rest of the app.
   const originalSetItem = Storage.prototype.setItem
   Storage.prototype.setItem = function (this: Storage, key: string, value: string) {
+    const previous = this === localStorage ? this.getItem(key) : null
     originalSetItem.call(this, key, value)
-    if (this === localStorage && key.startsWith(prefix)) {
+    // The app rewrites unchanged data on startup; that is not an edit and must not look like one.
+    if (this === localStorage && key.startsWith(prefix) && previous !== value) {
       meta[key] = { syncedAtMs: meta[key]?.syncedAtMs ?? 0, dirty: true }
       saveMeta()
       schedulePush(key)
@@ -130,13 +151,12 @@ export async function startUserSync(userId: string): Promise<SyncResult> {
   for (const [key, item] of remote) {
     const local = localStorage.getItem(key)
     const known = meta[key]
-    if (known?.dirty && local !== null) continue // unsynced local edits win; pushed below
-    if (local === item.value) {
-      meta[key] = { syncedAtMs: item.updatedAtMs, dirty: false }
-      continue
+    const decision = decideRemote(local, known, item)
+    if (decision === 'keep-local') {
+      if (local === item.value) meta[key] = { syncedAtMs: item.updatedAtMs, dirty: false }
+      continue // genuine unsynced local edits are pushed below
     }
-    // Server is newer than what this browser last synced, or this browser never synced: take the server copy.
-    if (local !== null && !known) {
+    if (local !== null) {
       try { localStorage.setItem(`trade-horizon:backup:${key}`, local) } catch { /* ignore */ }
     }
     originalSetItem.call(localStorage, key, item.value)
