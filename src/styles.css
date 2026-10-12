@@ -3318,3 +3318,25 @@ button:disabled {
 .toolbar-action.text-action { width: auto; padding: 0 10px; font-size: .74rem; font-weight: 700; letter-spacing: .02em; }
 .toolbar-check { display: inline-flex; align-items: center; gap: 6px; padding: 0 8px; font-size: .74rem; color: var(--text); cursor: pointer; white-space: nowrap; }
 .toolbar-check input { accent-color: var(--accent, #2962ff); }
+
+.folder-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: -12px 0 24px; }
+.folder-chip {
+  display: inline-flex; align-items: center; gap: 6px; height: 34px; padding: 0 14px; border: 1px solid var(--border-strong); border-radius: 17px;
+  color: var(--text); background: transparent; font: inherit; font-size: .86rem; cursor: pointer; white-space: nowrap;
+}
+.folder-chip svg { width: 16px; height: 16px; }
+.folder-chip small { color: var(--muted); font-size: .74rem; }
+.folder-chip:hover { border-color: var(--k-6a6d78); }
+.folder-chip.active { color: var(--tv-blue, #2962ff); border-color: var(--tv-blue, #2962ff); background: rgb(var(--kr-41-98-255) / 14%); }
+.folder-chip.folder-add { color: var(--muted); border-style: dashed; }
+.folder-input { height: 34px; width: 160px; padding: 0 12px; border: 1px solid var(--tv-blue, #2962ff); border-radius: 17px; color: var(--text); background: var(--tv-surface, transparent); font: inherit; font-size: .86rem; outline: 0; }
+.folder-actions { display: inline-flex; gap: 4px; margin-left: auto; }
+.folder-actions button { height: 30px; padding: 0 10px; border: 0; border-radius: 6px; color: var(--muted); background: transparent; font: inherit; font-size: .8rem; cursor: pointer; }
+.folder-actions button:hover { color: var(--text); background: var(--tv-hover); }
+.folder-actions button.danger:hover { color: var(--k-ff7b8b); }
+.layout-card-folder { display: inline-flex; align-items: center; gap: 4px; font-weight: 500; }
+.layout-card-folder svg { width: 14px; height: 14px; }
+.superchart-menu .menu-label { padding: 8px 12px 4px; color: var(--muted); font-size: .7rem; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; }
+.superchart-menu .menu-separator { height: 1px; margin: 4px 0; background: var(--border-strong); }
+.layout-card-menu-anchor .superchart-menu { max-height: 320px; overflow-y: auto; }
+@media (max-width: 760px) { .folder-bar { margin-top: -16px; } .folder-actions { margin-left: 0; } }

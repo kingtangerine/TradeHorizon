@@ -10,13 +10,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [0.11.0] - 2026-10-12
 
 ### Added
-- 
+- **Free vertical pan.** Dragging the chart now moves it up and down as well as sideways, so after switching to a lower timeframe you can pan to any price area. An "Auto" button appears once you have moved the price view; it (or a timeframe change) fits the candles again.
+- **Drag to reorder tabs.** Press and drag an open tab to a new position (mouse or touch). Alt+Shift+Left/Right moves the focused tab.
+- **DCA on positions.** Select a long or short position and press DCA in its toolbar to add a draggable second-buy line inside the buy region (between entry and stop). Tick Triggered once the order has filled to show the average entry; the quantity, risk, reward and R/R then use it. The DCA order size (a multiple of the entry order) is in the position settings.
+- **VWAP and QVWAP indicators.** VWAP restarts every day, week, month, quarter or year (UTC, chosen in the Indicators menu); QVWAP is the quarterly VWAP. Both appear in the chart legend.
+- **Folders for saved layouts.** The layouts page has a folder bar: create folders, move a layout into one from its menu, filter by folder or "No folder", rename or delete a folder (its layouts are kept). Folders sync with the account like other per-user data.
+- **Version tracking.** The version, build hash and build time are shown next to the logo (full details in the account window). `npm run version:bump -- patch|minor|major` updates package.json, the lockfile and adds a changelog entry.
+- `/healthz` reports `pushReady` so a deployment can be checked for background-alert support.
 
 ### Changed
-- 
+- Turning on background alerts now explains why it failed (old server code, missing /api proxy, no HTTPS) instead of a generic "could not provide notification key".
 
 ### Fixed
-- 
+- Vertical dragging no longer locks while the price axis is on auto-fit.
 
 ## [0.10.0] - 2026-10-10
 

@@ -1,5 +1,15 @@
 import { useEffect, useMemo, useState } from 'react'
-import { CloseIcon, MoreVerticalIcon, PlusIcon, SearchIcon, SortIcon, SplitIcon, StarIcon } from './Icons'
+import { CloseIcon, FolderIcon, MoreVerticalIcon, PlusIcon, SearchIcon, SortIcon, SplitIcon, StarIcon } from './Icons'
+import {
+  createFolder,
+  deleteFolder,
+  filterByFolder,
+  folderCounts,
+  moveLayoutToFolder,
+  renameFolder,
+  type FolderFilter,
+  type LayoutFolderState,
+} from './layoutFolders'
 import {
   MAX_COMBINED_LAYOUTS,
   combinedPanes,
@@ -26,6 +36,8 @@ export function formatLayoutDate(valueMs: number): string {
 
 interface SuperchartProps {
   layouts: readonly SavedLayout[]
+  folders: LayoutFolderState
+  onFoldersChange(next: LayoutFolderState): void
   activeLayoutId?: string
   onOpen(layout: SavedLayout): void
   /** Middle-click: open in a new tab without switching to it. */
@@ -42,6 +54,8 @@ interface SuperchartProps {
 
 export function Superchart({
   layouts,
+  folders,
+  onFoldersChange,
   activeLayoutId,
   onOpen,
   onOpenInBackground,
@@ -60,7 +74,32 @@ export function Superchart({
   const [confirmDeleteId, setConfirmDeleteId] = useState<string>()
   const [renamingId, setRenamingId] = useState<string>()
   const [draftName, setDraftName] = useState('')
-  const visible = useMemo(() => filterAndSortLayouts(layouts, query, sort), [layouts, query, sort])
+  const [folderFilter, setFolderFilter] = useState<FolderFilter>('all')
+  const [newFolderName, setNewFolderName] = useState<string>()
+  const [renamingFolderId, setRenamingFolderId] = useState<string>()
+  const [folderDraft, setFolderDraft] = useState('')
+  const [confirmDeleteFolder, setConfirmDeleteFolder] = useState(false)
+  // A folder deleted elsewhere (or on another device) falls back to showing everything.
+  const filter: FolderFilter = folderFilter === 'all' || folderFilter === 'none' || folders.groups.some((folder) => folder.id === folderFilter) ? folderFilter : 'all'
+  const counts = useMemo(() => folderCounts(layouts, folders), [layouts, folders])
+  const unfiledCount = layouts.length - Object.values(counts).reduce((sum, count) => sum + count, 0)
+  const activeFolder = folders.groups.find((folder) => folder.id === filter)
+  const visible = useMemo(
+    () => filterAndSortLayouts(filterByFolder(layouts, folders, filter), query, sort),
+    [layouts, folders, filter, query, sort],
+  )
+
+  const commitNewFolder = (layoutId?: string) => {
+    if (newFolderName === undefined) return
+    const id = crypto.randomUUID()
+    onFoldersChange(createFolder(folders, newFolderName, layoutId ? [layoutId] : [], id))
+    setFolderFilter(layoutId ? filter : id)
+    setNewFolderName(undefined)
+  }
+  const commitFolderRename = () => {
+    if (renamingFolderId && folderDraft.trim()) onFoldersChange(renameFolder(folders, renamingFolderId, folderDraft))
+    setRenamingFolderId(undefined)
+  }
 
   // Combine mode: tick 2 to 4 layouts, in the order the charts should appear.
   const [combining, setCombining] = useState(false)
@@ -85,6 +124,7 @@ export function Superchart({
       setMenuId(undefined)
       setConfirmDeleteId(undefined)
       setSortOpen(false)
+      setConfirmDeleteFolder(false)
     }
     globalThis.addEventListener('mousedown', closePopovers)
     return () => globalThis.removeEventListener('mousedown', closePopovers)
@@ -157,6 +197,85 @@ export function Superchart({
           </div>
         </header>
 
+        <div className="folder-bar" role="tablist" aria-label="Layout folders">
+          <button type="button" role="tab" aria-selected={filter === 'all'} className={filter === 'all' ? 'folder-chip active' : 'folder-chip'} onClick={() => setFolderFilter('all')}>
+            All <small>{layouts.length}</small>
+          </button>
+          {folders.groups.map((folder) => (
+            renamingFolderId === folder.id ? (
+              <input
+                key={folder.id}
+                className="folder-input"
+                autoFocus
+                maxLength={40}
+                value={folderDraft}
+                aria-label="Folder name"
+                onChange={(event) => setFolderDraft(event.target.value)}
+                onFocus={(event) => event.currentTarget.select()}
+                onBlur={commitFolderRename}
+                onKeyDown={(event) => {
+                  if (event.key === 'Enter') commitFolderRename()
+                  if (event.key === 'Escape') setRenamingFolderId(undefined)
+                }}
+              />
+            ) : (
+              <button
+                type="button"
+                role="tab"
+                key={folder.id}
+                aria-selected={filter === folder.id}
+                className={filter === folder.id ? 'folder-chip active' : 'folder-chip'}
+                onClick={() => setFolderFilter(folder.id)}
+              >
+                <FolderIcon /> {folder.name} <small>{counts[folder.id] ?? 0}</small>
+              </button>
+            )
+          ))}
+          {unfiledCount > 0 && folders.groups.length > 0 && (
+            <button type="button" role="tab" aria-selected={filter === 'none'} className={filter === 'none' ? 'folder-chip active' : 'folder-chip'} onClick={() => setFolderFilter('none')}>
+              No folder <small>{unfiledCount}</small>
+            </button>
+          )}
+          {newFolderName !== undefined ? (
+            <input
+              className="folder-input"
+              autoFocus
+              maxLength={40}
+              placeholder="Folder name"
+              value={newFolderName}
+              aria-label="New folder name"
+              onChange={(event) => setNewFolderName(event.target.value)}
+              onBlur={() => (newFolderName.trim() ? commitNewFolder() : setNewFolderName(undefined))}
+              onKeyDown={(event) => {
+                if (event.key === 'Enter') commitNewFolder()
+                if (event.key === 'Escape') setNewFolderName(undefined)
+              }}
+            />
+          ) : (
+            <button type="button" className="folder-chip folder-add" onClick={() => setNewFolderName('')}>
+              <PlusIcon /> New folder
+            </button>
+          )}
+          {activeFolder && renamingFolderId !== activeFolder.id && (
+            <span className="folder-actions" data-popover>
+              <button type="button" onClick={() => { setRenamingFolderId(activeFolder.id); setFolderDraft(activeFolder.name) }}>Rename</button>
+              <button
+                type="button"
+                className="danger"
+                title="Layouts in the folder are kept"
+                onClick={() => {
+                  if (!confirmDeleteFolder) { setConfirmDeleteFolder(true); return }
+                  setConfirmDeleteFolder(false)
+                  setFolderFilter('all')
+                  onFoldersChange(deleteFolder(folders, activeFolder.id))
+                }}
+              >
+                {confirmDeleteFolder ? 'Click again to delete folder' : 'Delete folder'}
+              </button>
+            </span>
+          )}
+        </div>
+
         <div className="layout-card-grid">
           {!combining && (
             <button type="button" className="layout-card layout-card-create" onClick={onCreate}>
@@ -217,6 +336,7 @@ export function Superchart({
                 <span className="layout-card-meta">
                   {summary.charts > 1 && <b className="layout-card-split" title={`${summary.charts} charts`}><SplitIcon count={summary.charts} /> {summary.charts}</b>}
                   {summary.symbol}, {summary.interval} • {formatLayoutDate(layout.updatedAtMs)}
+                  {folders.assignments[layout.id] && filter === 'all' && <b className="layout-card-folder" title="Folder"><FolderIcon /> {folders.groups.find((folder) => folder.id === folders.assignments[layout.id])?.name}</b>}
                   {layout.id === activeLayoutId && <em>Current</em>}
                 </span>
 
@@ -235,6 +355,34 @@ export function Superchart({
                       <button type="button" role="menuitem" onClick={() => { setMenuId(undefined); onOpen(layout) }}>Open</button>
                       <button type="button" role="menuitem" onClick={() => { setMenuId(undefined); onOpenInBackground(layout, true) }}>Open in new tab</button>
                       <button type="button" role="menuitem" onClick={() => startRename(layout)}>Rename</button>
+                      <div className="menu-label">Move to folder</div>
+                      {folders.groups.map((folder) => (
+                        <button
+                          type="button"
+                          role="menuitemradio"
+                          aria-checked={folders.assignments[layout.id] === folder.id}
+                          className={folders.assignments[layout.id] === folder.id ? 'selected' : ''}
+                          key={folder.id}
+                          onClick={() => { setMenuId(undefined); onFoldersChange(moveLayoutToFolder(folders, [layout.id], folder.id)) }}
+                        >
+                          {folder.name}
+                        </button>
+                      ))}
+                      {folders.assignments[layout.id] && (
+                        <button type="button" role="menuitem" onClick={() => { setMenuId(undefined); onFoldersChange(moveLayoutToFolder(folders, [layout.id], undefined)) }}>No folder</button>
+                      )}
+                      <button
+                        type="button"
+                        role="menuitem"
+                        onClick={() => {
+                          const name = globalThis.prompt('Name for the new folder')
+                          setMenuId(undefined)
+                          if (name && name.trim()) onFoldersChange(createFolder(folders, name, [layout.id]))
+                        }}
+                      >
+                        + New folder…
+                      </button>
+                      <div className="menu-separator" />
                       <button type="button" role="menuitem" onClick={() => { setMenuId(undefined); onDuplicate(layout.id) }}>Make a copy</button>
                       <button
                         type="button"
@@ -307,7 +455,7 @@ export function Superchart({
           <p className="superchart-empty">
             {layouts.length === 0
               ? 'No saved layouts yet. Create one, or use Save in the chart toolbar.'
-              : `No layouts match “${query.trim()}”.`}
+              : query.trim() ? `No layouts match “${query.trim()}”.` : 'No layouts in this folder yet. Use ⋮ on a layout and pick Move to folder.'}
           </p>
         )}
       </div>

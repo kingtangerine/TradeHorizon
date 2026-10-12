@@ -34,6 +34,7 @@ import { defaultTemplateStyle, loadTemplates, rectangleStyleOf, saveTemplates } 
 import { ProfileDialog } from './ProfileDialog'
 import { applyTheme, loadUserTheme, saveUserTheme, type Theme } from './theme'
 import { loadGroups, saveGroups } from './groups'
+import { loadLayoutFolders, pruneFolderAssignments, saveLayoutFolders } from './layoutFolders'
 import { hasSyncedBefore, startUserSync, stopUserSync } from './userSync'
 import { logIn, logOut, restoreSession, signUp, verifySession, type AppUser } from './auth'
 import { Superchart } from './Superchart'
@@ -251,6 +252,7 @@ function WorkspaceApp({ user, onLogout }: WorkspaceAppProps) {
   const [selectedDrawingId, setSelectedDrawingId] = useState<string>()
   const [objectTreeOpen, setObjectTreeOpen] = useState(false)
   const [groupState, setGroupState] = useState(() => loadGroups(user.id))
+  const [layoutFolders, setLayoutFolders] = useState(() => loadLayoutFolders(user.id))
   const [theme, setTheme] = useState<Theme>(() => loadUserTheme(user.id))
   const [groupSelectMode, setGroupSelectMode] = useState(false)
   const [templateState, setTemplateState] = useState(() => loadTemplates(user.id))
@@ -783,6 +785,11 @@ function WorkspaceApp({ user, onLogout }: WorkspaceAppProps) {
   useEffect(() => saveSavedLayouts(user.id, savedLayouts), [savedLayouts, user.id])
   useEffect(() => saveAlerts(user.id, alerts), [alerts, user.id])
   useEffect(() => saveGroups(user.id, groupState), [groupState, user.id])
+  useEffect(() => saveLayoutFolders(user.id, layoutFolders), [layoutFolders, user.id])
+  // A deleted layout leaves its folder.
+  useEffect(() => {
+    setLayoutFolders((current) => pruneFolderAssignments(current, savedLayouts.map((layout) => layout.id)))
+  }, [savedLayouts])
   useEffect(() => saveTemplates(user.id, templateState), [templateState, user.id])
   useEffect(() => saveWatchlists(user.id, watchlistState), [watchlistState, user.id])
   useEffect(() => {
@@ -2133,6 +2140,8 @@ function WorkspaceApp({ user, onLogout }: WorkspaceAppProps) {
       {superchartOpen && (
         <Superchart
           layouts={savedLayouts}
+          folders={layoutFolders}
+          onFoldersChange={setLayoutFolders}
           activeLayoutId={activeTab.layoutId}
           onOpen={openSavedLayout}
           onOpenInBackground={openSavedLayoutInBackground}
