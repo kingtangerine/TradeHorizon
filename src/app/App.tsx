@@ -25,6 +25,7 @@ import { ColorPicker } from './ColorPicker'
 import { disablePush, enablePush, fetchAlertEvents, getPushStatus, type PushStatus } from './backgroundAlerts'
 import { ChartPane } from './ChartPane'
 import { ObjectList } from './ObjectList'
+import { versionDetails, versionLabel } from '../version'
 import { activePaneIndex, panesOf, withActivePane, withPaneChange, withPaneCount, type PaneSpec, type SplitCount } from './panes'
 import { Watchlist } from './Watchlist'
 import { addSymbol, loadWatchlists, saveWatchlists } from './watchlists'
@@ -791,6 +792,7 @@ function WorkspaceApp({ user, onLogout }: WorkspaceAppProps) {
           <HorizonLogo />
           <span className="brand-name">TradeHorizon</span>
           <span className="preview-pill">ALPHA</span>
+          <span className="brand-version" title={versionDetails()}>{versionLabel()}</span>
         </div>
         <div className="chart-tabs-scroll">
           {workspace.tabs.map((tab) => {
