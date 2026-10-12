@@ -3301,3 +3301,16 @@ button:disabled {
   font: 600 .7rem Inter, system-ui, sans-serif; cursor: pointer;
 }
 .chart-auto-reset:hover { background: var(--tv-blue, #2962ff); border-color: var(--tv-blue, #2962ff); color: #fff; }
+
+/* Reordering open tabs */
+.chart-tab { cursor: grab; }
+.chart-tab.dragging { position: relative; z-index: 60; cursor: grabbing; opacity: .92; box-shadow: 0 6px 18px rgb(0 0 0 / 45%); transition: none; user-select: none; }
+.chart-tab.dragging .chart-tab-main { pointer-events: none; }
+.chart-tab-main { cursor: inherit; }
+/* The tab strip is the positioning origin for tab offsets while dragging. */
+.chart-tabs-scroll { position: relative; }
+
+.vwap-anchor {
+  width: 100%; height: 32px; padding: 0 8px; border: 1px solid var(--border-strong); border-radius: 6px;
+  background: var(--bg); color: var(--text); font: inherit; font-size: .76rem;
+}

@@ -76,6 +76,18 @@ export function layoutSummary(layout: SavedLayout): { symbol: string; interval: 
   return { symbol: tab.symbol, interval: tab.interval, charts: tab.split?.count ?? 1 }
 }
 
+/** Moves the tab with `id` so it ends up at position `toIndex` (counted in the list that results). */
+export function moveTab<T extends { readonly id: string }>(tabs: readonly T[], id: string, toIndex: number): T[] {
+  const from = tabs.findIndex((tab) => tab.id === id)
+  if (from < 0) return [...tabs]
+  const target = Math.min(Math.max(toIndex, 0), tabs.length - 1)
+  if (target === from) return [...tabs]
+  const next = [...tabs]
+  const [moved] = next.splice(from, 1)
+  next.splice(target, 0, moved)
+  return next
+}
+
 export const MAX_COMBINED_LAYOUTS = 4
 
 /** "BTCUSDT" -> "BTC". Pairs quoted in something else keep their full name. */
