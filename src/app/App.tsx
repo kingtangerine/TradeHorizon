@@ -20,7 +20,8 @@ import {
   type DrawingType,
 } from '../drawings'
 import { MARKET_INTERVALS, MARKET_INTERVAL_SPECS, type MarketInterval } from '../market'
-import { alertReached, loadAlerts, saveAlerts, type AlertDirection, type PriceAlert } from './alerts'
+import { alertReached, isTriggered, loadAlerts, moveAlert, saveAlerts, type AlertDirection, type PriceAlert } from './alerts'
+import { AlertsPanel } from './AlertsPanel'
 import { ColorPicker } from './ColorPicker'
 import { getTelegramStatus, sendTelegramTest, startTelegramLink, unlinkTelegram, type TelegramStatus } from './telegram'
 import { disablePush, enablePush, fetchAlertEvents, getPushStatus, type PushStatus } from './backgroundAlerts'
@@ -296,7 +297,6 @@ function WorkspaceApp({ user, onLogout }: WorkspaceAppProps) {
   const interval = panes[activePaneIdx].interval
   const [layoutNotice, setLayoutNotice] = useState('')
   const [alerts, setAlerts] = useState<PriceAlert[]>(() => loadAlerts(user.id))
-  const [alertDirection, setAlertDirection] = useState<AlertDirection>('above')
   const [pushStatus, setPushStatus] = useState<PushStatus>('off')
   const [pushBusy, setPushBusy] = useState(false)
   const [telegram, setTelegram] = useState<TelegramStatus>()
@@ -305,7 +305,6 @@ function WorkspaceApp({ user, onLogout }: WorkspaceAppProps) {
   const [telegramBusy, setTelegramBusy] = useState(false)
   const [telegramMessage, setTelegramMessage] = useState('')
   const [pushError, setPushError] = useState('')
-  const [alertPrice, setAlertPrice] = useState('')
   const previousPriceRef = useRef<number | undefined>(undefined)
   const profileMenuRef = useRef<HTMLDivElement>(null)
   const layoutMenuRef = useRef<HTMLDivElement>(null)
@@ -338,11 +337,35 @@ function WorkspaceApp({ user, onLogout }: WorkspaceAppProps) {
       enabled: true,
       createdAtMs: Date.now(),
     }, ...current])
-    setAlertsOpen(true)
-    setWatchlistOpen(false)
+    const message = `Alert set at ${targetPrice.toLocaleString('en-US', { maximumFractionDigits: 8 })}. Drag its line to move it, ✕ to delete.`
+    setToast(message)
+    globalThis.setTimeout(() => setToast((currentToast) => (currentToast === message ? '' : currentToast)), 3600)
     if ('Notification' in globalThis && Notification.permission === 'default') {
       void Notification.requestPermission()
     }
+  }, [])
+
+  const createAlert = useCallback((direction: AlertDirection, targetPrice: number, symbol: string) => {
+    setAlerts((current) => [{ id: crypto.randomUUID(), symbol, targetPrice, direction, enabled: true, createdAtMs: Date.now() }, ...current])
+    if ('Notification' in globalThis && Notification.permission === 'default') void Notification.requestPermission()
+  }, [])
+
+  /** Dragging an alert line moves the alert (and re-arms it on the side of the price it now sits). */
+  const moveAlertTo = useCallback((id: string, targetPrice: number, lastPrice: number | undefined) => {
+    setAlerts((current) => current.map((alert) => (alert.id === id ? moveAlert(alert, targetPrice, lastPrice) : alert)))
+  }, [])
+
+  const deleteAlert = useCallback((id: string) => {
+    setAlerts((current) => current.filter((alert) => alert.id !== id))
+  }, [])
+
+  const toggleAlert = useCallback((id: string) => {
+    setAlerts((current) => current.map((alert) => {
+      if (alert.id !== id) return alert
+      if (alert.enabled) return { ...alert, enabled: false }
+      const { triggeredAtMs: _at, triggeredPrice: _price, ...rearmed } = alert
+      return { ...rearmed, enabled: true }
+    }))
   }, [])
 
   const findWatchMarket = useCallback((symbol: string) => markets.find((item) => item.symbol === symbol), [markets])
@@ -1558,6 +1581,10 @@ function WorkspaceApp({ user, onLogout }: WorkspaceAppProps) {
                 chartType={workspace.chartType ?? 'candles'}
                 theme={theme}
                 countdown={preferences.candleCountdown}
+                alerts={alerts}
+                alertLinesVisible={preferences.alertLines}
+                onMoveAlert={moveAlertTo}
+                onDeleteAlert={deleteAlert}
                 onActivate={handleActivatePane}
                 onActiveRuntime={setRuntime}
                 onActiveController={handleControllerChange}
@@ -2073,121 +2100,64 @@ function WorkspaceApp({ user, onLogout }: WorkspaceAppProps) {
       )}
 
       {alertsOpen && (
-        <aside className="alerts-panel" aria-label="Price alerts">
-          <header>
-            <div><BellIcon /><strong>Price alerts</strong></div>
-            <button type="button" onClick={() => setAlertsOpen(false)} aria-label="Close alerts"><CloseIcon /></button>
-          </header>
-          <form
-            className="alert-create-form"
-            onSubmit={(event) => {
-              event.preventDefault()
-              const targetPrice = Number(alertPrice)
-              if (!Number.isFinite(targetPrice) || targetPrice <= 0) return
-              const alert: PriceAlert = {
-                id: crypto.randomUUID(),
-                symbol: market.symbol,
-                targetPrice,
-                direction: alertDirection,
-                enabled: true,
-                createdAtMs: Date.now(),
-              }
-              setAlerts((current) => [alert, ...current])
-              setAlertPrice('')
-              if ('Notification' in globalThis && Notification.permission === 'default') {
-                void Notification.requestPermission()
-              }
-            }}
-          >
-            <strong>Create alert for {market.symbol}</strong>
-            <label>
-              <span>Trigger</span>
-              <select value={alertDirection} onChange={(event) => setAlertDirection(event.target.value as AlertDirection)}>
-                <option value="above">Price crosses above</option>
-                <option value="below">Price crosses below</option>
-              </select>
-            </label>
-            <label>
-              <span>Target {market.kind === 'dominance' ? (market.quoteAsset === '%' ? 'level (%)' : 'level (USD billions)') : `price (${market.quoteAsset})`}</span>
-              <input
-                type="number"
-                min="0"
-                step="any"
-                required
-                placeholder={quote ? String(quote.close) : 'Target price'}
-                value={alertPrice}
-                onChange={(event) => setAlertPrice(event.target.value)}
-              />
-            </label>
-            {market.kind === 'dominance' && <small className="alert-note">Index alerts only fire while TradeHorizon is open in a browser tab.</small>}
-            <button type="submit"><BellIcon /> Create alert</button>
-          </form>
-          <div className="alert-background">
-            <div>
-              <strong>Alerts when TradeHorizon is closed</strong>
-              <small>
-                {pushStatus === 'on' && 'On for this device. The server watches prices and notifies you even with the browser closed.'}
-                {pushStatus === 'off' && 'Get a notification on this device when a price alert triggers, even with TradeHorizon closed.'}
-                {pushStatus === 'blocked' && 'Notifications are blocked for this site. Allow them in your browser settings, then try again.'}
-                {pushStatus === 'unsupported' && 'This browser does not support background notifications. On iPhone, add TradeHorizon to the Home Screen first.'}
-              </small>
-              {pushError && <small className="alert-error" role="alert">{pushError}</small>}
-            </div>
-            {pushStatus !== 'unsupported' && pushStatus !== 'blocked' && (
-              <button type="button" onClick={() => void togglePush()} disabled={pushBusy}>
-                {pushBusy ? 'Please wait…' : pushStatus === 'on' ? 'Turn off' : 'Turn on'}
-              </button>
-            )}
-          </div>
-          {telegram?.configured && (
-            <div className="alert-background alert-telegram">
-              <div>
-                <strong>Telegram alerts</strong>
-                <small>
-                  {telegram.linked
-                    ? `Connected${telegram.chats[0]?.name ? ` as ${telegram.chats[0].name}` : ''}. Triggered alerts are sent to your Telegram chat, on your phone too.`
-                    : 'Get triggered alerts as Telegram messages on your phone, with TradeHorizon closed.'}
-                </small>
-                {telegramMessage && <small className={telegramPending ? '' : 'alert-error'} role="status">{telegramMessage}</small>}
-              </div>
-              {telegram.linked ? (
-                <span className="alert-telegram-actions">
-                  <button type="button" disabled={telegramBusy} onClick={() => void runTelegram(async () => { await sendTelegramTest(); return 'Test message sent.' })}>Send test</button>
-                  <button type="button" disabled={telegramBusy} onClick={() => void runTelegram(async () => { await unlinkTelegram(); setTelegram(await getTelegramStatus()) })}>Disconnect</button>
-                </span>
-              ) : (
-                <button type="button" disabled={telegramBusy || !telegram.ready} onClick={() => void connectTelegram()}>
-                  {telegramPending ? 'Waiting…' : 'Connect Telegram'}
-                </button>
-              )}
-            </div>
-          )}
-          <div className="alerts-list">
-            {alerts.map((alert) => (
-              <div className={alert.triggeredAtMs ? 'alert-row triggered' : 'alert-row'} key={alert.id}>
+        <AlertsPanel
+          alerts={alerts}
+          market={market}
+          lastPrice={quote?.close}
+          linesVisible={preferences.alertLines}
+          onToggleLines={() => setPreferences((current) => ({ ...current, alertLines: !current.alertLines }))}
+          onCreate={(direction, targetPrice) => createAlert(direction, targetPrice, market.symbol)}
+          onToggle={toggleAlert}
+          onDelete={deleteAlert}
+          onClearTriggered={() => setAlerts((current) => current.filter((alert) => !isTriggered(alert)))}
+          onOpenSymbol={(symbol) => { const next = findWatchMarket(symbol); if (next) changeMarket(next) }}
+          onClose={() => setAlertsOpen(false)}
+          notificationSummary={`Browser ${pushStatus === 'on' ? 'on' : 'off'}${telegram?.configured ? ` · Telegram ${telegram.linked ? 'on' : 'off'}` : ''}`}
+          notifications={(
+            <>
+              <div className="alert-background">
                 <div>
-                  <strong>{alert.symbol.replace('USDT', '')} {alert.direction === 'above' ? '≥' : '≤'} {alert.targetPrice.toLocaleString()}</strong>
-                  <span>{alert.triggeredAtMs ? 'Triggered' : alert.enabled ? 'Active' : 'Paused'}</span>
+                  <strong>Alerts when TradeHorizon is closed</strong>
+                  <small>
+                    {pushStatus === 'on' && 'On for this device. The server watches prices and notifies you even with the browser closed.'}
+                    {pushStatus === 'off' && 'Get a notification on this device when a price alert triggers, even with TradeHorizon closed.'}
+                    {pushStatus === 'blocked' && 'Notifications are blocked for this site. Allow them in your browser settings, then try again.'}
+                    {pushStatus === 'unsupported' && 'This browser does not support background notifications. On iPhone, add TradeHorizon to the Home Screen first.'}
+                  </small>
+                  {pushError && <small className="alert-error" role="alert">{pushError}</small>}
                 </div>
-                <button
-                  type="button"
-                  onClick={() => setAlerts((current) => current.map((item) => {
-                    if (item.id !== alert.id) return item
-                    if (item.enabled) return { ...item, enabled: false }
-                    const { triggeredAtMs: _, ...reset } = item
-                    return { ...reset, enabled: true }
-                  }))}
-                >
-                  {alert.enabled ? 'Pause' : 'Enable'}
-                </button>
-                <button type="button" className="delete" onClick={() => setAlerts((current) => current.filter((item) => item.id !== alert.id))}>
-                  <TrashIcon />
-                </button>
+                {pushStatus !== 'unsupported' && pushStatus !== 'blocked' && (
+                  <button type="button" onClick={() => void togglePush()} disabled={pushBusy}>
+                    {pushBusy ? 'Please wait…' : pushStatus === 'on' ? 'Turn off' : 'Turn on'}
+                  </button>
+                )}
               </div>
-            ))}
-            {alerts.length === 0 && <div className="alerts-empty">No price alerts yet.</div>}
-          </div>
-        </aside>
+              {telegram?.configured && (
+                <div className="alert-background alert-telegram">
+                  <div>
+                    <strong>Telegram alerts</strong>
+                    <small>
+                      {telegram.linked
+                        ? `Connected${telegram.chats[0]?.name ? ` as ${telegram.chats[0].name}` : ''}. Triggered alerts are sent to your Telegram chat, on your phone too.`
+                        : 'Get triggered alerts as Telegram messages on your phone, with TradeHorizon closed.'}
+                    </small>
+                    {telegramMessage && <small className={telegramPending ? '' : 'alert-error'} role="status">{telegramMessage}</small>}
+                  </div>
+                  {telegram.linked ? (
+                    <span className="alert-telegram-actions">
+                      <button type="button" disabled={telegramBusy} onClick={() => void runTelegram(async () => { await sendTelegramTest(); return 'Test message sent.' })}>Send test</button>
+                      <button type="button" disabled={telegramBusy} onClick={() => void runTelegram(async () => { await unlinkTelegram(); setTelegram(await getTelegramStatus()) })}>Disconnect</button>
+                    </span>
+                  ) : (
+                    <button type="button" disabled={telegramBusy || !telegram.ready} onClick={() => void connectTelegram()}>
+                      {telegramPending ? 'Waiting…' : 'Connect Telegram'}
+                    </button>
+                  )}
+                </div>
+              )}
+            </>
+          )}
+        />
       )}
 
       {symbolSearch && (

@@ -7,3 +7,5 @@ export const VERTICAL_LINE_OVERLAY_NAME = 'tradeHorizonVerticalLine'
 export const PRICE_RANGE_OVERLAY_NAME = 'tradeHorizonPriceRange'
 export const FIB_RETRACEMENT_OVERLAY_NAME = 'tradeHorizonFibRetracement'
 export const TEXT_OVERLAY_NAME = 'tradeHorizonText'
+/** Price alerts on the chart (not a drawing: not stored in the DrawingStore). */
+export const ALERT_LINE_OVERLAY_NAME = 'tradeHorizonAlertLine'

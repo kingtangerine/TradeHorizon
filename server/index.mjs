@@ -184,6 +184,13 @@ async function handleApi(req, res, path) {
     if (catalog.listings.length === 0) return send(res, 503, { error: 'Market list is still loading.' })
     return sendCompressed(req, res, 200, catalog, 'public, max-age=300')
   }
+  if (path === '/api/cg/caps' && req.method === 'GET') {
+    try {
+      return await sendCompressed(req, res, 200, await markets.marketCaps(), 'public, max-age=600')
+    } catch {
+      return send(res, 502, { error: 'Market-cap data is unavailable right now.' })
+    }
+  }
   if ((path === '/api/cg/global' || path === '/api/cg/markets') && req.method === 'GET') {
     try {
       return await sendCompressed(req, res, 200, await markets.coingecko(path.slice('/api/cg/'.length)), 'public, max-age=60')

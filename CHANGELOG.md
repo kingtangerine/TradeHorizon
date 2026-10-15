@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [0.16.0] - 2026-10-15
+
+### Added
+- **Alert lines on the chart.** Every active alert of the chart's coin is drawn as an orange dashed line with its price, a tag on the price scale and a ✕ to delete it; paused alerts are grey. Drag a line to move the alert (it re-arms on the side of the price it now sits).
+- **Show or hide alert lines** for all charts with the "On chart" switch in the alerts panel (saved with your settings).
+- **Market cap in the chart legend**: a colour-coded tier with a 4-bar meter, the market cap and the CoinGecko rank, e.g. "Mega cap · MC $1.63T · #1". Tiers: Mega cap (over $50B, green), Large cap ($10B to $50B, blue), Mid cap ($1B to $10B, amber), Small cap (under $1B or outside the top 500, red). Hover for what the tier means and the 24h volume as a share of the market cap (a high share flags fast-moving coins). The server caches the top 500 coins from CoinGecko for 30 minutes (`/api/cg/caps`).
+
+### Changed
+- **Placing an alert no longer opens the alerts panel**: a short confirmation appears and the alert line shows where it is.
+- **Alerts panel reorganised for many alerts**: a one-line create form, notifications (browser and Telegram) folded into one collapsible line with their status, Active / Triggered / All tabs with counts, search once there are more than 6 alerts, alerts grouped per coin (the chart's coin first, collapsible, with "Open chart" for the others), each row showing direction, price, status and the distance from the current price, and "Clear triggered".
+
 ## [0.15.0] - 2026-10-15
 
 ### Added
