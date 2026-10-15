@@ -12,7 +12,7 @@ import { applySecurityHeaders, clientIp, createThrottle, readBody, send, sendCom
 import { createMarketService } from './markets.mjs'
 import { createStaticHandler } from './static.mjs'
 import { createTelegramService } from './telegram.mjs'
-import { ensureRevisions, itemsSince, latestRevision, storeValue, writeValue } from './userdata.mjs'
+import { describeData, deviceFrom, ensureRevisions, itemsSince, latestRevision, storeValue, writeValue } from './userdata.mjs'
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const dataDir = process.env.TH_DATA_DIR ?? join(root, 'server', 'data')
@@ -25,6 +25,8 @@ const version = (() => {
   try { return JSON.parse(readFileSync(join(root, 'package.json'), 'utf8')).version } catch { return 'unknown' }
 })()
 const startedAtMs = Date.now()
+/** Bumped when the sync API changes; the app compares it to warn about a server that was not restarted. */
+const SYNC_PROTOCOL = 2
 
 mkdirSync(dataDir, { recursive: true })
 let db = { users: [], sessions: [] }
@@ -149,7 +151,7 @@ async function handleData(req, res) {
     if (!DATA_KEY.test(key) || typeof body.value !== 'string') return send(res, 400, { error: 'Invalid data.' })
     if (body.value.length > MAX_VALUE_BYTES) return send(res, 413, { error: 'Data too large.' })
     if (!(key in data) && Object.keys(data).length >= MAX_KEYS) return send(res, 400, { error: 'Too many items.' })
-    const result = writeValue(data, key, body.value, body.baseRev)
+    const result = writeValue(data, key, body.value, body.baseRev, Date.now(), deviceFrom(body.device))
     if (result.status === 'outdated') return send(res, 409, { error: 'TradeHorizon was updated. Reload the page.', outdated: true })
     if (result.status === 'conflict') return send(res, 409, { error: 'Changed on another device.', item: result.item })
     saveUserData(user.id)
@@ -161,6 +163,13 @@ async function handleData(req, res) {
 
 async function handleApi(req, res, path) {
   if (path === '/api/data') return handleData(req, res)
+  // Sync check: what the server holds for this user (times, sizes, fingerprints, which device), no values.
+  if (path === '/api/sync/status' && req.method === 'GET') {
+    const user = sessionUser(req)
+    if (!user) return send(res, 401, { error: 'Session expired.' })
+    const data = loadUserData(user.id)
+    return send(res, 200, { protocol: SYNC_PROTOCOL, version, serverTimeMs: Date.now(), rev: latestRevision(data), items: describeData(data) })
+  }
 
   // Public market data, cached here so browsers do not each download it from the exchanges.
   if (path === '/api/markets' && req.method === 'GET') {
@@ -301,6 +310,7 @@ function health() {
     version,
     uptimeSec: Math.round((Date.now() - startedAtMs) / 1000),
     dataWritable,
+    syncProtocol: SYNC_PROTOCOL,
     pushReady: Boolean(push.publicKey),
     telegramReady: Boolean(telegram.botUsername()),
     marketsLoaded: catalog.listings.length > 0,

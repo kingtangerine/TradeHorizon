@@ -40,6 +40,7 @@ import { loadLayoutFolders, pruneFolderAssignments, saveLayoutFolders } from './
 import { hasSyncedBefore, startUserSync, stopUserSync, subscribeRemoteData } from './userSync'
 import { logIn, logOut, restoreSession, signUp, verifySession, type AppUser } from './auth'
 import { Superchart } from './Superchart'
+import { syncStatusText, useSyncStatus } from './SyncPanel'
 import {
   DEFAULT_INDICATORS,
   DOMINANCE_DESCRIPTIONS,
@@ -298,6 +299,7 @@ function WorkspaceApp({ user, onLogout }: WorkspaceAppProps) {
   const [pushBusy, setPushBusy] = useState(false)
   const [telegram, setTelegram] = useState<TelegramStatus>()
   const [telegramPending, setTelegramPending] = useState(false)
+  const syncStatus = useSyncStatus()
   const [telegramBusy, setTelegramBusy] = useState(false)
   const [telegramMessage, setTelegramMessage] = useState('')
   const [pushError, setPushError] = useState('')
@@ -2251,6 +2253,14 @@ function WorkspaceApp({ user, onLogout }: WorkspaceAppProps) {
         <span className="status-separator" />
         <span>{marketDrawings.length} saved drawing{marketDrawings.length === 1 ? '' : 's'} for {market.symbol}</span>
         <span className="status-spacer" />
+        <button
+          type="button"
+          className={`status-sync sync-${syncStatus.state}`}
+          title={syncStatus.error ?? 'Sync between your devices. Click for details and a sync check.'}
+          onClick={() => setProfileOpen(true)}
+        >
+          <i aria-hidden="true" /> {syncStatusText(syncStatus)}
+        </button>
         <span className="status-note">Market data · Public feed</span>
         {runtime.error && quote && (
           <button type="button" className="status-retry" onClick={() => controller?.retry()}>
