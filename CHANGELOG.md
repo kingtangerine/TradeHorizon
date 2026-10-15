@@ -10,13 +10,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [0.13.0] - 2026-10-15
 
 ### Added
-- 
+- **Telegram alerts.** Triggered price alerts can be sent to a Telegram chat (phone or desktop), with TradeHorizon closed. In the Alerts panel press Connect Telegram, press Start in the chat, and the account is linked; Send test and Disconnect are there too. The server runs one bot (token from @BotFather in `TH_TELEGRAM_TOKEN`) and reads its messages by long polling, so no webhook or extra HTTPS setup is needed. The section only appears when the server has a token. `/healthz` reports `telegramReady`.
 
 ### Changed
-- 
-
-### Fixed
-- 
+- Triggered alerts now go to every channel the user has set up (web push and Telegram); one failing channel does not block the other.
 
 ## [0.12.0] - 2026-10-15
 

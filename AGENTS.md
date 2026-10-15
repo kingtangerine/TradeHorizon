@@ -33,7 +33,8 @@ TradeHorizon/
 │   ├── index.mjs                #   routes: auth, synced user data, markets, push, health
 │   ├── static.mjs / http.mjs    #   static files (compression, cache), security headers, helpers
 │   ├── markets.mjs              #   cached coin catalog + CoinGecko
-│   └── alerts.mjs               #   server-side price alerts + web-push subscriptions
+│   ├── alerts.mjs               #   server-side price alerts + web-push subscriptions
+│   └── telegram.mjs             #   Telegram bot (long polling): account linking by one-time code, alert delivery
 ├── public/                      # sw.js (push), manifest.webmanifest, icons
 ├── eslint.config.js             # lint rules (`npm run lint`); CI in .github/workflows/ci.yml
 └── src/
