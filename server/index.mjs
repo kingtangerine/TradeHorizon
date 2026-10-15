@@ -313,6 +313,9 @@ function health() {
     syncProtocol: SYNC_PROTOCOL,
     pushReady: Boolean(push.publicKey),
     telegramReady: Boolean(telegram.botUsername()),
+    telegram: telegram.diagnostics(),
+    // Changes between requests: the app was restarted, or Passenger runs more than one copy.
+    pid: process.pid,
     marketsLoaded: catalog.listings.length > 0,
     marketsAgeMin: catalog.fetchedAtMs ? Math.round((Date.now() - catalog.fetchedAtMs) / 60_000) : null,
   }

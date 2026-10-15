@@ -23,6 +23,19 @@ export function parseCommand(text) {
   return match ? { command: match[1].toLowerCase(), arg: match[2] } : undefined
 }
 
+/** A Telegram or network error as a sentence that says what to fix. */
+export function explainError(error) {
+  if (error?.status === 401 || error?.status === 404) return 'Telegram rejected the bot token (it is wrong or was revoked). Copy the current token from @BotFather into TH_TELEGRAM_TOKEN and restart the app.'
+  if (error?.status === 409) return 'Another process is reading this bot\'s messages: the same token runs on two servers, or the app runs twice. Only one may use the token.'
+  if (error?.status === 429) return 'Telegram is rate-limiting this bot; it retries automatically.'
+  const code = error?.cause?.code ?? error?.code
+  if (code === 'ENOTFOUND' || code === 'EAI_AGAIN') return `This server cannot look up api.telegram.org (DNS ${code}). Check the server's DNS settings.`
+  if (code === 'ECONNREFUSED' || code === 'ECONNRESET' || code === 'ETIMEDOUT' || code === 'UND_ERR_CONNECT_TIMEOUT' || error?.name === 'TimeoutError') {
+    return `This server cannot reach api.telegram.org (${code ?? 'timeout'}). A firewall or the hosting provider is probably blocking outgoing HTTPS to Telegram.`
+  }
+  return `Telegram request failed: ${error?.message ?? error}${code ? ` (${code})` : ''}.`
+}
+
 export function formatAlertMessage(payload) {
   return `🔔 <b>${escapeHtml(payload.title)}</b>\n${escapeHtml(payload.body)}`
 }
@@ -49,6 +62,9 @@ export function createTelegramService({ dataDir, token, apiBase = API, userName 
   /** code -> { userId, expiresAtMs } (memory only: a restart simply invalidates open codes) */
   const codes = new Map()
   let botUsername
+  /** The latest reason the bot is not working, in plain words (cleared by a successful poll). */
+  let problem
+  let startedPollingAtMs
   let stopped = false
   const stopSignal = new AbortController()
 
@@ -146,14 +162,16 @@ export function createTelegramService({ dataDir, token, apiBase = API, userName 
       try {
         await pollOnce()
         delayMs = 0
+        problem = undefined
+        startedPollingAtMs ??= now()
       } catch (error) {
         if (stopped) return
+        problem = explainError(error)
         if (error.status === 401 || error.status === 404) {
-          log.warn?.('[telegram] Telegram rejected the bot token. Check TH_TELEGRAM_TOKEN. Telegram alerts are off.')
+          log.warn?.(`[telegram] ${problem}`)
           return
         }
-        if (error.status === 409) log.warn?.('[telegram] another process is reading this bot\'s messages. Only one server may use the same bot token.')
-        else log.warn?.(`[telegram] ${error.message}`)
+        log.warn?.(`[telegram] ${problem}`)
         delayMs = Math.min(60_000, delayMs ? delayMs * 2 : 3000)
         await new Promise((resolve) => { const timer = setTimeout(resolve, delayMs); timer.unref?.() })
       }
@@ -163,6 +181,13 @@ export function createTelegramService({ dataDir, token, apiBase = API, userName 
   return {
     enabled,
     botUsername: () => botUsername,
+    /** For /healthz: whether the bot works, and if not, why (never includes the token). */
+    diagnostics() {
+      if (!token) return { state: 'off', problem: 'TH_TELEGRAM_TOKEN is not set for this Node process (add it under Custom environment variables, then restart the app).' }
+      if (!enabled) return { state: 'off', problem: 'TH_TELEGRAM_TOKEN is set but does not look like a bot token (expected digits, a colon, then 30+ letters/digits; check for extra quotes or spaces).' }
+      if (botUsername && !problem) return { state: 'ready', bot: `@${botUsername}`, pollingSinceMs: startedPollingAtMs ?? null }
+      return { state: problem ? 'error' : 'starting', bot: botUsername ? `@${botUsername}` : null, problem: problem ?? 'Contacting Telegram… reload in a few seconds.' }
+    },
     start() { if (enabled) void loop() },
     stop() { stopped = true; stopSignal.abort() },
     pollOnce,

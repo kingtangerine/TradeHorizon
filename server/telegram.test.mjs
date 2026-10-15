@@ -2,7 +2,7 @@ import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
-import { createTelegramService, escapeHtml, formatAlertMessage, parseCommand } from './telegram.mjs'
+import { createTelegramService, escapeHtml, explainError, formatAlertMessage, parseCommand } from './telegram.mjs'
 
 const TOKEN = '123456789:AAHdqTcvCH1vGWJxfSeofSAs0K5PALDsaw'
 const dirs = []
@@ -149,5 +149,26 @@ describe('telegram service', () => {
     const polls = telegram.calls.filter((call) => call.method === 'getUpdates')
     expect(polls[0].body.offset).toBe(0)
     expect(polls[1].body.offset).toBe(42)
+  })
+})
+
+describe('diagnostics for /healthz', () => {
+  it('says why the bot is off', () => {
+    expect(make({ token: undefined }).service.diagnostics()).toMatchObject({ state: 'off', problem: expect.stringContaining('not set') })
+    expect(make({ token: '"123:abc"' }).service.diagnostics()).toMatchObject({ state: 'off', problem: expect.stringContaining('does not look like') })
+    expect(make().service.diagnostics()).toMatchObject({ state: 'starting' })
+  })
+
+  it('is ready after Telegram answered', async () => {
+    const { service } = make()
+    await service.pollOnce()
+    expect(service.diagnostics()).toMatchObject({ bot: '@TradeHorizonBot' })
+  })
+
+  it('explains token, conflict and network errors', () => {
+    expect(explainError({ status: 401 })).toContain('rejected the bot token')
+    expect(explainError({ status: 409 })).toContain('Another process')
+    expect(explainError({ message: 'fetch failed', cause: { code: 'ENOTFOUND' } })).toContain('DNS')
+    expect(explainError({ message: 'fetch failed', cause: { code: 'ECONNREFUSED' } })).toContain('firewall')
   })
 })

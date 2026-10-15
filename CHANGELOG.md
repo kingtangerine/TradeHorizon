@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [0.14.2] - 2026-10-15
+
+### Added
+- `/healthz` explains the Telegram bot: `telegram.state` (off, starting, ready, error) and `telegram.problem` in plain words (token not set for the Node process, token malformed or rejected, Telegram unreachable from the server, two processes using the same bot). It also reports `pid`, which changes when the app was restarted or more than one copy runs.
+
 ## [0.14.1] - 2026-10-15
 
 ### Added
