@@ -10,12 +10,12 @@ import {
   toggleDefaultTemplate,
 } from './templates'
 
-const style = rectangleStyleOf({ color: '#ff0000', fillColor: '#00ff00', fillOpacity: 40, lineWidth: 3, lineStyle: 'dashed', midline: true })
+const style = rectangleStyleOf({ color: '#ff0000', fillColor: '#00ff00', fillOpacity: 40, lineWidth: 3, lineStyle: 'dashed', midline: true, noBorder: true })
 
 describe('rectangle templates', () => {
   it('reads template fields from a drawing style and fills the gaps', () => {
-    expect(style).toEqual({ color: '#ff0000', fillColor: '#00ff00', fillOpacity: 40, lineWidth: 3, lineStyle: 'dashed', midline: true })
-    expect(rectangleStyleOf({})).toEqual({ color: '#3aa9ff', fillColor: '#3aa9ff', fillOpacity: 14, lineWidth: 2, lineStyle: 'solid', midline: false })
+    expect(style).toEqual({ color: '#ff0000', fillColor: '#00ff00', fillOpacity: 40, lineWidth: 3, lineStyle: 'dashed', midline: true, noBorder: true })
+    expect(rectangleStyleOf({})).toEqual({ color: '#3aa9ff', fillColor: '#3aa9ff', fillOpacity: 14, lineWidth: 2, lineStyle: 'solid', midline: false, noBorder: false })
     expect(rectangleStyleOf({ fillOpacity: 400, lineWidth: 99, color: 'red' })).toMatchObject({ fillOpacity: 100, lineWidth: 5, color: '#3aa9ff' })
   })
 
