@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [0.14.1] - 2026-10-15
+
+### Added
+- **Sync check.** The account window has a "Sync between devices" section: the live sync state, a name for this device, and **Save & check sync**, which uploads everything waiting, downloads other devices' changes, and lists every saved item on this device next to the server's copy (what it contains, when it was saved and by which device, same or different, and which layouts exist on only one side). Problems are explained in plain words with the fix, e.g. a server that was updated but not restarted, a proxy refusing large uploads (HTTP 413) or an unreachable server. **Copy report** puts the whole check on the clipboard.
+- A sync indicator in the status bar (Synced / Saving / Offline / Sync problem); click it for the details.
+- The server records which device saved each item, and `GET /api/sync/status` describes what it holds; `/healthz` reports `syncProtocol`.
+
+### Changed
+- Sync no longer fails silently: download and upload problems (including talking to a server that runs an older TradeHorizon) are shown in the status bar instead of being ignored.
+
 ## [0.14.0] - 2026-10-15
 
 ### Added

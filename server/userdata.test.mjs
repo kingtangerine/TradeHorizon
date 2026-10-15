@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { ensureRevisions, itemsSince, latestRevision, storeValue, writeValue } from './userdata.mjs'
+import { describeData, deviceFrom, ensureRevisions, fingerprint, itemsSince, latestRevision, storeValue, writeValue } from './userdata.mjs'
+import { fingerprint as appFingerprint } from '../src/app/syncMerge.ts'
 
 describe('user data revisions', () => {
   it('gives revisions to items stored before revisions existed', () => {
@@ -49,5 +50,27 @@ describe('user data revisions', () => {
     expect(Object.keys(itemsSince(data, 0)).sort()).toEqual(['a', 'b'])
     expect(Object.keys(itemsSince(data, 2))).toEqual(['a'])
     expect(itemsSince(data, 3)).toEqual({})
+  })
+})
+
+describe('sync check data', () => {
+  it('records which device wrote an item and describes items without their values', () => {
+    const data = {}
+    writeValue(data, 'layouts:v1', '[1,2,3]', 0, 50, deviceFrom({ id: 'device-abc', name: 'Windows · Chrome' }))
+    storeValue(data, 'alerts:v1', '[]', 60)
+    expect(describeData(data)).toEqual({
+      'layouts:v1': { rev: 1, updatedAtMs: 50, size: 7, hash: fingerprint('[1,2,3]'), by: 'device-abc', byName: 'Windows · Chrome' },
+      'alerts:v1': { rev: 2, updatedAtMs: 60, size: 2, hash: fingerprint('[]'), by: 'server', byName: 'TradeHorizon server' },
+    })
+  })
+
+  it('cleans up device details sent by the app', () => {
+    expect(deviceFrom(undefined)).toEqual({ id: 'unknown', name: 'Unknown device' })
+    expect(deviceFrom({ id: '../x', name: '  ' })).toEqual({ id: 'unknown', name: 'Unknown device' })
+    expect(deviceFrom({ id: 'abcdef12', name: 'x'.repeat(100) }).name).toHaveLength(60)
+  })
+
+  it('fingerprints exactly like the app does', () => {
+    for (const text of ['', 'dark', '[{"id":"a","name":"Ünïcode ✓"}]']) expect(fingerprint(text)).toBe(appFingerprint(text))
   })
 })

@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom'
 import { changePassword, type AppUser } from './auth'
 import { backupFileName, buildBackup, parseBackup, restoreBackup, type BackupFile } from './dataTransfer'
 import { CloseIcon, UserIcon } from './Icons'
+import { SyncPanel } from './SyncPanel'
 import type { Theme } from './theme'
 import { versionDetails } from '../version'
 
@@ -108,6 +109,8 @@ export function ProfileDialog({ user, theme, tabCount, layoutCount, onTheme, can
               <div><dt>App version</dt><dd>{versionDetails()}</dd></div>
             </dl>
           </section>
+
+          <SyncPanel userId={user.id} />
 
           <section>
             <h3>Appearance</h3>
