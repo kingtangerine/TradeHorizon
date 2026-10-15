@@ -1749,7 +1749,17 @@ function WorkspaceApp({ user, onLogout }: WorkspaceAppProps) {
                 <>
                   {selectedDrawing.type !== 'fibRetracement' && selectedDrawing.type !== 'priceRange' && (
                     <label className="toolbar-color-control" title="Line color">
-                      <ColorPicker label="Line color" value={colorInputValue(selectedDrawing.style.color, selectedDrawing.type === 'rectangle' ? '#3aa9ff' : '#f4b860')} onChange={(color) => updateSelectedStyle({ color: color })} />
+                      {selectedDrawing.type === 'rectangle' ? (
+                        <ColorPicker
+                          label="Line color"
+                          value={colorInputValue(selectedDrawing.style.color, '#3aa9ff')}
+                          none={selectedDrawing.style.noBorder === true}
+                          onNone={() => updateSelectedStyle({ noBorder: true })}
+                          onChange={(color) => updateSelectedStyle({ color, noBorder: false })}
+                        />
+                      ) : (
+                        <ColorPicker label="Line color" value={colorInputValue(selectedDrawing.style.color, '#f4b860')} onChange={(color) => updateSelectedStyle({ color: color })} />
+                      )}
                     </label>
                   )}
                   <select

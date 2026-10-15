@@ -8,6 +8,8 @@ export interface RectangleStyle {
   readonly fillColor: string
   readonly fillOpacity: number
   readonly midline: boolean
+  /** Fill only: no outline. */
+  readonly noBorder: boolean
 }
 
 export interface RectangleTemplate {
@@ -44,6 +46,7 @@ export function rectangleStyleOf(style: Readonly<Record<string, unknown>>): Rect
     lineStyle: style.lineStyle === 'dashed' ? 'dashed' : 'solid',
     fillOpacity: Math.min(100, Math.max(0, opacity)),
     midline: style.midline === true,
+    noBorder: style.noBorder === true,
   }
 }
 

@@ -20,9 +20,12 @@ interface ColorPickerProps {
   value: string
   label: string
   onChange(color: string): void
+  /** Offer "No color" (e.g. a rectangle without an outline); `none` says it is the current choice. */
+  onNone?(): void
+  none?: boolean
 }
 
-export function ColorPicker({ value, label, onChange }: ColorPickerProps) {
+export function ColorPicker({ value, label, onChange, onNone, none = false }: ColorPickerProps) {
   const [open, setOpen] = useState(false)
   const [position, setPosition] = useState({ top: 0, left: 0 })
   const buttonRef = useRef<HTMLButtonElement>(null)
@@ -65,7 +68,7 @@ export function ColorPicker({ value, label, onChange }: ColorPickerProps) {
     <button
       type="button"
       key={color}
-      className={color.toLowerCase() === value.toLowerCase() ? 'color-swatch selected' : 'color-swatch'}
+      className={!none && color.toLowerCase() === value.toLowerCase() ? 'color-swatch selected' : 'color-swatch'}
       style={{ background: color }}
       title={color}
       aria-label={color}
@@ -84,10 +87,15 @@ export function ColorPicker({ value, label, onChange }: ColorPickerProps) {
         aria-expanded={open}
         onClick={toggle}
       >
-        <span style={{ background: value }} />
+        <span className={none ? 'color-none' : undefined} style={none ? undefined : { background: value }} />
       </button>
       {open && createPortal(
         <div ref={popoverRef} className="color-popover" role="dialog" aria-label={label} style={position}>
+          {onNone && (
+            <button type="button" className={none ? 'color-none-option selected' : 'color-none-option'} onClick={() => { onNone(); setOpen(false) }}>
+              <span className="color-none" aria-hidden="true" /> No color
+            </button>
+          )}
           <div className="color-row">{GREYS.map(swatch)}</div>
           <div className="color-grid">
             {Array.from({ length: 9 }, (_, shade) => (

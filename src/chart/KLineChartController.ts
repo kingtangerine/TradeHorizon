@@ -1760,10 +1760,11 @@ export class KLineChartController {
       styles: {
         line: { color, size: lineWidth, style: lineStyle, dashedValue: [6, 4] },
         rect: {
-          style: 'stroke_fill',
+          // "No color" for a rectangle's line: fill only (a zero-width border would still be drawn 1px wide).
+          style: style.noBorder === true ? 'fill' : 'stroke_fill',
           color: colorWithOpacity(text('fillColor', '#3aa9ff'), fillOpacity),
           borderColor: color,
-          borderSize: lineWidth,
+          borderSize: style.noBorder === true ? 0 : lineWidth,
           borderStyle: lineStyle,
           borderDashedValue: [4, 4],
           borderRadius: 0,

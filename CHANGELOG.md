@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [0.18.0] - 2026-10-15
+
+### Added
+- **Rectangles without an outline.** The rectangle's line colour picker has a **No color** option at the top: the box is drawn with its fill only (the swatch shows a red slash). Picking any colour brings the outline back. A fill-only box is still selected and dragged by clicking its fill, and saved rectangle templates remember the choice.
+
 ## [0.17.1] - 2026-10-15
 
 ### Fixed
