@@ -34,6 +34,7 @@ TradeHorizon/
 │   ├── static.mjs / http.mjs    #   static files (compression, cache), security headers, helpers
 │   ├── markets.mjs              #   cached coin catalog + CoinGecko
 │   ├── alerts.mjs               #   server-side price alerts + web-push subscriptions
+│   ├── admin.mjs                #   admin page helpers (user summaries without content, folder/disk size)
 │   ├── userdata.mjs             #   revisions for synced user data (conflict detection, changes since N)
 │   └── telegram.mjs             #   Telegram bot (long polling): account linking by one-time code, alert delivery
 ├── public/                      # sw.js (push), manifest.webmanifest, icons

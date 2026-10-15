@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [0.17.0] - 2026-10-15
+
+### Added
+- **Admin page** for the accounts listed in `TH_ADMIN_EMAILS` (in `.env`, comma-separated). Open it from the account window (Admin panel). Access is decided by the server: everyone else gets 403 and never sees the button.
+  - **Overview**: users (registered, active today / this week, new sign-ups, signed-in sessions); server (version, Node, uptime, starts in the last 24 h, app and server memory, load); storage (TradeHorizon data size, free disk space, .env settings found); services (Telegram bot and connected users, browser-push devices, keep-alive, alerts being watched, market list). Warnings are colour-coded.
+  - **Users**: every account with joined date, last active, devices, layouts, drawings, alerts, storage used and notification channels; search and sort (last active, newest, storage, name).
+  - **User details**: joined, last login, last active, last sync, sessions, storage, Telegram and push, the devices that saved data, and every stored item with what it holds, its size, when and by which device it was saved. Sizes and counts only, never the content of layouts, drawings or alerts.
+  - **Actions**: sign a user out everywhere; delete an account and all its data (type the email to confirm; admins cannot delete themselves here).
+- The server now records each account's last login and last activity.
+
 ## [0.16.1] - 2026-10-15
 
 ### Added
