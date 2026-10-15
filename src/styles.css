@@ -3354,3 +3354,5 @@ button:disabled {
 .profile-toggle input { margin-top: 3px; accent-color: var(--tv-blue, #2962ff); }
 .profile-toggle span { display: grid; gap: 2px; }
 .profile-toggle small { color: var(--muted); font-size: .78rem; }
+
+.alert-telegram-actions { display: inline-flex; flex-direction: column; gap: 6px; }
