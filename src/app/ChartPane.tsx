@@ -32,6 +32,7 @@ interface ChartPaneProps {
   magnet: boolean
   chartType: ChartType
   theme: 'dark' | 'light'
+  countdown: boolean
   onActivate(index: number): void
   onActiveRuntime(state: ChartRuntimeState): void
   onActiveController(controller: KLineChartController | null): void
@@ -68,6 +69,7 @@ export function ChartPane({
   magnet,
   chartType,
   theme,
+  countdown,
   onActivate,
   onActiveRuntime,
   onActiveController,
@@ -184,6 +186,7 @@ export function ChartPane({
         onSelectionChange={handleSelection}
         onAddAlert={(price) => onAddAlert(price, market.symbol, quote?.close)}
         theme={theme}
+        countdown={countdown}
       />
 
       {blockingLoad && (

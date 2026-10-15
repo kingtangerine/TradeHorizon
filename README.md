@@ -15,6 +15,7 @@
   - **Price Range Measurement**: Measure price change ($ and %) with auto-adjusting directional color indicators.
   - **Long Position Calculator**: Automatic risk/reward ratio, position sizing, and stop-loss/take-profit calculation.
 - **Object Tree & Layers**: Layer manager to focus, lock, hide, or delete annotations.
+- **Candle countdown** under the last price (switch it off in the account window).
 - **Indicators**: SMA, EMA, VWAP (day/week/month/quarter/year), QVWAP and market dominance panes.
 - **Multi-Tab Workspaces**: Open multiple crypto pairs across various timeframes with saved layout state.
 - **Client-Side Price Alerts**: Trigger visual alerts when live prices cross predefined thresholds.

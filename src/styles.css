@@ -3340,3 +3340,17 @@ button:disabled {
 .superchart-menu .menu-separator { height: 1px; margin: 4px 0; background: var(--border-strong); }
 .layout-card-menu-anchor .superchart-menu { max-height: 320px; overflow-y: auto; }
 @media (max-width: 760px) { .folder-bar { margin-top: -16px; } .folder-actions { margin-left: 0; } }
+
+/* Time left in the current candle, under the last-price tag on the price axis */
+.chart-countdown {
+  position: absolute; z-index: 3; box-sizing: border-box; margin-top: 11px; height: 17px; line-height: 17px;
+  color: #fff; background: #089981; font: 600 11px Inter, system-ui, sans-serif; text-align: center;
+  font-variant-numeric: tabular-nums; pointer-events: none; overflow: hidden; white-space: nowrap;
+}
+.chart-countdown[data-direction="down"] { background: #f23645; }
+.chart-countdown[hidden] { display: none; }
+
+.profile-toggle { display: flex; align-items: flex-start; gap: 10px; cursor: pointer; }
+.profile-toggle input { margin-top: 3px; accent-color: var(--tv-blue, #2962ff); }
+.profile-toggle span { display: grid; gap: 2px; }
+.profile-toggle small { color: var(--muted); font-size: .78rem; }

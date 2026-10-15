@@ -34,6 +34,7 @@ import { defaultTemplateStyle, loadTemplates, rectangleStyleOf, saveTemplates } 
 import { ProfileDialog } from './ProfileDialog'
 import { applyTheme, loadUserTheme, saveUserTheme, type Theme } from './theme'
 import { loadGroups, saveGroups } from './groups'
+import { loadPreferences, savePreferences } from './preferences'
 import { loadLayoutFolders, pruneFolderAssignments, saveLayoutFolders } from './layoutFolders'
 import { hasSyncedBefore, startUserSync, stopUserSync } from './userSync'
 import { logIn, logOut, restoreSession, signUp, verifySession, type AppUser } from './auth'
@@ -252,6 +253,7 @@ function WorkspaceApp({ user, onLogout }: WorkspaceAppProps) {
   const [selectedDrawingId, setSelectedDrawingId] = useState<string>()
   const [objectTreeOpen, setObjectTreeOpen] = useState(false)
   const [groupState, setGroupState] = useState(() => loadGroups(user.id))
+  const [preferences, setPreferences] = useState(() => loadPreferences(user.id))
   const [layoutFolders, setLayoutFolders] = useState(() => loadLayoutFolders(user.id))
   const [theme, setTheme] = useState<Theme>(() => loadUserTheme(user.id))
   const [groupSelectMode, setGroupSelectMode] = useState(false)
@@ -785,6 +787,7 @@ function WorkspaceApp({ user, onLogout }: WorkspaceAppProps) {
   useEffect(() => saveSavedLayouts(user.id, savedLayouts), [savedLayouts, user.id])
   useEffect(() => saveAlerts(user.id, alerts), [alerts, user.id])
   useEffect(() => saveGroups(user.id, groupState), [groupState, user.id])
+  useEffect(() => savePreferences(user.id, preferences), [preferences, user.id])
   useEffect(() => saveLayoutFolders(user.id, layoutFolders), [layoutFolders, user.id])
   // A deleted layout leaves its folder.
   useEffect(() => {
@@ -1015,6 +1018,8 @@ function WorkspaceApp({ user, onLogout }: WorkspaceAppProps) {
               tabCount={workspace.tabs.length}
               layoutCount={savedLayouts.length}
               onTheme={setTheme}
+              candleCountdown={preferences.candleCountdown}
+              onCandleCountdown={(candleCountdown) => setPreferences((current) => ({ ...current, candleCountdown }))}
               onLogout={onLogout}
               onClose={() => setProfileOpen(false)}
             />
@@ -1486,6 +1491,7 @@ function WorkspaceApp({ user, onLogout }: WorkspaceAppProps) {
                 magnet={!!workspace.magnet}
                 chartType={workspace.chartType ?? 'candles'}
                 theme={theme}
+                countdown={preferences.candleCountdown}
                 onActivate={handleActivatePane}
                 onActiveRuntime={setRuntime}
                 onActiveController={handleControllerChange}

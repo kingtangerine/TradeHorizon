@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [0.12.0] - 2026-10-15
+
+### Added
+- **Candle countdown.** The time left until the current candle closes is shown under the last price on the price axis (e.g. 14:08, or 2d 03:05:09 on daily and longer charts), like TradingView. It runs on the browser's clock, so it costs the server nothing. It can be switched off in the account window, under Chart; the choice is saved with the account.
+
+### Changed
+- **Long and short positions behave like TradingView's.** A newly placed position is selected at once, with its handles and axis price tags showing, instead of needing a second click. The labels sit centred on the box so they stay readable on narrow positions.
+
+### Fixed
+- **Resizing a position needs one drag, not two.** Target and stop share the right edge, so dragging either one sideways now moves both and resizes the box.
+
 ## [0.11.0] - 2026-10-12
 
 ### Added

@@ -10,6 +10,7 @@ import {
   type OverlayEvent,
   type Point,
 } from 'klinecharts'
+import { candleCloseMs } from './countdown'
 import { QVWAP_INDICATOR_NAME, VWAP_INDICATOR_NAME, registerVwapIndicators } from './vwapIndicator'
 import { VWAP_ANCHORS } from './vwap'
 import { MAX_CACHE_GAP_BARS, loadCachedBars, saveCachedBars } from './candleCache'
@@ -241,6 +242,7 @@ export class KLineChartController {
   #dominancePoll?: ReturnType<typeof globalThis.setInterval>
   #replay?: ReplaySession
   #replayPicking = false
+  readonly #viewListeners = new Set<() => void>()
   readonly #movingAverageIds = new Map<MovingAverageKind, string>()
   readonly #dominanceIds = new Map<DominanceKey, string>()
   #dominanceRows?: DominanceRow[]
@@ -547,6 +549,9 @@ export class KLineChartController {
     chart.setOffsetRightDistance(72)
     chart.subscribeAction('onScroll', this.#handleManualNavigation)
     chart.subscribeAction('onPaneDrag', this.#handleManualNavigation)
+    chart.subscribeAction('onScroll', this.#emitView)
+    chart.subscribeAction('onZoom', this.#emitView)
+    chart.subscribeAction('onVisibleRangeChange', this.#emitView)
 
     // Capture-phase listeners let a drawing tool own the pointer before the chart starts panning.
     host.addEventListener('pointerdown', this.#handleToolPointerDown, true)
@@ -975,6 +980,7 @@ export class KLineChartController {
     }
     this.#drawingStore.execute(createDrawing(copy))
     this.#selectOverlay(copy.id)
+    this.#showHandles(copy.id)
   }
 
   #endTool(): void {
@@ -1096,6 +1102,7 @@ export class KLineChartController {
     this.#drawingStore.execute(createDrawing(drawing))
     this.#callbacks.onToolSettled()
     this.#selectOverlay(drawing.id)
+    this.#showHandles(drawing.id)
   }
 
   // --- Price axis zoom ---------------------------------------------------------------------------
@@ -1126,6 +1133,7 @@ export class KLineChartController {
     this.#priceScale = nextScale
     this.#priceOffset = offset
     this.#chart.overrideYAxis({ paneId: 'candle_pane', createRange: this.#createPriceRange })
+    this.#emitView()
     const manual = this.#priceScale !== 1 || this.#priceOffset !== 0
     if (manual !== wasManual) this.#callbacks.onPriceViewChange?.(manual)
   }
@@ -1361,6 +1369,22 @@ export class KLineChartController {
     } as never)
   }
 
+  /**
+   * A drawing that was just placed (or copied) is selected like one that was clicked: its handles and
+   * axis tags show at once, so it can be adjusted without first clicking it. klinecharts has no public
+   * API for this, so the click state is set directly (pinned version 10.0.3).
+   */
+  #showHandles(id: string): void {
+    const overlay = this.#chart.getOverlays({ id })[0]
+    const store = (this.#chart as unknown as { _chartStore?: { setClickOverlayInfo?(info: unknown, onSelected: () => void, onDeselected: () => void): void } })._chartStore
+    if (!overlay || !store?.setClickOverlayInfo) return
+    store.setClickOverlayInfo(
+      { paneId: 'candle_pane', overlay, figureType: 'point', figureIndex: 0, figure: null },
+      () => undefined,
+      () => undefined,
+    )
+  }
+
   public clearDrawingSelection(): void {
     this.#selectOverlay(undefined)
     // klinecharts has no public API to deselect, so it keeps drawing handles on the last
@@ -1381,6 +1405,10 @@ export class KLineChartController {
     this.#drawingStoreUnsubscribe()
     this.#chart.unsubscribeAction('onScroll', this.#handleManualNavigation)
     this.#chart.unsubscribeAction('onPaneDrag', this.#handleManualNavigation)
+    this.#chart.unsubscribeAction('onScroll', this.#emitView)
+    this.#chart.unsubscribeAction('onZoom', this.#emitView)
+    this.#chart.unsubscribeAction('onVisibleRangeChange', this.#emitView)
+    this.#viewListeners.clear()
     this.#stopDominancePolling()
     this.#stopReplayTimer()
     if (this.#dominanceIndicatorPoll !== undefined) globalThis.clearInterval(this.#dominanceIndicatorPoll)
@@ -1417,6 +1445,37 @@ export class KLineChartController {
   #patchRuntime(patch: Partial<ChartRuntimeState>): void {
     this.#runtimeState = { ...this.#runtimeState, ...patch }
     this.#callbacks.onRuntimeState(this.#runtimeState)
+    this.#emitView()
+  }
+
+  readonly #emitView = (): void => {
+    for (const listener of this.#viewListeners) listener()
+  }
+
+  /** Called when what is on screen may have moved (scroll, zoom, price view, new price). */
+  public onViewChange(listener: () => void): () => void {
+    this.#viewListeners.add(listener)
+    return () => { this.#viewListeners.delete(listener) }
+  }
+
+  /**
+   * Time left in the current candle and where to show it: just under the last-price tag on the
+   * price axis, in coordinates of the chart host. Null when there is nothing sensible to show.
+   * Pure client clock and chart maths; nothing is requested from the server.
+   */
+  public countdownState(now = Date.now()): { remainingMs: number; top: number; left: number; width: number; up: boolean } | null {
+    if (this.#disposed || this.#replay) return null
+    const last = this.#chart.getDataList().at(-1)
+    const axis = this.#chart.getDom('candle_pane', 'yAxis')?.getBoundingClientRect()
+    const pane = this.#paneRect()
+    if (!last || !axis || !pane) return null
+    const remainingMs = candleCloseMs(last.timestamp, this.#interval) - now
+    // A stale last candle (feed down, market paused) would count down from the past.
+    if (remainingMs < -(MARKET_INTERVAL_SPECS[this.#interval].durationMs ?? 30 * DAY_MS)) return null
+    const y = (this.#chart.convertToPixel({ value: last.close }, { paneId: 'candle_pane' }) as Partial<Coordinate>).y
+    if (y === undefined || !Number.isFinite(y) || y < 0 || y > pane.height) return null
+    const host = this.#host.getBoundingClientRect()
+    return { remainingMs, top: pane.top - host.top + y, left: axis.left - host.left, width: axis.width, up: last.close >= last.open }
   }
 
   #handleStreamStatus(status: KlineStreamStatus): void {

@@ -12,6 +12,8 @@ interface ProfileDialogProps {
   tabCount: number
   layoutCount: number
   onTheme(theme: Theme): void
+  candleCountdown: boolean
+  onCandleCountdown(enabled: boolean): void
   onLogout(): void
   onClose(): void
 }
@@ -20,7 +22,7 @@ function formatDate(ms: number): string {
   return new Date(ms).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })
 }
 
-export function ProfileDialog({ user, theme, tabCount, layoutCount, onTheme, onLogout, onClose }: ProfileDialogProps) {
+export function ProfileDialog({ user, theme, tabCount, layoutCount, onTheme, candleCountdown, onCandleCountdown, onLogout, onClose }: ProfileDialogProps) {
   const [current, setCurrent] = useState('')
   const [next, setNext] = useState('')
   const [confirm, setConfirm] = useState('')
@@ -113,6 +115,17 @@ export function ProfileDialog({ user, theme, tabCount, layoutCount, onTheme, onL
               <button type="button" className={theme === 'dark' ? 'active' : ''} aria-pressed={theme === 'dark'} onClick={() => onTheme('dark')}>Dark</button>
               <button type="button" className={theme === 'light' ? 'active' : ''} aria-pressed={theme === 'light'} onClick={() => onTheme('light')}>Light</button>
             </div>
+          </section>
+
+          <section>
+            <h3>Chart</h3>
+            <label className="profile-toggle">
+              <input type="checkbox" checked={candleCountdown} onChange={(event) => onCandleCountdown(event.target.checked)} />
+              <span>
+                <b>Candle countdown</b>
+                <small>Show the time left until the current candle closes, under the last price.</small>
+              </span>
+            </label>
           </section>
 
           <section>

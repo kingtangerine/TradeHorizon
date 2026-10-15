@@ -229,19 +229,19 @@ export function registerTradeHorizonOverlays(): void {
       const labels = !showValues ? [] : [
         {
           type: 'text',
-          attrs: { x: left + 5, y: targetCoordinate.y, text: `Target: ${formatPositionNumber(target)} (${formatPositionNumber(metrics.targetPercent)}%)  P&L: ${formatPositionNumber(metrics.rewardAmount)}  Qty: ${formatPositionNumber(metrics.quantity, 6)}`, align: 'left', baseline: direction === 'long' ? 'bottom' : 'top' },
+          attrs: { x: (left + right) / 2, y: targetCoordinate.y, text: `Target: ${formatPositionNumber(target)} (${formatPositionNumber(metrics.targetPercent)}%)  P&L: ${formatPositionNumber(metrics.rewardAmount)}  Qty: ${formatPositionNumber(metrics.quantity, 6)}`, align: 'center', baseline: direction === 'long' ? 'bottom' : 'top' },
           styles: { ...textStyles, backgroundColor: targetColor },
           ignoreEvent: true,
         },
         {
           type: 'text',
-          attrs: { x: left + 5, y: avgY, text: `${dcaMetrics && dcaTriggered ? 'Avg entry' : 'Entry'}: ${formatPositionNumber(referenceEntry)}  Risk/Reward: ${formatPositionNumber(metrics.riskReward)}`, align: 'left', baseline: 'bottom' },
+          attrs: { x: (left + right) / 2, y: avgY, text: `${dcaMetrics && dcaTriggered ? 'Avg entry' : 'Entry'}: ${formatPositionNumber(referenceEntry)}  Risk/Reward: ${formatPositionNumber(metrics.riskReward)}`, align: 'center', baseline: 'bottom' },
           styles: { ...textStyles, backgroundColor: '#3a4655' },
           ignoreEvent: true,
         },
         {
           type: 'text',
-          attrs: { x: left + 5, y: stopCoordinate.y, text: `Stop: ${formatPositionNumber(stop)} (${formatPositionNumber(metrics.stopPercent)}%)  Risk: ${formatPositionNumber(metrics.riskAmount)}`, align: 'left', baseline: direction === 'long' ? 'top' : 'bottom' },
+          attrs: { x: (left + right) / 2, y: stopCoordinate.y, text: `Stop: ${formatPositionNumber(stop)} (${formatPositionNumber(metrics.stopPercent)}%)  Risk: ${formatPositionNumber(metrics.riskAmount)}`, align: 'center', baseline: direction === 'long' ? 'top' : 'bottom' },
           styles: { ...textStyles, backgroundColor: stopColor },
           ignoreEvent: true,
         },
@@ -286,6 +286,11 @@ export function registerTradeHorizonOverlays(): void {
       if (performPointIndex === 0) {
         points[0].value = Math.min(Math.max(target, stop), Math.max(Math.min(target, stop), entry))
       } else if (performPointIndex === 1 || performPointIndex === 2) {
+        // Target and stop share the right edge, so dragging either one sideways resizes the whole box.
+        const moved = points[performPointIndex]
+        const other = points[performPointIndex === 1 ? 2 : 1]
+        other.timestamp = moved.timestamp
+        other.dataIndex = moved.dataIndex
         const clamped = clampPositionLevels(direction, entry, target, stop)
         points[1].value = clamped.target
         points[2].value = clamped.stop
