@@ -208,6 +208,8 @@ export function createTelegramService({ dataDir, token, apiBase = API, userName 
       return { url: `https://t.me/${botUsername}?start=${code}`, expiresInSec: CODE_TTL_MS / 1000 }
     },
 
+    linkedCount: () => Object.keys(state.links).length,
+
     unlink(userId) {
       if (!state.links[userId]) return
       delete state.links[userId]

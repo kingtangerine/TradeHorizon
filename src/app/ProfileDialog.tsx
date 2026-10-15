@@ -17,6 +17,8 @@ interface ProfileDialogProps {
   onCandleCountdown(enabled: boolean): void
   /** Scroll to and highlight a section when opening (the chart's right-click "Settings…"). */
   focusSection?: 'chart'
+  /** Only for administrators: opens the admin page. */
+  onOpenAdmin?(): void
   onLogout(): void
   onClose(): void
 }
@@ -25,7 +27,7 @@ function formatDate(ms: number): string {
   return new Date(ms).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })
 }
 
-export function ProfileDialog({ user, theme, tabCount, layoutCount, onTheme, candleCountdown, onCandleCountdown, focusSection, onLogout, onClose }: ProfileDialogProps) {
+export function ProfileDialog({ user, theme, tabCount, layoutCount, onTheme, candleCountdown, onCandleCountdown, focusSection, onOpenAdmin, onLogout, onClose }: ProfileDialogProps) {
   const [current, setCurrent] = useState('')
   const [next, setNext] = useState('')
   const [confirm, setConfirm] = useState('')
@@ -175,6 +177,7 @@ export function ProfileDialog({ user, theme, tabCount, layoutCount, onTheme, can
         </div>
 
         <footer className="profile-dialog-footer">
+          {onOpenAdmin && <button type="button" className="profile-admin" onClick={onOpenAdmin}>Admin panel</button>}
           <button type="button" className="profile-logout" onClick={onLogout}>Log out</button>
         </footer>
       </section>

@@ -41,6 +41,7 @@ import { loadLayoutFolders, pruneFolderAssignments, saveLayoutFolders } from './
 import { hasSyncedBefore, startUserSync, stopUserSync, subscribeRemoteData } from './userSync'
 import { logIn, logOut, restoreSession, signUp, verifySession, type AppUser } from './auth'
 import { Superchart } from './Superchart'
+import { AdminPage } from './AdminPage'
 import { syncStatusText, useSyncStatus } from './SyncPanel'
 import {
   DEFAULT_INDICATORS,
@@ -270,6 +271,7 @@ function WorkspaceApp({ user, onLogout }: WorkspaceAppProps) {
   const [alertsOpen, setAlertsOpen] = useState(false)
   const [profileOpen, setProfileOpen] = useState(false)
   const [profileFocus, setProfileFocus] = useState<'chart'>()
+  const [adminOpen, setAdminOpen] = useState(false)
   const openChartSettings = useCallback(() => { setProfileFocus('chart'); setProfileOpen(true) }, [])
   const [layoutMenuOpen, setLayoutMenuOpen] = useState(false)
   const [saveAsOpen, setSaveAsOpen] = useState(false)
@@ -1110,6 +1112,7 @@ function WorkspaceApp({ user, onLogout }: WorkspaceAppProps) {
               onCandleCountdown={(candleCountdown) => setPreferences((current) => ({ ...current, candleCountdown }))}
               onLogout={onLogout}
               focusSection={profileFocus}
+              onOpenAdmin={user.isAdmin ? () => { setProfileOpen(false); setProfileFocus(undefined); setAdminOpen(true) } : undefined}
               onClose={() => { setProfileOpen(false); setProfileFocus(undefined) }}
             />
           )}
@@ -2160,6 +2163,8 @@ function WorkspaceApp({ user, onLogout }: WorkspaceAppProps) {
         />
       )}
 
+      {adminOpen && user.isAdmin && <AdminPage myUserId={user.id} onClose={() => setAdminOpen(false)} />}
+
       {symbolSearch && (
         <SymbolSearch
           markets={markets}
@@ -2316,6 +2321,7 @@ export function App() {
         if (live) setUser(null)
         return
       }
+      if (live) setUser((current) => restoreSession() ?? current)
       await sync
       // Newer data from other devices is applied in place (subscribeRemoteData), so no reload is needed.
       if (live && !returning) setSyncedUserId(user.id)

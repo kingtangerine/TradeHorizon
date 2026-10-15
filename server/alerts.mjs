@@ -273,6 +273,13 @@ export function createPushService({ dataDir, subject, log = console, sender = we
     },
 
     count: (userId) => (subscriptions[userId] ?? []).length,
+    totalDevices: () => Object.values(subscriptions).reduce((sum, list) => sum + list.length, 0),
+    /** Forgets every device of a deleted account. */
+    removeUser(userId) {
+      if (!subscriptions[userId]) return
+      delete subscriptions[userId]
+      persist()
+    },
 
     async send(userId, payload) {
       const list = subscriptions[userId] ?? []

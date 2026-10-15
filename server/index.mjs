@@ -2,10 +2,12 @@
 // Dev:  `npm run server` (Vite proxies /api to it).  Prod: `npm run build && npm start`
 // serves dist/ and /api from one port.
 //   Environment: PORT, HOST, TH_DATA_DIR, TH_TRUST_PROXY=1 (behind nginx/Cloudflare), TH_VAPID_SUBJECT, TH_TELEGRAM_TOKEN (bot token from @BotFather, enables Telegram alerts),
+//   TH_ADMIN_EMAILS (comma-separated emails of the accounts that may open the admin page),
 //   TH_PUBLIC_URL (optional: the site's address for the keep-alive ping; otherwise learned from requests).
 import { createServer } from 'node:http'
+import { freemem, hostname, loadavg, totalmem } from 'node:os'
 import { randomBytes, randomUUID, scrypt, timingSafeEqual, createHash } from 'node:crypto'
-import { accessSync, constants as fsConstants, existsSync, mkdirSync, readdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs'
+import { accessSync, constants as fsConstants, existsSync, mkdirSync, readdirSync, readFileSync, renameSync, statSync, unlinkSync, writeFileSync } from 'node:fs'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { ALERTS_KEY, createAlertService, createPushService } from './alerts.mjs'
@@ -14,6 +16,7 @@ import { createMarketService } from './markets.mjs'
 import { createStaticHandler } from './static.mjs'
 import { createTelegramService } from './telegram.mjs'
 import { loadEnvFile } from './envfile.mjs'
+import { adminEmails, describeUserItems, diskSpace, folderSize, summarizeUserData } from './admin.mjs'
 import { createKeepAlive, recordStart, startsWithinDay } from './keepalive.mjs'
 import { describeData, deviceFrom, ensureRevisions, itemsSince, latestRevision, storeValue, writeValue } from './userdata.mjs'
 
@@ -53,7 +56,17 @@ const derive = (password, salt) => new Promise((ok, fail) => {
   scrypt(password, salt, 64, (error, key) => (error ? fail(error) : ok(key)))
 })
 const tokenHash = (token) => createHash('sha256').update(token).digest('hex')
-const publicUser = ({ id, email, displayName, createdAtMs }) => ({ id, email, displayName, createdAtMs })
+/** Accounts allowed on the admin page (TH_ADMIN_EMAILS). Decided here only: the app just hides the button. */
+const admins = adminEmails(process.env.TH_ADMIN_EMAILS)
+const isAdmin = (user) => admins.has(user.email)
+const publicUser = (user) => ({ id: user.id, email: user.email, displayName: user.displayName, createdAtMs: user.createdAtMs, ...(isAdmin(user) ? { isAdmin: true } : {}) })
+
+// "Last active" for the admin page: noted at most once a minute per user and written a little later.
+let saveTimer
+function saveSoon() {
+  saveTimer ??= setTimeout(() => { saveTimer = undefined; save() }, 30_000)
+  saveTimer.unref?.()
+}
 
 async function makeHash(password) {
   const salt = randomBytes(16)
@@ -80,7 +93,12 @@ function sessionUser(req) {
   if (!header.startsWith('Bearer ')) return undefined
   const hash = tokenHash(header.slice(7))
   const session = db.sessions.find((s) => s.tokenHash === hash && s.expiresAtMs > Date.now())
-  return session ? db.users.find((u) => u.id === session.userId) : undefined
+  const user = session ? db.users.find((u) => u.id === session.userId) : undefined
+  if (user && Date.now() - (user.lastSeenAtMs ?? 0) > 60_000) {
+    user.lastSeenAtMs = Date.now()
+    saveSoon()
+  }
+  return user
 }
 
 // Credential endpoints: 20 attempts per minute per client IP.
@@ -174,8 +192,130 @@ async function handleData(req, res) {
   return send(res, 404, { error: 'Not found.' })
 }
 
+// --- Admin page (TH_ADMIN_EMAILS) ------------------------------------------------------------------------
+
+/** A user's stored data without putting it in the cache (the admin page may list every account). */
+const storedDataOf = (userId) => userData.get(userId) ?? readUserFile(userId)
+
+function storageBytes(userId) {
+  try { return statSync(join(userDataDir, `${userId}.json`)).size } catch { return 0 }
+}
+
+function adminUserRow(user) {
+  const now = Date.now()
+  return {
+    id: user.id,
+    email: user.email,
+    displayName: user.displayName,
+    createdAtMs: user.createdAtMs,
+    lastLoginAtMs: user.lastLoginAtMs ?? null,
+    lastSeenAtMs: user.lastSeenAtMs ?? null,
+    isAdmin: isAdmin(user),
+    sessions: db.sessions.filter((session) => session.userId === user.id && session.expiresAtMs > now).length,
+    telegram: telegram.status(user.id).linked,
+    pushDevices: push.count(user.id),
+    storageBytes: storageBytes(user.id),
+    ...summarizeUserData(storedDataOf(user.id)),
+  }
+}
+
+function adminOverview() {
+  const now = Date.now()
+  const day = 24 * 60 * 60 * 1000
+  const memory = process.memoryUsage()
+  const megabytes = (bytes) => Math.round(bytes / 1048576)
+  const catalog = markets.getCatalog()
+  return {
+    server: {
+      version,
+      node: process.version,
+      platform: `${process.platform} ${process.arch}`,
+      hostname: hostname(),
+      pid: process.pid,
+      startedAtMs,
+      uptimeSec: Math.round((now - startedAtMs) / 1000),
+      startsLast24h: startsWithinDay(processStarts),
+      memoryMb: { app: megabytes(memory.rss), heapUsed: megabytes(memory.heapUsed) },
+      hostMemoryMb: { total: megabytes(totalmem()), free: megabytes(freemem()) },
+      loadAverage: loadavg().map((value) => Math.round(value * 100) / 100),
+      dataDir,
+      dataBytes: folderSize(dataDir),
+      disk: diskSpace(dataDir),
+      envFile: envFile.found ? envFile.keys : null,
+    },
+    services: {
+      telegram: telegram.diagnostics(),
+      telegramLinkedUsers: telegram.linkedCount(),
+      pushReady: Boolean(push.publicKey),
+      pushDevices: push.totalDevices(),
+      keepAlive: keepAlive.status(),
+      marketsLoaded: catalog.listings.length,
+      marketsAgeMin: catalog.fetchedAtMs ? Math.round((now - catalog.fetchedAtMs) / 60_000) : null,
+      alertsWatched: alerts.activeCount(),
+    },
+    users: {
+      total: db.users.length,
+      admins: db.users.filter(isAdmin).length,
+      signups24h: db.users.filter((user) => now - user.createdAtMs < day).length,
+      signups7d: db.users.filter((user) => now - user.createdAtMs < 7 * day).length,
+      active24h: db.users.filter((user) => now - (user.lastSeenAtMs ?? 0) < day).length,
+      active7d: db.users.filter((user) => now - (user.lastSeenAtMs ?? 0) < 7 * day).length,
+      activeSessions: db.sessions.filter((session) => session.expiresAtMs > now).length,
+    },
+  }
+}
+
+/** Removes an account and everything stored for it. */
+function deleteAccount(userId) {
+  db.users = db.users.filter((user) => user.id !== userId)
+  db.sessions = db.sessions.filter((session) => session.userId !== userId)
+  save()
+  userData.delete(userId)
+  try { unlinkSync(join(userDataDir, `${userId}.json`)) } catch { /* had no synced data */ }
+  telegram.unlink(userId)
+  push.removeUser(userId)
+  alerts.updateUserAlerts(userId, '[]')
+}
+
+async function handleAdmin(req, res, path) {
+  const admin = sessionUser(req)
+  if (!admin) return send(res, 401, { error: 'Session expired.' })
+  if (!isAdmin(admin)) return send(res, 403, { error: 'Administrators only.' })
+
+  if (path === '/api/admin/overview' && req.method === 'GET') return send(res, 200, adminOverview())
+  if (path === '/api/admin/users' && req.method === 'GET') return sendCompressed(req, res, 200, { users: db.users.map(adminUserRow) })
+
+  const match = /^\/api\/admin\/users\/([\w-]{6,64})(?:\/(signout|delete))?$/.exec(path)
+  const target = match ? db.users.find((user) => user.id === match[1]) : undefined
+  if (!target) return send(res, 404, { error: 'No such user.' })
+
+  if (!match[2] && req.method === 'GET') {
+    const now = Date.now()
+    return send(res, 200, {
+      user: adminUserRow(target),
+      items: describeUserItems(storedDataOf(target.id)),
+      sessions: db.sessions.filter((session) => session.userId === target.id && session.expiresAtMs > now)
+        .map((session) => ({ expiresAtMs: session.expiresAtMs })),
+    })
+  }
+  if (req.method !== 'POST') return send(res, 404, { error: 'Not found.' })
+  if (match[2] === 'signout') {
+    db.sessions = db.sessions.filter((session) => session.userId !== target.id)
+    save()
+    return send(res, 200, { ok: true })
+  }
+  // delete
+  const body = await readBody(req)
+  if (target.id === admin.id) return send(res, 400, { error: 'You cannot delete your own account from the admin page.' })
+  if (String(body.confirmEmail ?? '').trim().toLowerCase() !== target.email) return send(res, 400, { error: "Type the account's email address to confirm." })
+  deleteAccount(target.id)
+  console.log(`[admin] ${admin.email} deleted the account ${target.email}`)
+  return send(res, 200, { ok: true })
+}
+
 async function handleApi(req, res, path) {
   if (path === '/api/data') return handleData(req, res)
+  if (path.startsWith('/api/admin/')) return handleAdmin(req, res, path)
   // Sync check: what the server holds for this user (times, sizes, fingerprints, which device), no values.
   if (path === '/api/sync/status' && req.method === 'GET') {
     const user = sessionUser(req)
@@ -307,6 +447,7 @@ async function handleApi(req, res, path) {
     const legacyId = typeof body.legacyId === 'string' && /^[0-9a-f-]{36}$/i.test(body.legacyId) && !db.users.some((u) => u.id === body.legacyId) ? body.legacyId : undefined
     const user = { id: legacyId ?? randomUUID(), email, displayName, createdAtMs: Date.now(), passwordHash: await makeHash(password) }
     db.users.push(user)
+    user.lastLoginAtMs = Date.now()
     const token = startSession(user.id)
     save()
     return send(res, 201, { user: publicUser(user), token })
@@ -316,6 +457,7 @@ async function handleApi(req, res, path) {
   // Always run a hash so unknown emails and wrong passwords take similar time.
   const ok = user ? await verifyHash(password, user.passwordHash) : (await makeHash(password), false)
   if (!user || !ok) return send(res, 401, { error: 'Email or password is incorrect.' })
+  user.lastLoginAtMs = Date.now()
   const token = startSession(user.id)
   save()
   return send(res, 200, { user: publicUser(user), token })
