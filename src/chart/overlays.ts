@@ -1,6 +1,7 @@
 import { getSupportedOverlays, registerOverlay } from 'klinecharts'
 import { FIB_LEVELS, clampDcaPrice, clampPositionLevels, fibLevelPrice, type PositionDirection } from './geometry'
 import {
+  ALERT_LINE_OVERLAY_NAME,
   FIB_RETRACEMENT_OVERLAY_NAME,
   HORIZONTAL_LINE_OVERLAY_NAME,
   LONG_POSITION_OVERLAY_NAME,
@@ -301,6 +302,76 @@ export function registerTradeHorizonOverlays(): void {
       }
     },
   })
+
+  if (!supported.has(ALERT_LINE_OVERLAY_NAME)) {
+    // A price alert: a dashed line across the chart, a label with the price and a ✕ to delete it on the right,
+    // and a tag on the price axis. Dragging it moves the alert (the controller commits the new price).
+    const alertText = (color: string) => ({
+      style: 'fill',
+      color: '#ffffff',
+      size: 11,
+      family: 'Inter, system-ui, sans-serif',
+      weight: 600,
+      backgroundColor: color,
+      borderColor: color,
+      borderSize: 1,
+      borderStyle: 'solid',
+      borderDashedValue: [2, 2],
+      borderRadius: 3,
+      paddingLeft: 5,
+      paddingRight: 5,
+      paddingTop: 3,
+      paddingBottom: 3,
+    })
+    const formatAlertPrice = (value: number | undefined, precision: number) => (
+      value === undefined ? '' : value.toLocaleString('en-US', { minimumFractionDigits: precision, maximumFractionDigits: precision })
+    )
+    registerOverlay({
+      name: ALERT_LINE_OVERLAY_NAME,
+      totalStep: 2,
+      needDefaultPointFigure: false,
+      needDefaultXAxisFigure: false,
+      needDefaultYAxisFigure: false,
+      createPointFigures: ({ chart, coordinates, bounding, overlay }) => {
+        if (coordinates.length < 1) return []
+        const y = coordinates[0].y
+        const color = stringStyle(overlay.styles, 'alertColor', '#f5a623')
+        const paused = numericStyle(overlay.styles, 'alertPaused', 0) === 1
+        const precision = chart.getSymbol()?.pricePrecision ?? 2
+        // Clear of the "+" alert button that appears at the right edge of the chart.
+        const right = bounding.width - 32
+        return [
+          {
+            type: 'line',
+            attrs: { coordinates: [{ x: 0, y }, { x: bounding.width, y }] },
+            styles: { style: 'dashed', color, size: 1, dashedValue: [6, 4] },
+          },
+          {
+            key: 'alert-label',
+            type: 'text',
+            attrs: { x: right - 24, y, text: `${paused ? 'Paused  ' : ''}🔔 ${formatAlertPrice(overlay.points[0]?.value, precision)}`, align: 'right', baseline: 'middle' },
+            styles: alertText(color),
+          },
+          {
+            key: 'alert-delete',
+            type: 'text',
+            attrs: { x: right, y, text: '✕', align: 'right', baseline: 'middle' },
+            styles: alertText(color),
+          },
+        ]
+      },
+      createYAxisFigures: ({ chart, coordinates, overlay }) => {
+        if (coordinates.length < 1) return []
+        const color = stringStyle(overlay.styles, 'alertColor', '#f5a623')
+        const precision = chart.getSymbol()?.pricePrecision ?? 2
+        return [{
+          type: 'text',
+          attrs: { x: 0, y: coordinates[0].y, text: formatAlertPrice(overlay.points[0]?.value, precision), align: 'left', baseline: 'middle' },
+          styles: { ...alertText(color), borderRadius: 2, paddingLeft: 4 },
+        }]
+      },
+    })
+  }
 
   if (!supported.has(TEXT_OVERLAY_NAME)) {
     registerOverlay({

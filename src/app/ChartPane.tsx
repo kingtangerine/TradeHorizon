@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
 import { CryptoChartSurface } from '../chart/CryptoChartSurface'
 import {
   MOVING_AVERAGE_COLORS,
@@ -18,6 +18,9 @@ import type { MarketInterval } from '../market'
 import { formatCompact, formatPrice } from './format'
 import { EyeIcon, EyeOffIcon, RefreshIcon } from './Icons'
 import { ChartContextMenu } from './ChartContextMenu'
+import type { PriceAlert } from './alerts'
+import { capTier, coinSymbol, formatUsdCompact, loadMarketCaps, type MarketCapInfo } from './marketCap'
+import type { AlertLine } from '../chart/KLineChartController'
 
 interface ChartPaneProps {
   index: number
@@ -34,6 +37,10 @@ interface ChartPaneProps {
   chartType: ChartType
   theme: 'dark' | 'light'
   countdown: boolean
+  alerts: readonly PriceAlert[]
+  alertLinesVisible: boolean
+  onMoveAlert(id: string, price: number, lastPrice: number | undefined): void
+  onDeleteAlert(id: string): void
   onActivate(index: number): void
   onActiveRuntime(state: ChartRuntimeState): void
   onActiveController(controller: KLineChartController | null): void
@@ -72,6 +79,10 @@ export function ChartPane({
   chartType,
   theme,
   countdown,
+  alerts,
+  alertLinesVisible,
+  onMoveAlert,
+  onDeleteAlert,
   onActivate,
   onActiveRuntime,
   onActiveController,
@@ -87,6 +98,26 @@ export function ChartPane({
   const [controller, setController] = useState<KLineChartController | null>(null)
   const [contextMenu, setContextMenu] = useState<{ left: number, top: number, price: number | null } | null>(null)
   const closeContextMenu = useCallback(() => setContextMenu(null), [])
+  // Market cap of the coin (from the server's cached CoinGecko top 500), shown as a colour-coded size tier.
+  const [cap, setCap] = useState<{ symbol: string, info?: MarketCapInfo } | null>(null)
+  useEffect(() => {
+    if (market.kind === 'dominance') return
+    let live = true
+    const symbol = coinSymbol(market.baseAsset)
+    void loadMarketCaps().then((index) => {
+      if (live) setCap(index.size > 0 ? { symbol, info: index.get(symbol) } : null)
+    })
+    return () => { live = false }
+  }, [market.baseAsset, market.kind])
+  const capShown = market.kind !== 'dominance' && cap?.symbol === coinSymbol(market.baseAsset) ? cap : null
+  const tier = capTier(capShown?.info?.marketCap)
+  // This chart's alerts as lines: active and paused ones (a triggered alert has done its job).
+  const alertLines = useMemo<readonly AlertLine[]>(() => (
+    alertLinesVisible
+      ? alerts.filter((alert) => alert.symbol === market.symbol && alert.triggeredAtMs === undefined)
+        .map((alert) => ({ id: alert.id, price: alert.targetPrice, paused: !alert.enabled }))
+      : []
+  ), [alerts, alertLinesVisible, market.symbol])
 
   // Callbacks go through refs so the handlers handed to the chart surface stay stable
   // (a changing handler would make the surface rebuild its chart).
@@ -136,6 +167,27 @@ export function ChartPane({
           <span><b>C</b>{formatPrice(quote?.close, market.pricePrecision)}</span>
           <span className={isPositive ? 'price-up' : 'price-down'}>{quote ? `${isPositive ? '+' : ''}${quote.changePercent.toFixed(2)}%` : '—'}</span>
         </div>
+        {capShown && (
+          <div
+            className="chart-cap-row"
+            style={{ '--cap-color': tier.color } as CSSProperties}
+            title={[
+              `${tier.label} (tier ${tier.tier} of 4): ${tier.description}`,
+              capShown.info
+                ? `24h volume ${formatUsdCompact(capShown.info.volume24h)} = ${((capShown.info.volume24h / capShown.info.marketCap) * 100).toFixed(1)}% of its market cap${capShown.info.volume24h / capShown.info.marketCap > 0.25 ? ' (very actively traded: expect fast moves)' : ''}.`
+                : 'Not in the top 500 coins by market cap.',
+              'Source: CoinGecko, refreshed every 30 minutes.',
+            ].join('\n')}
+          >
+            <span className="cap-meter" aria-hidden="true">
+              {[1, 2, 3, 4].map((bar) => <i key={bar} className={bar <= 5 - tier.tier ? 'on' : ''} />)}
+            </span>
+            <b>{tier.label}</b>
+            <span>
+              {capShown.info ? <>MC {formatUsdCompact(capShown.info.marketCap)} · #{capShown.info.rank}</> : 'Outside top 500'}
+            </span>
+          </div>
+        )}
         {market.kind !== 'dominance' && <button
           type="button"
           className={volumeVisible ? 'chart-indicator-row' : 'chart-indicator-row muted'}
@@ -191,6 +243,9 @@ export function ChartPane({
         onSelectionChange={handleSelection}
         onAddAlert={(price) => onAddAlert(price, market.symbol, quote?.close)}
         onChartContextMenu={setContextMenu}
+        alertLines={alertLines}
+        onAlertMove={(id, price) => onMoveAlert(id, price, quote?.close)}
+        onAlertDelete={onDeleteAlert}
         theme={theme}
         countdown={countdown}
       />

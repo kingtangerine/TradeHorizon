@@ -10,6 +10,23 @@ const COINGECKO = {
   markets: 'https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&order=market_cap_desc&per_page=100&page=1',
 }
 
+/** Top 500 coins by market cap, for the market-cap badge on the chart (separate from the top-100 dominance data). */
+const COINGECKO_CAP_PAGES = [1, 2].map((page) => `https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&order=market_cap_desc&per_page=250&page=${page}`)
+const CAPS_TTL_MS = 30 * 60 * 1000
+
+/** Keeps what the chart needs from CoinGecko's market rows: symbol, name, market cap, rank, 24h volume. */
+export function compactMarketCaps(pages) {
+  return pages.flat().filter((coin) => (
+    coin && typeof coin.symbol === 'string' && typeof coin.market_cap === 'number' && coin.market_cap > 0
+  )).map((coin) => ({
+    s: coin.symbol.toUpperCase(),
+    n: String(coin.name ?? coin.symbol),
+    c: coin.market_cap,
+    r: Number(coin.market_cap_rank) || 0,
+    v: Number(coin.total_volume) || 0,
+  }))
+}
+
 const CATALOG_REFRESH_MS = 6 * 60 * 60 * 1000
 const COINGECKO_TTL_MS = 10 * 60 * 1000
 const REQUEST_TIMEOUT_MS = 30_000
@@ -141,8 +158,30 @@ export function createMarketService({ dataDir, fetchImpl = (url, init) => fetch(
     return slot.inflight
   }
 
+  // Market caps: two CoinGecko pages every 30 minutes at most, shared by everyone; a missing page keeps the rest.
+  const caps = { at: 0, data: undefined, inflight: undefined }
+  async function marketCaps() {
+    if (caps.data && Date.now() - caps.at < CAPS_TTL_MS) return caps.data
+    caps.inflight ??= (async () => {
+      const pages = []
+      for (const url of COINGECKO_CAP_PAGES) {
+        try { pages.push(await getJson(url)) } catch (error) { if (pages.length === 0) throw error }
+      }
+      caps.data = compactMarketCaps(pages)
+      caps.at = Date.now()
+      return caps.data
+    })()
+      .catch((error) => {
+        if (caps.data) return caps.data
+        throw error
+      })
+      .finally(() => { caps.inflight = undefined })
+    return caps.inflight
+  }
+
   let timer
   return {
+    marketCaps,
     start() {
       void refreshCatalog()
       timer = setInterval(() => void refreshCatalog(), CATALOG_REFRESH_MS)

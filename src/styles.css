@@ -3406,3 +3406,65 @@ button:disabled {
 .chart-context-separator { height: 1px; margin: 4px 2px; background: var(--border-strong); }
 .profile-focus { border-radius: 8px; animation: profile-focus 1.6s ease-out; }
 @keyframes profile-focus { from { box-shadow: 0 0 0 2px var(--tv-blue, #2962ff); } to { box-shadow: 0 0 0 2px transparent; } }
+
+/* Market cap tier in the chart legend */
+.chart-cap-row {
+  display: inline-flex; align-items: center; gap: 7px; width: max-content; margin: 2px 0 1px; padding: 2px 8px 2px 6px;
+  border: 1px solid color-mix(in srgb, var(--cap-color) 45%, transparent); border-radius: 4px;
+  background: color-mix(in srgb, var(--cap-color) 12%, transparent); font-size: .72rem; pointer-events: auto; cursor: help;
+}
+.chart-cap-row b { color: var(--cap-color); font-weight: 700; }
+.chart-cap-row span:last-child { color: var(--text); font-variant-numeric: tabular-nums; }
+.cap-meter { display: inline-flex; align-items: flex-end; gap: 2px; height: 11px; }
+.cap-meter i { display: block; width: 3px; border-radius: 1px; background: color-mix(in srgb, var(--cap-color) 25%, transparent); }
+.cap-meter i:nth-child(1) { height: 4px; } .cap-meter i:nth-child(2) { height: 6px; } .cap-meter i:nth-child(3) { height: 8px; } .cap-meter i:nth-child(4) { height: 11px; }
+.cap-meter i.on { background: var(--cap-color); }
+
+/* Alerts panel: compact form, collapsible notifications, filters, groups per coin */
+.alerts-panel { grid-template-rows: auto auto auto auto minmax(0, 1fr); }
+.alerts-count { min-width: 18px; padding: 1px 6px; border-radius: 9px; color: #131722; background: var(--amber); font-size: .66rem; font-weight: 700; text-align: center; }
+.alerts-header-actions { display: inline-flex; align-items: center; gap: 2px; }
+.alerts-panel > header button.alerts-lines-toggle { display: inline-flex; gap: 5px; width: auto; padding: 0 8px; border-radius: 5px; font: inherit; font-size: .68rem; }
+.alerts-lines-toggle svg { width: 15px !important; }
+.alerts-lines-toggle.on { color: var(--amber) !important; }
+.alerts-lines-toggle:hover { background: var(--k-1a2430) !important; }
+.alert-create-form { gap: 8px; padding: 12px 14px; }
+.alert-create-row { display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr) auto; gap: 6px; }
+.alert-create-row button { display: flex; align-items: center; gap: 5px; height: 34px; padding: 0 10px; border: 0; border-radius: 6px; color: var(--k-07130f); background: var(--mint); font: inherit; font-size: .74rem; font-weight: 700; cursor: pointer; }
+.alert-create-row button svg { width: 14px; }
+.alert-note { color: var(--k-5f6c7e); font-size: .64rem; line-height: 1.4; }
+.alert-notifications { border-bottom: 1px solid var(--border); }
+.alert-notifications > summary { display: flex; align-items: center; gap: 8px; padding: 9px 14px; font-size: .74rem; font-weight: 600; cursor: pointer; list-style: none; }
+.alert-notifications > summary::-webkit-details-marker { display: none; }
+.alert-notifications > summary small { flex: 1; color: var(--muted); font-weight: 400; text-align: right; }
+.alert-notifications > summary svg { width: 14px; color: var(--muted); transition: transform .15s; }
+.alert-notifications[open] > summary svg { transform: rotate(180deg); }
+.alert-notifications .alert-background:last-child { border-bottom: 0; }
+.alerts-toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; padding: 8px 10px; border-bottom: 1px solid var(--border); }
+.alerts-filter { display: inline-flex; gap: 2px; padding: 2px; border-radius: 6px; background: var(--k-101821); }
+.alerts-filter button { height: 26px; padding: 0 9px; border: 0; border-radius: 4px; color: var(--muted); background: transparent; font: inherit; font-size: .7rem; cursor: pointer; }
+.alerts-filter button small { opacity: .7; }
+.alerts-filter button.active { color: var(--text); background: var(--k-1a2430); }
+.alerts-search { display: flex; flex: 1; min-width: 110px; align-items: center; gap: 5px; height: 28px; padding: 0 8px; border: 1px solid var(--k-2d3948); border-radius: 6px; }
+.alerts-search svg { width: 13px; color: var(--muted); }
+.alerts-search input { flex: 1; min-width: 0; border: 0; color: var(--text); background: transparent; font: inherit; font-size: .72rem; outline: 0; }
+.alerts-clear { margin-left: auto; height: 26px; padding: 0 8px; border: 0; border-radius: 4px; color: var(--k-ff8098); background: transparent; font: inherit; font-size: .68rem; cursor: pointer; }
+.alerts-clear:hover { background: rgb(242 54 69 / 12%); }
+.alerts-list { padding: 4px 6px 10px; }
+.alert-group > header { position: sticky; top: -4px; z-index: 1; display: flex; align-items: center; justify-content: space-between; padding: 4px 2px; background: var(--k-0d131b); }
+.alert-group-toggle { display: inline-flex; align-items: center; gap: 6px; padding: 3px 4px; border: 0; border-radius: 4px; color: var(--text); background: transparent; font: inherit; font-size: .74rem; cursor: pointer; }
+.alert-group-toggle svg { width: 13px; color: var(--muted); transition: transform .15s; }
+.alert-group-toggle svg.collapsed { transform: rotate(-90deg); }
+.alert-group-toggle small { padding: 0 5px; border-radius: 7px; color: var(--muted); background: var(--k-1a2430); font-size: .62rem; }
+.alert-group-toggle em { color: var(--amber); font-size: .62rem; font-style: normal; }
+.alert-group-open { padding: 2px 6px; border: 0; border-radius: 4px; color: var(--tv-blue, #2962ff); background: transparent; font: inherit; font-size: .66rem; cursor: pointer; }
+.alert-group-open:hover { background: var(--k-1a2430); }
+.alert-row { grid-template-columns: 16px minmax(0, 1fr) 28px 28px; min-height: 42px; padding: 5px 4px 5px 8px; }
+.alert-row.paused strong { color: var(--muted); }
+.alert-row span b { color: var(--muted); font-weight: 500; }
+.alert-row.paused > div > span { color: var(--muted); }
+.alert-direction { font-size: .6rem; }
+.alert-direction.above { color: #2ebd85; }
+.alert-direction.below { color: #f23645; }
+.alert-row button.icon { display: grid; place-items: center; width: 28px; height: 28px; padding: 0; }
+.alert-row button.icon svg { width: 14px; }

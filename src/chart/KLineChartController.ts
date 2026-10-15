@@ -11,6 +11,7 @@ import {
   type Point,
 } from 'klinecharts'
 import { candleCloseMs } from './countdown'
+import { ALERT_LINE_OVERLAY_NAME } from './overlayNames'
 import { QVWAP_INDICATOR_NAME, VWAP_INDICATOR_NAME, registerVwapIndicators } from './vwapIndicator'
 import { VWAP_ANCHORS } from './vwap'
 import { MAX_CACHE_GAP_BARS, loadCachedBars, saveCachedBars } from './candleCache'
@@ -171,7 +172,23 @@ export interface KLineChartControllerCallbacks {
   onSelectionChange(selectedId?: string): void
   /** The price scale was moved or zoomed by the user (true) or is back on automatic fit (false). */
   onPriceViewChange?(manual: boolean): void
+  /** An alert line was dragged to a new price. */
+  onAlertMove?(id: string, price: number): void
+  /** The ✕ on an alert line was clicked. */
+  onAlertDelete?(id: string): void
 }
+
+/** A price alert shown as a line on this chart. */
+export interface AlertLine {
+  readonly id: string
+  readonly price: number
+  readonly paused: boolean
+}
+
+const ALERT_GROUP_ID = 'trade-horizon:alerts'
+const ALERT_OVERLAY_PREFIX = 'alert:'
+const ALERT_COLOR = '#f5a623'
+const ALERT_PAUSED_COLOR = '#787b86'
 
 function isAbortError(error: unknown): boolean {
   return (
@@ -243,6 +260,7 @@ export class KLineChartController {
   #replay?: ReplaySession
   #replayPicking = false
   readonly #viewListeners = new Set<() => void>()
+  #alertLines: readonly AlertLine[] = []
   readonly #movingAverageIds = new Map<MovingAverageKind, string>()
   readonly #dominanceIds = new Map<DominanceKey, string>()
   #dominanceRows?: DominanceRow[]
@@ -1327,6 +1345,43 @@ export class KLineChartController {
     event.stopPropagation()
     this.cancelActiveTool()
     this.cancelReplaySelection()
+  }
+
+  /** Shows these price alerts as draggable lines (an empty list hides them all). */
+  public setAlertLines(lines: readonly AlertLine[]): void {
+    if (this.#disposed) return
+    this.#alertLines = lines
+    const wanted = new Map(lines.map((line) => [ALERT_OVERLAY_PREFIX + line.id, line]))
+    for (const overlay of this.#chart.getOverlays({ groupId: ALERT_GROUP_ID })) {
+      if (!wanted.has(overlay.id)) this.#chart.removeOverlay({ id: overlay.id })
+    }
+    const existing = new Set(this.#chart.getOverlays({ groupId: ALERT_GROUP_ID }).map((overlay) => overlay.id))
+    // The line spans the whole chart, so only its price matters; the time just has to be a valid candle.
+    const timestamp = this.#chart.getDataList().at(-1)?.timestamp ?? Date.now()
+    for (const [overlayId, line] of wanted) {
+      const configuration = {
+        id: overlayId,
+        name: ALERT_LINE_OVERLAY_NAME,
+        groupId: ALERT_GROUP_ID,
+        zLevel: 1,
+        points: [{ timestamp, value: line.price }],
+        styles: { alertColor: line.paused ? ALERT_PAUSED_COLOR : ALERT_COLOR, alertPaused: line.paused ? 1 : 0 },
+        onPressedMoveEnd: (event: OverlayEvent<unknown>) => {
+          const price = event.overlay.points[0]?.value
+          const current = this.#alertLines.find((item) => item.id === line.id)
+          if (price === undefined || !Number.isFinite(price) || price <= 0 || !current) return
+          const rounded = Number(price.toFixed(this.#chart.getSymbol()?.pricePrecision ?? 8))
+          if (rounded !== current.price) this.#callbacks.onAlertMove?.(line.id, rounded)
+        },
+        onClick: (event: OverlayEvent<unknown>) => {
+          if (event.figure?.key === 'alert-delete') this.#callbacks.onAlertDelete?.(line.id)
+        },
+        // The library deletes an overlay on right-click unless this is prevented.
+        onRightClick: (event: OverlayEvent<unknown>) => { event.preventDefault?.() },
+      }
+      if (existing.has(overlayId)) this.#chart.overrideOverlay(configuration as never)
+      else this.#chart.createOverlay(configuration as never)
+    }
   }
 
   /** True while the pointer is over a drawing (a right-click there selects the drawing instead of opening the chart menu). */

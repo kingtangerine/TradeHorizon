@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import type { DrawingStore } from '../drawings'
 import type { MarketInterval } from '../market'
-import { KLineChartController } from './KLineChartController'
+import { KLineChartController, type AlertLine } from './KLineChartController'
 import type { ChartRuntimeState, ChartType } from './types'
 import type { IndicatorSettings } from './indicators'
 import type { CryptoMarket } from './markets'
@@ -24,6 +24,10 @@ interface CryptoChartSurfaceProps {
   onAddAlert?(price: number): void
   /** Right-click on the chart (not on a drawing, not while a tool is armed): where, and the price there. */
   onChartContextMenu?(info: { left: number, top: number, price: number | null }): void
+  /** Price alerts to draw as draggable lines. */
+  alertLines?: readonly AlertLine[]
+  onAlertMove?(id: string, price: number): void
+  onAlertDelete?(id: string): void
   theme?: 'dark' | 'light'
 }
 
@@ -42,6 +46,9 @@ export function CryptoChartSurface({
   onSelectionChange,
   onAddAlert,
   onChartContextMenu,
+  alertLines,
+  onAlertMove,
+  onAlertDelete,
   theme = 'dark',
 }: CryptoChartSurfaceProps) {
   const themeRef = useRef(theme)
@@ -59,6 +66,8 @@ export function CryptoChartSurface({
   const chartTypeRef = useRef(chartType)
   chartTypeRef.current = chartType
   callbacksRef.current = { onRuntimeState, onToolSettled, onSelectionChange }
+  const alertRef = useRef({ alertLines, onAlertMove, onAlertDelete })
+  alertRef.current = { alertLines, onAlertMove, onAlertDelete }
 
   useEffect(() => {
     if (!hostRef.current) return
@@ -69,7 +78,10 @@ export function CryptoChartSurface({
         onToolSettled: () => callbacksRef.current.onToolSettled(),
         onSelectionChange: (selected) => callbacksRef.current.onSelectionChange(selected),
         onPriceViewChange: setPriceViewManual,
+        onAlertMove: (id, price) => alertRef.current.onAlertMove?.(id, price),
+        onAlertDelete: (id) => alertRef.current.onAlertDelete?.(id),
       })
+      controller.setAlertLines(alertRef.current.alertLines ?? [])
       controllerRef.current = controller
       controller.setVolumeVisible(volumeVisible)
       controller.setIndicators(indicatorsRef.current)
@@ -117,6 +129,10 @@ export function CryptoChartSurface({
   useEffect(() => {
     controllerRef.current?.setTheme(theme)
   }, [theme])
+
+  useEffect(() => {
+    controllerRef.current?.setAlertLines(alertLines ?? [])
+  }, [alertLines])
 
   // Candle countdown: text once a second, position whenever the view moves (coalesced to one frame).
   // The label is moved by writing to the element directly, so a ticking clock never re-renders React.
