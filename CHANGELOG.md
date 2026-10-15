@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [0.16.1] - 2026-10-15
+
+### Added
+- `/healthz` shows `startsLast24h` (how often the app was started in the last day) and `keepAlive` (the address it pings and whether the last ping worked).
+
+### Changed
+- The Notifications section of the alerts panel (browser notifications and Telegram) is open by default and says so in its title; it had been collapsed and looked missing.
+
+### Fixed
+- **Telegram alerts arriving only for a while after "Send test".** Plesk (Phusion Passenger) stops a Node app after about 5 minutes without web requests, and price alerts and the Telegram bot run inside it, so nothing was checked until the next request woke it (a test message, or a device that happened to see the price cross). The server now requests its own `/healthz` every 2 minutes through its public address (learned from the first visitor request, or `TH_PUBLIC_URL`), so the host never sees it as idle.
+
 ## [0.16.0] - 2026-10-15
 
 ### Added

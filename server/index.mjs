@@ -1,7 +1,8 @@
 // TradeHorizon server: accounts, synced user data, cached market data and server-side price alerts.
 // Dev:  `npm run server` (Vite proxies /api to it).  Prod: `npm run build && npm start`
 // serves dist/ and /api from one port.
-//   Environment: PORT, HOST, TH_DATA_DIR, TH_TRUST_PROXY=1 (behind nginx/Cloudflare), TH_VAPID_SUBJECT, TH_TELEGRAM_TOKEN (bot token from @BotFather, enables Telegram alerts).
+//   Environment: PORT, HOST, TH_DATA_DIR, TH_TRUST_PROXY=1 (behind nginx/Cloudflare), TH_VAPID_SUBJECT, TH_TELEGRAM_TOKEN (bot token from @BotFather, enables Telegram alerts),
+//   TH_PUBLIC_URL (optional: the site's address for the keep-alive ping; otherwise learned from requests).
 import { createServer } from 'node:http'
 import { randomBytes, randomUUID, scrypt, timingSafeEqual, createHash } from 'node:crypto'
 import { accessSync, constants as fsConstants, existsSync, mkdirSync, readdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs'
@@ -13,6 +14,7 @@ import { createMarketService } from './markets.mjs'
 import { createStaticHandler } from './static.mjs'
 import { createTelegramService } from './telegram.mjs'
 import { loadEnvFile } from './envfile.mjs'
+import { createKeepAlive, recordStart, startsWithinDay } from './keepalive.mjs'
 import { describeData, deviceFrom, ensureRevisions, itemsSince, latestRevision, storeValue, writeValue } from './userdata.mjs'
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..')
@@ -32,6 +34,10 @@ const startedAtMs = Date.now()
 const SYNC_PROTOCOL = 2
 
 mkdirSync(dataDir, { recursive: true })
+// When this process started (kept for /healthz: frequent starts mean the host keeps stopping the app).
+const processStarts = recordStart(dataDir)
+// Hosts like Plesk stop an idle app, which would stop price alerts and the Telegram bot: ping ourselves.
+const keepAlive = createKeepAlive({ publicUrl: process.env.TH_PUBLIC_URL, trustProxy: process.env.TH_TRUST_PROXY === '1' })
 let db = { users: [], sessions: [] }
 if (existsSync(dataFile)) {
   try { db = { users: [], sessions: [], ...JSON.parse(readFileSync(dataFile, 'utf8')) } } catch { /* start empty */ }
@@ -323,6 +329,9 @@ function health() {
     ok: dataWritable,
     version,
     uptimeSec: Math.round((Date.now() - startedAtMs) / 1000),
+    // More than a few a day means the host keeps stopping the app (alerts are not checked while it is stopped).
+    startsLast24h: startsWithinDay(processStarts),
+    keepAlive: keepAlive.status(),
     dataWritable,
     syncProtocol: SYNC_PROTOCOL,
     pushReady: Boolean(push.publicKey),
@@ -341,6 +350,7 @@ const serveStatic = createStaticHandler(distDir)
 
 const server = createServer(async (req, res) => {
   applySecurityHeaders(req, res)
+  keepAlive.observe(req)
   const path = new URL(req.url ?? '/', 'http://localhost').pathname
   try {
     if (path === '/healthz') {
@@ -360,6 +370,7 @@ server.listen(port, host, () => {
   markets.start()
   alerts.start()
   telegram.start()
+  keepAlive.start()
 })
 
 for (const signal of ['SIGINT', 'SIGTERM']) {
@@ -367,6 +378,7 @@ for (const signal of ['SIGINT', 'SIGTERM']) {
     markets.stop()
     alerts.stop()
     telegram.stop()
+    keepAlive.stop()
     server.close(() => process.exit(0))
     setTimeout(() => process.exit(0), 2000).unref()
   })
