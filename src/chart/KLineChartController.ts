@@ -55,6 +55,7 @@ import {
   magnetPrice,
   positionPoints,
   rectanglePoints,
+  stackLevels,
   translatePoints,
   type ChartPoint,
 } from './geometry'
@@ -188,6 +189,13 @@ export interface AlertLine {
 const ALERT_GROUP_ID = 'trade-horizon:alerts'
 const ALERT_OVERLAY_PREFIX = 'alert:'
 const ALERT_COLOR = '#f5a623'
+/**
+ * Stacking (klinecharts zLevel): drawings get theirs from stackLevels() and keep it while hovered, because the
+ * library's hover-raise would leave a big box on top of a small box inside it, so the small one could not be clicked.
+ * A drawing being placed sits above all of them, alert lines above everything.
+ */
+const DRAFT_Z_LEVEL = 1_000_000
+const ALERT_Z_LEVEL = 2_000_000
 const ALERT_PAUSED_COLOR = '#787b86'
 
 function isAbortError(error: unknown): boolean {
@@ -261,6 +269,7 @@ export class KLineChartController {
   #replayPicking = false
   readonly #viewListeners = new Set<() => void>()
   #alertLines: readonly AlertLine[] = []
+  #stackLevels = new Map<string, number>()
   readonly #movingAverageIds = new Map<MovingAverageKind, string>()
   readonly #dominanceIds = new Map<DominanceKey, string>()
   #dominanceRows?: DominanceRow[]
@@ -1363,7 +1372,8 @@ export class KLineChartController {
         id: overlayId,
         name: ALERT_LINE_OVERLAY_NAME,
         groupId: ALERT_GROUP_ID,
-        zLevel: 1,
+        zLevel: ALERT_Z_LEVEL,
+        fixedZLevel: true,
         points: [{ timestamp, value: line.price }],
         styles: { alertColor: line.paused ? ALERT_PAUSED_COLOR : ALERT_COLOR, alertPaused: line.paused ? 1 : 0 },
         onPressedMoveEnd: (event: OverlayEvent<unknown>) => {
@@ -1741,6 +1751,8 @@ export class KLineChartController {
       modeSensitivity: MAGNET_TOLERANCE_PX,
       lock: drawing?.locked ?? false,
       visible: !(drawing?.hidden ?? false),
+      zLevel: drawing ? this.#stackLevels.get(id) ?? DRAFT_Z_LEVEL : DRAFT_Z_LEVEL,
+      fixedZLevel: true,
       needDefaultPointFigure: true,
       needDefaultXAxisFigure: type !== 'horizontalLine',
       needDefaultYAxisFigure: type !== 'verticalLine',
@@ -1895,6 +1907,7 @@ export class KLineChartController {
     const desiredById = new Map(desired.map((drawing) => [drawing.id, drawing]))
     const existing = this.#chart.getOverlays({ groupId: DRAWING_GROUP_ID })
     const existingIds = new Set(existing.map((overlay) => overlay.id))
+    this.#stackLevels = stackLevels(desired)
 
     this.#suppressDrawingEvents = true
     try {
