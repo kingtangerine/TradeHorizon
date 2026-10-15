@@ -59,6 +59,7 @@ npm run build
 | `TH_DATA_DIR` | Where accounts, user data, push keys and the market cache live (default `server/data`). **Back this folder up.** |
 | `TH_TRUST_PROXY=1` | Set when running behind nginx/Cloudflare so login limits use the real visitor IP and HTTPS is detected. |
 | `TH_TELEGRAM_TOKEN` | Bot token from @BotFather. Turns on Telegram alerts (see below). Leave unset to keep the feature off. |
+| `TH_PUBLIC_URL` | The site's address (e.g. `https://example.com`) for the keep-alive ping that stops hosts like Plesk from shutting the idle app down. Optional: otherwise learned from the first visit after a start. |
 | `TH_VAPID_SUBJECT` | Contact URL or `mailto:` sent to browser push services (optional). |
 
 - **HTTPS is required** for the service worker, installing the app, and background alert notifications (browsers only allow them on HTTPS; `localhost` is exempt). Terminate TLS in nginx/Cloudflare and forward `X-Forwarded-For` and `X-Forwarded-Proto`.

@@ -45,6 +45,7 @@ export function AlertsPanel({
   const [collapsed, setCollapsed] = useState<ReadonlySet<string>>(new Set())
   const [direction, setDirection] = useState<AlertDirection>('above')
   const [price, setPrice] = useState('')
+  const [notificationsOpen, setNotificationsOpen] = useState(true)
 
   const counts = useMemo(() => {
     const triggered = alerts.filter(isTriggered).length
@@ -118,8 +119,8 @@ export function AlertsPanel({
         </small>
       </form>
 
-      <details className="alert-notifications">
-        <summary><span>Notifications</span><small>{notificationSummary}</small><ChevronIcon /></summary>
+      <details className="alert-notifications" open={notificationsOpen} onToggle={(event) => setNotificationsOpen(event.currentTarget.open)}>
+        <summary><span>Notifications · browser &amp; Telegram</span><small>{notificationSummary}</small><ChevronIcon /></summary>
         {notifications}
       </details>
 
