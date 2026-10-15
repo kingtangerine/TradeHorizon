@@ -1,7 +1,7 @@
 // TradeHorizon server: accounts, synced user data, cached market data and server-side price alerts.
 // Dev:  `npm run server` (Vite proxies /api to it).  Prod: `npm run build && npm start`
 // serves dist/ and /api from one port.
-//   Environment: PORT, HOST, TH_DATA_DIR, TH_TRUST_PROXY=1 (behind nginx/Cloudflare), TH_VAPID_SUBJECT.
+//   Environment: PORT, HOST, TH_DATA_DIR, TH_TRUST_PROXY=1 (behind nginx/Cloudflare), TH_VAPID_SUBJECT, TH_TELEGRAM_TOKEN (bot token from @BotFather, enables Telegram alerts).
 import { createServer } from 'node:http'
 import { randomBytes, randomUUID, scrypt, timingSafeEqual, createHash } from 'node:crypto'
 import { accessSync, constants as fsConstants, existsSync, mkdirSync, readdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs'
@@ -11,6 +11,7 @@ import { ALERTS_KEY, createAlertService, createPushService } from './alerts.mjs'
 import { applySecurityHeaders, clientIp, createThrottle, readBody, send, sendCompressed } from './http.mjs'
 import { createMarketService } from './markets.mjs'
 import { createStaticHandler } from './static.mjs'
+import { createTelegramService } from './telegram.mjs'
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const dataDir = process.env.TH_DATA_DIR ?? join(root, 'server', 'data')
@@ -75,6 +76,7 @@ const isThrottled = createThrottle(20, 60_000)
 const throttled = (req) => isThrottled(clientIp(req))
 // Browser error reports: a handful per minute per IP.
 const errorReportThrottled = createThrottle(10, 60_000)
+const telegramThrottled = createThrottle(10, 60_000)
 
 // Per-user synced data (layouts, drawings, alerts, workspace): one JSON file per user, last write wins.
 const userDataDir = join(dataDir, 'userdata')
@@ -109,6 +111,12 @@ const push = createPushService({
   dataDir,
   subject: process.env.TH_VAPID_SUBJECT ?? 'https://github.com/kingtangerine/TradeHorizon',
 })
+const telegram = createTelegramService({
+  dataDir,
+  token: process.env.TH_TELEGRAM_TOKEN?.trim(),
+  apiBase: process.env.TH_TELEGRAM_API || undefined, // tests only: a stand-in for api.telegram.org
+  userName: (userId) => db.users.find((user) => user.id === userId)?.displayName,
+})
 const alerts = createAlertService({
   store: {
     listUserIds: () => readdirSync(userDataDir).filter((name) => name.endsWith('.json')).map((name) => name.slice(0, -5)),
@@ -120,7 +128,8 @@ const alerts = createAlertService({
     },
   },
   exchangeOf: (symbol) => markets.exchangeOf(symbol),
-  notify: (userId, payload) => push.send(userId, payload),
+  // Every channel the user has set up; one failing channel never blocks the others.
+  notify: async (userId, payload) => { await Promise.allSettled([push.send(userId, payload), telegram.send(userId, payload)]) },
 })
 
 async function handleData(req, res) {
@@ -181,6 +190,28 @@ async function handleApi(req, res, path) {
     if (!user) return send(res, 401, { error: 'Session expired.' })
     const since = Number(new URL(req.url, 'http://localhost').searchParams.get('since')) || 0
     return send(res, 200, { events: alerts.eventsSince(user.id, since), pushDevices: push.count(user.id) })
+  }
+
+  // Telegram alerts: link a chat to the account with a one-time code, see the state, unlink, send a test.
+  if (path.startsWith('/api/telegram/')) {
+    const user = sessionUser(req)
+    if (!user) return send(res, 401, { error: 'Session expired.' })
+    if (path === '/api/telegram/status' && req.method === 'GET') return send(res, 200, telegram.status(user.id))
+    if (req.method !== 'POST') return send(res, 404, { error: 'Not found.' })
+    if (!telegram.enabled) return send(res, 503, { error: 'Telegram alerts are not set up on this server.' })
+    if (path === '/api/telegram/link') {
+      if (telegramThrottled(clientIp(req))) return send(res, 429, { error: 'Too many attempts. Wait a minute and try again.' })
+      const link = telegram.createLink(user.id)
+      return link ? send(res, 200, link) : send(res, 503, { error: 'The Telegram bot is still starting. Try again in a few seconds.' })
+    }
+    if (path === '/api/telegram/unlink') { telegram.unlink(user.id); return send(res, 200, { ok: true }) }
+    if (path === '/api/telegram/test') {
+      if (telegramThrottled(clientIp(req))) return send(res, 429, { error: 'Too many attempts. Wait a minute and try again.' })
+      if (!telegram.status(user.id).linked) return send(res, 409, { error: 'Telegram is not connected.' })
+      await telegram.send(user.id, { title: 'TradeHorizon test alert', body: 'If you can read this, Telegram alerts work.' })
+      return send(res, 200, { ok: true })
+    }
+    return send(res, 404, { error: 'Not found.' })
   }
 
   // Lightweight browser error reports (written to the server log).
@@ -264,6 +295,7 @@ function health() {
     uptimeSec: Math.round((Date.now() - startedAtMs) / 1000),
     dataWritable,
     pushReady: Boolean(push.publicKey),
+    telegramReady: Boolean(telegram.botUsername()),
     marketsLoaded: catalog.listings.length > 0,
     marketsAgeMin: catalog.fetchedAtMs ? Math.round((Date.now() - catalog.fetchedAtMs) / 60_000) : null,
   }
@@ -291,12 +323,14 @@ server.listen(port, host, () => {
   console.log(`TradeHorizon ${version} listening on http://${host}:${port}  (data: ${dataDir})`)
   markets.start()
   alerts.start()
+  telegram.start()
 })
 
 for (const signal of ['SIGINT', 'SIGTERM']) {
   process.on(signal, () => {
     markets.stop()
     alerts.stop()
+    telegram.stop()
     server.close(() => process.exit(0))
     setTimeout(() => process.exit(0), 2000).unref()
   })
