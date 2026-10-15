@@ -37,7 +37,7 @@ import { applyTheme, loadUserTheme, saveUserTheme, type Theme } from './theme'
 import { loadGroups, saveGroups } from './groups'
 import { loadPreferences, savePreferences } from './preferences'
 import { loadLayoutFolders, pruneFolderAssignments, saveLayoutFolders } from './layoutFolders'
-import { hasSyncedBefore, startUserSync, stopUserSync } from './userSync'
+import { hasSyncedBefore, startUserSync, stopUserSync, subscribeRemoteData } from './userSync'
 import { logIn, logOut, restoreSession, signUp, verifySession, type AppUser } from './auth'
 import { Superchart } from './Superchart'
 import {
@@ -792,6 +792,23 @@ function WorkspaceApp({ user, onLogout }: WorkspaceAppProps) {
   useEffect(() => saveSavedLayouts(user.id, savedLayouts), [savedLayouts, user.id])
   useEffect(() => saveAlerts(user.id, alerts), [alerts, user.id])
   useEffect(() => saveGroups(user.id, groupState), [groupState, user.id])
+
+  // Another device changed something (merged into storage by userSync): show it without a reload.
+  useEffect(() => {
+    const reloaders: Record<string, () => void> = {
+      'workspace:v1': () => setWorkspace(adoptActiveLayout(loadWorkspace(user.id))),
+      'layouts:v1': () => setSavedLayouts(loadSavedLayouts(user.id)),
+      'drawings:v1': () => drawingStore.reloadFromRepository(),
+      'alerts:v1': () => setAlerts(loadAlerts(user.id)),
+      'groups:v1': () => setGroupState(loadGroups(user.id)),
+      'layout-folders:v1': () => setLayoutFolders(loadLayoutFolders(user.id)),
+      'rect-templates:v1': () => setTemplateState(loadTemplates(user.id)),
+      'watchlists:v1': () => setWatchlistState(loadWatchlists(user.id)),
+      'prefs:v1': () => setPreferences(loadPreferences(user.id)),
+      'theme:v1': () => setTheme(loadUserTheme(user.id)),
+    }
+    return subscribeRemoteData((keys) => { for (const key of keys) reloaders[key]?.() })
+  }, [drawingStore, user.id])
   useEffect(() => savePreferences(user.id, preferences), [preferences, user.id])
   useEffect(() => saveLayoutFolders(user.id, layoutFolders), [layoutFolders, user.id])
   // A deleted layout leaves its folder.
@@ -2315,11 +2332,9 @@ export function App() {
         if (live) setUser(null)
         return
       }
-      const { changed } = await sync
-      if (!live) return
-      if (!returning) setSyncedUserId(user.id)
-      // Another device saved newer data: reload once so the app shows it instead of silently overwriting it later.
-      else if (changed) window.location.reload()
+      await sync
+      // Newer data from other devices is applied in place (subscribeRemoteData), so no reload is needed.
+      if (live && !returning) setSyncedUserId(user.id)
     })()
     return () => { live = false }
   }, [user?.id])
