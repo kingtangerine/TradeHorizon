@@ -8,7 +8,7 @@ export interface PriceAlert {
   readonly enabled: boolean
   readonly createdAtMs: number
   readonly triggeredAtMs?: number
-  /** Price at the moment the server saw the alert trigger. */
+  /** Price at the moment the alert triggered (seen by the server, or by the app while open). */
   readonly triggeredPrice?: number
 }
 

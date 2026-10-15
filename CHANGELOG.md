@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [0.14.4] - 2026-10-15
+
+### Fixed
+- **Telegram (and other devices) missed alerts that triggered while TradeHorizon was open.** The open chart usually sees the price cross before the server's 10-second check and marked the alert as triggered, so the server never sent a notification. The server now also notifies for alerts a device uploads as just triggered (within 30 minutes), and sends each trigger only once even when the server and a device both catch it. The app now records the trigger price too.
+
 ## [0.14.3] - 2026-10-15
 
 ### Added

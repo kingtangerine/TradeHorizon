@@ -2,7 +2,7 @@ import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { ALERTS_KEY, alertReached, createAlertService, createPushService, fetchLastPrices, parseActiveAlerts } from './alerts.mjs'
+import { ALERTS_KEY, alertReached, createAlertService, createPushService, fetchLastPrices, newlyTriggered, parseActiveAlerts } from './alerts.mjs'
 import { mergeListings, parseBinanceListings, parseBybitListings, precisionFromStep } from './markets.mjs'
 
 const alert = (overrides = {}) => ({ id: 'a1', symbol: 'BTCUSDT', targetPrice: 100, direction: 'above', enabled: true, createdAtMs: 1, ...overrides })
@@ -192,5 +192,40 @@ describe('market catalog parsing', () => {
 describe('alerts key', () => {
   it('matches the key the app syncs alerts under', () => {
     expect(ALERTS_KEY).toBe('alerts:v1')
+  })
+})
+
+describe('alerts triggered by a device with the app open', () => {
+  const NOW = 5000
+  const untriggered = JSON.stringify([alert()])
+  const triggered = (at = 4000, extra = {}) => JSON.stringify([alert({ enabled: false, triggeredAtMs: at, triggeredPrice: 101, ...extra })])
+
+  it('finds alerts that became triggered in an upload, but not old or unchanged ones', () => {
+    expect(newlyTriggered(untriggered, triggered(), NOW).map((item) => item.id)).toEqual(['a1'])
+    expect(newlyTriggered(triggered(), triggered(), NOW)).toEqual([])
+    expect(newlyTriggered(untriggered, triggered(NOW - 31 * 60_000), NOW)).toEqual([])
+    expect(newlyTriggered(undefined, triggered(), NOW)).toHaveLength(1)
+    expect(newlyTriggered('garbage', 'garbage', NOW)).toEqual([])
+  })
+
+  it('relays them as notifications once, with the price the device saw', () => {
+    const store = fakeStore({ u1: untriggered })
+    const { instance, notifications } = service({ store, prices: [] })
+    instance.relayTriggered('u1', untriggered, triggered())
+    instance.relayTriggered('u1', untriggered, triggered()) // the same upload again (retry)
+    expect(notifications).toEqual([{ userId: 'u1', title: 'BTCUSDT price alert', body: 'Price reached 101 (target 100).', symbol: 'BTCUSDT', alertId: 'a1', price: 101 }])
+    instance.stop()
+  })
+
+  it('does not send twice when the server fired the alert and a device then uploads that trigger', async () => {
+    const store = fakeStore({ u1: untriggered })
+    const { instance, notifications } = service({ store, prices: [{ BTCUSDT: 90 }, { BTCUSDT: 101 }] })
+    await instance.tick()
+    await instance.tick()
+    expect(notifications).toHaveLength(1)
+    const serverCopy = store.values.u1
+    instance.relayTriggered('u1', untriggered, serverCopy) // a device that merged the server's trigger uploads it
+    expect(notifications).toHaveLength(1)
+    instance.stop()
   })
 })

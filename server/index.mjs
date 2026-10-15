@@ -154,11 +154,15 @@ async function handleData(req, res) {
     if (!DATA_KEY.test(key) || typeof body.value !== 'string') return send(res, 400, { error: 'Invalid data.' })
     if (body.value.length > MAX_VALUE_BYTES) return send(res, 413, { error: 'Data too large.' })
     if (!(key in data) && Object.keys(data).length >= MAX_KEYS) return send(res, 400, { error: 'Too many items.' })
+    const previousValue = data[key]?.value
     const result = writeValue(data, key, body.value, body.baseRev, Date.now(), deviceFrom(body.device))
     if (result.status === 'outdated') return send(res, 409, { error: 'TradeHorizon was updated. Reload the page.', outdated: true })
     if (result.status === 'conflict') return send(res, 409, { error: 'Changed on another device.', item: result.item })
     saveUserData(user.id)
-    if (key === ALERTS_KEY) alerts.updateUserAlerts(user.id, body.value)
+    if (key === ALERTS_KEY) {
+      alerts.updateUserAlerts(user.id, body.value)
+      alerts.relayTriggered(user.id, previousValue, body.value)
+    }
     return send(res, 200, { rev: result.item.rev, updatedAtMs: result.item.updatedAtMs })
   }
   return send(res, 404, { error: 'Not found.' })
