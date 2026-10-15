@@ -17,6 +17,7 @@ import type { DrawingStore } from '../drawings'
 import type { MarketInterval } from '../market'
 import { formatCompact, formatPrice } from './format'
 import { EyeIcon, EyeOffIcon, RefreshIcon } from './Icons'
+import { ChartContextMenu } from './ChartContextMenu'
 
 interface ChartPaneProps {
   index: number
@@ -42,6 +43,7 @@ interface ChartPaneProps {
   onToggleVolume(): void
   onToggleMovingAverage(kind: MovingAverageKind): void
   onToggleVwap(kind: VwapKind): void
+  onOpenSettings(): void
 }
 
 const INITIAL_RUNTIME = (interval: MarketInterval): ChartRuntimeState => ({
@@ -79,9 +81,12 @@ export function ChartPane({
   onToggleVolume,
   onToggleMovingAverage,
   onToggleVwap,
+  onOpenSettings,
 }: ChartPaneProps) {
   const [runtime, setRuntime] = useState<ChartRuntimeState>(() => INITIAL_RUNTIME(interval))
   const [controller, setController] = useState<KLineChartController | null>(null)
+  const [contextMenu, setContextMenu] = useState<{ left: number, top: number, price: number | null } | null>(null)
+  const closeContextMenu = useCallback(() => setContextMenu(null), [])
 
   // Callbacks go through refs so the handlers handed to the chart surface stay stable
   // (a changing handler would make the surface rebuild its chart).
@@ -185,9 +190,23 @@ export function ChartPane({
         onToolSettled={handleToolSettled}
         onSelectionChange={handleSelection}
         onAddAlert={(price) => onAddAlert(price, market.symbol, quote?.close)}
+        onChartContextMenu={setContextMenu}
         theme={theme}
         countdown={countdown}
       />
+
+      {contextMenu && (
+        <ChartContextMenu
+          {...contextMenu}
+          pricePrecision={market.pricePrecision}
+          quoteAsset={market.quoteAsset}
+          live={runtime.followingLive}
+          onGoLive={() => controller?.goToLive()}
+          onAddAlert={(price) => onAddAlert(price, market.symbol, quote?.close)}
+          onOpenSettings={onOpenSettings}
+          onClose={closeContextMenu}
+        />
+      )}
 
       {blockingLoad && (
         <div className="chart-state" role="status">

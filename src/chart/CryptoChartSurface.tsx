@@ -22,6 +22,8 @@ interface CryptoChartSurfaceProps {
   onToolSettled(): void
   onSelectionChange(selectedId?: string): void
   onAddAlert?(price: number): void
+  /** Right-click on the chart (not on a drawing, not while a tool is armed): where, and the price there. */
+  onChartContextMenu?(info: { left: number, top: number, price: number | null }): void
   theme?: 'dark' | 'light'
 }
 
@@ -39,6 +41,7 @@ export function CryptoChartSurface({
   onToolSettled,
   onSelectionChange,
   onAddAlert,
+  onChartContextMenu,
   theme = 'dark',
 }: CryptoChartSurfaceProps) {
   const themeRef = useRef(theme)
@@ -147,6 +150,30 @@ export function CryptoChartSurface({
       element.hidden = true
     }
   }, [countdown, drawingStore, market, onControllerChange])
+
+  // Right-click menu. The controller has already handled right-clicks that cancel a drawing tool (and stopped them).
+  const contextMenuRef = useRef(onChartContextMenu)
+  contextMenuRef.current = onChartContextMenu
+  useEffect(() => {
+    const host = hostRef.current
+    if (!host) return
+    const open = (event: MouseEvent) => {
+      const controller = controllerRef.current
+      event.preventDefault()
+      if (!controller || !contextMenuRef.current || controller.drawingUnderPointer()) return
+      const hostRect = host.getBoundingClientRect()
+      const pane = controller.pricePaneBounds()
+      const onPriceChart = !!pane && event.clientX >= pane.left && event.clientX <= pane.right && event.clientY >= pane.top && event.clientY <= pane.bottom
+      setAlertHover(null)
+      contextMenuRef.current({
+        left: event.clientX - hostRect.left,
+        top: event.clientY - hostRect.top,
+        price: onPriceChart ? controller.priceAtClientY(event.clientY) : null,
+      })
+    }
+    host.addEventListener('contextmenu', open)
+    return () => host.removeEventListener('contextmenu', open)
+  }, [])
 
   // TradingView-style "+" next to the price axis at the crosshair level: click to alert at that price.
   useEffect(() => {

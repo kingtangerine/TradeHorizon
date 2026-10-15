@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [0.15.0] - 2026-10-15
+
+### Added
+- **Right-click menu on the chart**: **Go live** (greyed out when already following the latest candles), **Add alert at <price>** at the exact price under the pointer (only on the price chart, not the volume pane), and **Settings…**, which opens the account window at the Chart section. Right-click on a drawing still selects it, right-click while a drawing tool is armed still cancels the tool, and Escape, a click elsewhere or scrolling closes the menu. In a split view the menu acts on the chart that was clicked.
+
 ## [0.14.4] - 2026-10-15
 
 ### Fixed

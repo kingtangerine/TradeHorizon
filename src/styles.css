@@ -3387,3 +3387,22 @@ button:disabled {
 .sync-report tr.differs td:last-child { color: #f23645; font-weight: 600; white-space: nowrap; }
 .sync-report td:last-child { white-space: nowrap; color: #2ebd85; }
 .sync-report td .sync-own { color: var(--muted); font-weight: 400; }
+
+/* Right-click menu on the chart */
+.chart-context-menu {
+  position: absolute; z-index: 20; display: grid; min-width: 210px; padding: 5px;
+  border: 1px solid var(--border-strong); border-radius: 8px; background: var(--tv-raised, var(--panel-raised));
+  box-shadow: 0 10px 32px rgb(0 0 0 / 50%); font: 500 .82rem Inter, system-ui, sans-serif;
+}
+.chart-context-menu button {
+  display: flex; align-items: center; gap: 10px; height: 34px; padding: 0 12px; border: 0; border-radius: 5px;
+  color: var(--text); background: transparent; font: inherit; text-align: left; white-space: nowrap; cursor: pointer;
+}
+.chart-context-menu button:hover:not(:disabled), .chart-context-menu button:focus-visible { background: var(--tv-hover, rgb(255 255 255 / 7%)); outline: 0; }
+.chart-context-menu button:disabled { color: var(--muted); cursor: default; }
+.chart-context-menu svg { width: 16px; height: 16px; flex: 0 0 auto; }
+.chart-context-menu b { font-weight: 700; }
+.chart-context-menu small { color: var(--muted); }
+.chart-context-separator { height: 1px; margin: 4px 2px; background: var(--border-strong); }
+.profile-focus { border-radius: 8px; animation: profile-focus 1.6s ease-out; }
+@keyframes profile-focus { from { box-shadow: 0 0 0 2px var(--tv-blue, #2962ff); } to { box-shadow: 0 0 0 2px transparent; } }
