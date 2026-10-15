@@ -58,12 +58,23 @@ npm run build
 | `PORT`, `HOST` | Where to listen (default `0.0.0.0:8787`). |
 | `TH_DATA_DIR` | Where accounts, user data, push keys and the market cache live (default `server/data`). **Back this folder up.** |
 | `TH_TRUST_PROXY=1` | Set when running behind nginx/Cloudflare so login limits use the real visitor IP and HTTPS is detected. |
+| `TH_TELEGRAM_TOKEN` | Bot token from @BotFather. Turns on Telegram alerts (see below). Leave unset to keep the feature off. |
 | `TH_VAPID_SUBJECT` | Contact URL or `mailto:` sent to browser push services (optional). |
 
 - **HTTPS is required** for the service worker, installing the app, and background alert notifications (browsers only allow them on HTTPS; `localhost` is exempt). Terminate TLS in nginx/Cloudflare and forward `X-Forwarded-For` and `X-Forwarded-Proto`.
 - `GET /healthz` returns `{"ok":true,...}` for uptime monitors.
 - The server caches Binance/Bybit coin lists and CoinGecko market caps for all users, and watches prices for **price alerts**, sending a web-push notification when one triggers (indices such as BTC.D are only evaluated while the app is open).
 - `server/data/` holds `users.json`, `userdata/`, `vapid.json` (push keys; losing it silently disconnects every device's notifications), `push.json` and `catalog.json`.
+
+### Telegram alerts
+
+1. In Telegram open **@BotFather**, send `/newbot`, choose a name and a username ending in `bot`, and copy the token it gives you.
+2. Set it on the server: `TH_TELEGRAM_TOKEN=<token>` (systemd `Environment=`, pm2 `--env`/ecosystem file, or your host's settings), then restart the Node process. Use the token on **one** server only; two servers polling the same bot fight each other.
+3. Check `/healthz`: it should show `"telegramReady": true`. The server must be able to reach `api.telegram.org` (outbound HTTPS).
+4. In TradeHorizon open **Alerts**; a **Telegram alerts** section appears. Press **Connect Telegram**, press **Start** in the chat that opens, and the panel shows Connected. **Send test** confirms delivery.
+5. Create alerts as usual. When one triggers the server sends the message even if no browser is open. `/stop` in the chat or **Disconnect** in the app unlinks it.
+
+Links are stored in `server/data/telegram.json` (back it up with the rest of the data folder).
 
 ---
 
