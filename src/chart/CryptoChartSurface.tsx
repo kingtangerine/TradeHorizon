@@ -5,6 +5,7 @@ import { KLineChartController } from './KLineChartController'
 import type { ChartRuntimeState, ChartType } from './types'
 import type { IndicatorSettings } from './indicators'
 import type { CryptoMarket } from './markets'
+import { formatCountdown } from './countdown'
 
 interface CryptoChartSurfaceProps {
   interval: MarketInterval
@@ -14,6 +15,8 @@ interface CryptoChartSurfaceProps {
   indicators: IndicatorSettings
   magnet: boolean
   chartType: ChartType
+  /** Show the time left in the current candle under the last price. */
+  countdown?: boolean
   onRuntimeState(state: ChartRuntimeState): void
   onControllerChange(controller: KLineChartController | null): void
   onToolSettled(): void
@@ -30,6 +33,7 @@ export function CryptoChartSurface({
   indicators,
   magnet,
   chartType,
+  countdown = false,
   onRuntimeState,
   onControllerChange,
   onToolSettled,
@@ -42,6 +46,7 @@ export function CryptoChartSurface({
   const [priceViewManual, setPriceViewManual] = useState(false)
   const [alertHover, setAlertHover] = useState<{ top: number, left: number, price: number } | null>(null)
   const hostRef = useRef<HTMLDivElement>(null)
+  const countdownRef = useRef<HTMLDivElement>(null)
   const controllerRef = useRef<KLineChartController | null>(null)
   const callbacksRef = useRef({ onRuntimeState, onToolSettled, onSelectionChange })
   const indicatorsRef = useRef(indicators)
@@ -110,6 +115,39 @@ export function CryptoChartSurface({
     controllerRef.current?.setTheme(theme)
   }, [theme])
 
+  // Candle countdown: text once a second, position whenever the view moves (coalesced to one frame).
+  // The label is moved by writing to the element directly, so a ticking clock never re-renders React.
+  useEffect(() => {
+    const element = countdownRef.current
+    const controller = controllerRef.current
+    if (!countdown || !element || !controller) return
+    const update = () => {
+      const state = controller.countdownState()
+      if (!state) { element.hidden = true; return }
+      element.hidden = false
+      const text = formatCountdown(state.remainingMs)
+      if (element.textContent !== text) element.textContent = text
+      element.style.top = `${state.top}px`
+      element.style.left = `${state.left}px`
+      element.style.width = `${state.width}px`
+      element.dataset.direction = state.up ? 'up' : 'down'
+    }
+    let frame = 0
+    const schedule = () => {
+      if (frame || document.hidden) return
+      frame = requestAnimationFrame(() => { frame = 0; update() })
+    }
+    const unsubscribe = controller.onViewChange(schedule)
+    const timer = setInterval(() => { if (!document.hidden) update() }, 1000)
+    update()
+    return () => {
+      unsubscribe()
+      clearInterval(timer)
+      cancelAnimationFrame(frame)
+      element.hidden = true
+    }
+  }, [countdown, drawingStore, market, onControllerChange])
+
   // TradingView-style "+" next to the price axis at the crosshair level: click to alert at that price.
   useEffect(() => {
     const host = hostRef.current
@@ -141,6 +179,7 @@ export function CryptoChartSurface({
   return (
     <>
       <div ref={hostRef} className="chart-host" aria-label={`${market.pair} candlestick chart`} />
+      {countdown && <div ref={countdownRef} className="chart-countdown" hidden aria-hidden="true" title="Time left until this candle closes" />}
       {priceViewManual && (
         <button
           type="button"
