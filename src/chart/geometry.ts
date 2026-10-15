@@ -154,3 +154,35 @@ export function clampDcaPrice(entry: number, stop: number, dca?: number): number
   const high = Math.max(entry, stop)
   return Math.min(high, Math.max(low, dca ?? (entry + stop) / 2))
 }
+
+/** Drawings that cover an area: a click anywhere inside them lands on them. */
+const AREA_DRAWINGS = new Set(['rectangle', 'fibRetracement', 'longPosition', 'shortPosition', 'priceRange'])
+
+export interface StackableDrawing {
+  readonly id: string
+  readonly type: string
+  readonly anchors: ReadonlyArray<{ readonly timeMs: number, readonly price: string | number }>
+}
+
+function marketArea(drawing: StackableDrawing): number {
+  const times = drawing.anchors.map((anchor) => anchor.timeMs)
+  const prices = drawing.anchors.map((anchor) => Number(anchor.price))
+  return (Math.max(...times) - Math.min(...times)) * (Math.max(...prices) - Math.min(...prices))
+}
+
+/**
+ * Stacking order (klinecharts zLevel, higher = on top and first to receive clicks) for drawings.
+ * Bigger areas go below smaller ones, so a box inside another box can always be clicked; lines and text,
+ * which are thin, go above every area. Areas are measured in time x price, so zooming never reorders them.
+ */
+export function stackLevels(drawings: readonly StackableDrawing[]): Map<string, number> {
+  const areas = drawings
+    .filter((drawing) => AREA_DRAWINGS.has(drawing.type))
+    .map((drawing) => ({ id: drawing.id, area: marketArea(drawing) }))
+    .sort((a, b) => b.area - a.area)
+  const levels = new Map<string, number>()
+  areas.forEach((item, index) => levels.set(item.id, index + 1))
+  let next = areas.length + 1
+  for (const drawing of drawings) if (!levels.has(drawing.id)) levels.set(drawing.id, next++)
+  return levels
+}

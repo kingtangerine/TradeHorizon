@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [0.17.1] - 2026-10-15
+
+### Fixed
+- **A drawing inside another (a small box in a big box) could not be selected or moved.** The chart library raises the drawing under the pointer to the top and keeps it there while the pointer stays inside it; a filled box counts as "under the pointer" across its whole area, so the big box caught every click meant for the small one. Drawings now keep a fixed stacking order instead: smaller areas above bigger ones (rectangles, positions, Fibonacci, price ranges), lines, rays and text above all areas, measured in time x price so zooming never changes it.
+
 ## [0.17.0] - 2026-10-15
 
 ### Added
