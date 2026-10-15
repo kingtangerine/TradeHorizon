@@ -1329,6 +1329,13 @@ export class KLineChartController {
     this.cancelReplaySelection()
   }
 
+  /** True while the pointer is over a drawing (a right-click there selects the drawing instead of opening the chart menu). */
+  public drawingUnderPointer(): boolean {
+    const store = (this.#chart as unknown as { _chartStore?: { getHoverOverlayInfo?(): { overlay?: { groupId?: string } | null, figureType?: string } } })._chartStore
+    const hovered = store?.getHoverOverlayInfo?.()
+    return !!hovered?.overlay && hovered.figureType !== 'none' && hovered.overlay.groupId === DRAWING_GROUP_ID
+  }
+
   public deleteSelected(): void {
     if (!this.#selectedDrawingId) return
     const id = this.#selectedDrawingId

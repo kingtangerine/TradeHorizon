@@ -15,6 +15,8 @@ interface ProfileDialogProps {
   onTheme(theme: Theme): void
   candleCountdown: boolean
   onCandleCountdown(enabled: boolean): void
+  /** Scroll to and highlight a section when opening (the chart's right-click "Settings…"). */
+  focusSection?: 'chart'
   onLogout(): void
   onClose(): void
 }
@@ -23,7 +25,7 @@ function formatDate(ms: number): string {
   return new Date(ms).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })
 }
 
-export function ProfileDialog({ user, theme, tabCount, layoutCount, onTheme, candleCountdown, onCandleCountdown, onLogout, onClose }: ProfileDialogProps) {
+export function ProfileDialog({ user, theme, tabCount, layoutCount, onTheme, candleCountdown, onCandleCountdown, focusSection, onLogout, onClose }: ProfileDialogProps) {
   const [current, setCurrent] = useState('')
   const [next, setNext] = useState('')
   const [confirm, setConfirm] = useState('')
@@ -32,6 +34,10 @@ export function ProfileDialog({ user, theme, tabCount, layoutCount, onTheme, can
   const [pendingImport, setPendingImport] = useState<BackupFile>()
   const [dataMessage, setDataMessage] = useState<{ ok: boolean, text: string }>()
   const fileRef = useRef<HTMLInputElement>(null)
+  const chartSectionRef = useRef<HTMLElement>(null)
+  useEffect(() => {
+    if (focusSection === 'chart') chartSectionRef.current?.scrollIntoView({ block: 'center' })
+  }, [focusSection])
 
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => { if (event.key === 'Escape') { event.stopPropagation(); onClose() } }
@@ -120,7 +126,7 @@ export function ProfileDialog({ user, theme, tabCount, layoutCount, onTheme, can
             </div>
           </section>
 
-          <section>
+          <section ref={chartSectionRef} className={focusSection === 'chart' ? 'profile-focus' : undefined}>
             <h3>Chart</h3>
             <label className="profile-toggle">
               <input type="checkbox" checked={candleCountdown} onChange={(event) => onCandleCountdown(event.target.checked)} />

@@ -268,6 +268,8 @@ function WorkspaceApp({ user, onLogout }: WorkspaceAppProps) {
   const [markets, setMarkets] = useState(() => allMarkets())
   const [alertsOpen, setAlertsOpen] = useState(false)
   const [profileOpen, setProfileOpen] = useState(false)
+  const [profileFocus, setProfileFocus] = useState<'chart'>()
+  const openChartSettings = useCallback(() => { setProfileFocus('chart'); setProfileOpen(true) }, [])
   const [layoutMenuOpen, setLayoutMenuOpen] = useState(false)
   const [saveAsOpen, setSaveAsOpen] = useState(false)
   const [timeframeMenuOpen, setTimeframeMenuOpen] = useState(false)
@@ -1084,7 +1086,8 @@ function WorkspaceApp({ user, onLogout }: WorkspaceAppProps) {
               candleCountdown={preferences.candleCountdown}
               onCandleCountdown={(candleCountdown) => setPreferences((current) => ({ ...current, candleCountdown }))}
               onLogout={onLogout}
-              onClose={() => setProfileOpen(false)}
+              focusSection={profileFocus}
+              onClose={() => { setProfileOpen(false); setProfileFocus(undefined) }}
             />
           )}
         </div>
@@ -1564,6 +1567,7 @@ function WorkspaceApp({ user, onLogout }: WorkspaceAppProps) {
                 onToggleVolume={() => setWorkspace((current) => ({ ...current, volumeVisible: !current.volumeVisible }))}
                 onToggleMovingAverage={toggleMovingAverage}
                 onToggleVwap={toggleVwap}
+                onOpenSettings={openChartSettings}
               />
             ))}
           </div>
