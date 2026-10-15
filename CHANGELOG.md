@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [0.14.3] - 2026-10-15
+
+### Added
+- **Settings from a `.env` file.** The server reads `KEY=value` lines from `.env` in the app folder (next to package.json) at start-up, for hosts where environment variables do not reach the Node process (Plesk's Node.js panel). Real environment variables still win. `.env` is git-ignored, and `/healthz` lists the setting names it found (`envFile`), never the values.
+
 ## [0.14.2] - 2026-10-15
 
 ### Added

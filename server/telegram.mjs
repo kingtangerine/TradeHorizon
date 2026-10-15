@@ -183,7 +183,7 @@ export function createTelegramService({ dataDir, token, apiBase = API, userName 
     botUsername: () => botUsername,
     /** For /healthz: whether the bot works, and if not, why (never includes the token). */
     diagnostics() {
-      if (!token) return { state: 'off', problem: 'TH_TELEGRAM_TOKEN is not set for this Node process (add it under Custom environment variables, then restart the app).' }
+      if (!token) return { state: 'off', problem: 'TH_TELEGRAM_TOKEN is not set for this Node process. Put TH_TELEGRAM_TOKEN=<token> in a .env file in the app folder (next to package.json), or set it as an environment variable, then restart the app.' }
       if (!enabled) return { state: 'off', problem: 'TH_TELEGRAM_TOKEN is set but does not look like a bot token (expected digits, a colon, then 30+ letters/digits; check for extra quotes or spaces).' }
       if (botUsername && !problem) return { state: 'ready', bot: `@${botUsername}`, pollingSinceMs: startedPollingAtMs ?? null }
       return { state: problem ? 'error' : 'starting', bot: botUsername ? `@${botUsername}` : null, problem: problem ?? 'Contacting Telegram… reload in a few seconds.' }

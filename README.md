@@ -51,7 +51,7 @@ npm run build
 
 ### Running in production
 
-`npm start` serves the built app and the API from one Node process. Settings (environment variables):
+`npm start` serves the built app and the API from one Node process. Settings come from environment variables, or from a `.env` file in the app folder (one `KEY=value` per line, git-ignored; environment variables win). On Plesk use the `.env` file: its Node.js panel does not always pass variables to the app.
 
 | Variable | Purpose |
 |---|---|
