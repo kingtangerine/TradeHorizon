@@ -33,6 +33,34 @@ export function parseActiveAlerts(value) {
   ))
 }
 
+/** How long after triggering a device-reported alert is still worth a notification (old uploads are not re-sent). */
+const RELAY_WINDOW_MS = 30 * 60_000
+
+/**
+ * Alerts that are triggered in `nextValue` but were not (or not at that moment) in `previousValue`:
+ * a device with the app open saw them trigger first and uploaded them. Only recent triggers count.
+ */
+export function newlyTriggered(previousValue, nextValue, nowMs, maxAgeMs = RELAY_WINDOW_MS) {
+  const parse = (value) => { try { const list = JSON.parse(value ?? '[]'); return Array.isArray(list) ? list : [] } catch { return [] } }
+  const before = new Map(parse(previousValue).filter((alert) => alert && typeof alert.id === 'string').map((alert) => [alert.id, alert.triggeredAtMs]))
+  return parse(nextValue).filter((alert) => (
+    alert && typeof alert.id === 'string' && typeof alert.symbol === 'string' &&
+    typeof alert.targetPrice === 'number' && typeof alert.triggeredAtMs === 'number' &&
+    before.get(alert.id) !== alert.triggeredAtMs &&
+    Math.abs(nowMs - alert.triggeredAtMs) <= maxAgeMs
+  ))
+}
+
+export function alertPayload(alert, price) {
+  return {
+    title: `${alert.symbol} price alert`,
+    body: `Price reached ${price} (target ${alert.targetPrice}).`,
+    symbol: alert.symbol,
+    alertId: alert.id,
+    price,
+  }
+}
+
 async function getJson(url, fetchImpl) {
   const response = await fetchImpl(url, { headers: { Accept: 'application/json' }, signal: AbortSignal.timeout(FETCH_TIMEOUT_MS) })
   if (!response.ok) throw new Error(`${new URL(url).hostname} answered ${response.status}`)
@@ -74,6 +102,8 @@ export function createAlertService({ store, exchangeOf, fetchPrices = fetchLastP
   const lastPrice = new Map()
   let running = false
   let timer
+  /** `alertId:triggeredAtMs` already notified, so a trigger seen by both the server and a device is sent once. */
+  const notified = new Set()
 
   function updateUserAlerts(userId, value) {
     const alerts = parseActiveAlerts(value)
@@ -88,25 +118,38 @@ export function createAlertService({ store, exchangeOf, fetchPrices = fetchLastP
     }
   }
 
+  function send(userId, payload) {
+    void notify(userId, payload).catch((error) => log.warn?.(`[alerts] notification failed: ${error.message}`))
+  }
+
   function fire(userId, alert, price) {
+    const triggeredAtMs = now()
+    notified.add(`${alert.id}:${triggeredAtMs}`)
     const value = store.getAlertsValue(userId)
     if (value) {
       try {
         const list = JSON.parse(value)
         const updated = list.map((item) => (
-          item?.id === alert.id ? { ...item, enabled: false, triggeredAtMs: now(), triggeredPrice: price } : item
+          item?.id === alert.id ? { ...item, enabled: false, triggeredAtMs, triggeredPrice: price } : item
         ))
         store.setAlertsValue(userId, JSON.stringify(updated))
       } catch { /* leave the stored data alone if it cannot be read */ }
     }
     updateUserAlerts(userId, store.getAlertsValue(userId) ?? '[]')
-    void notify(userId, {
-      title: `${alert.symbol} price alert`,
-      body: `Price reached ${price} (target ${alert.targetPrice}).`,
-      symbol: alert.symbol,
-      alertId: alert.id,
-      price,
-    }).catch((error) => log.warn?.(`[alerts] notification failed: ${error.message}`))
+    send(userId, alertPayload(alert, price))
+  }
+
+  /**
+   * A device uploaded its alerts. Ones it saw trigger first (the app was open, so its live price got there before
+   * this server's check) get the same notifications the server would send: Telegram and the other devices.
+   */
+  function relayTriggered(userId, previousValue, nextValue) {
+    for (const alert of newlyTriggered(previousValue, nextValue, now())) {
+      const id = `${alert.id}:${alert.triggeredAtMs}`
+      if (notified.has(id)) continue
+      notified.add(id)
+      send(userId, alertPayload(alert, alert.triggeredPrice ?? alert.targetPrice))
+    }
   }
 
   async function tick() {
@@ -165,6 +208,7 @@ export function createAlertService({ store, exchangeOf, fetchPrices = fetchLastP
     },
     stop() { clearInterval(timer) },
     updateUserAlerts,
+    relayTriggered,
     eventsSince,
     tick,
     /** Test and diagnostics helper. */

@@ -860,7 +860,7 @@ function WorkspaceApp({ user, onLogout }: WorkspaceAppProps) {
 
     const now = Date.now()
     setAlerts((current) => current.map((alert) => (
-      triggered.some((item) => item.id === alert.id) ? { ...alert, triggeredAtMs: now, enabled: false } : alert
+      triggered.some((item) => item.id === alert.id) ? { ...alert, triggeredAtMs: now, triggeredPrice: price, enabled: false } : alert
     )))
 
     announceAlerts(triggered.map((alert) => ({ symbol: alert.symbol, targetPrice: alert.targetPrice, price })))
