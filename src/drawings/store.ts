@@ -178,6 +178,20 @@ export class DrawingStore {
     return true;
   }
 
+  /**
+   * Replaces the drawings with what the repository now holds (another device's changes were merged into it).
+   * Not an undoable step, and the history is cleared: undoing to a copy from before the merge would drop them.
+   */
+  public reloadFromRepository(): void {
+    if (!this.repository) return;
+    this.drawings = sanitizeCollection(this.repository.load());
+    this.undoStack = [];
+    this.redoStack = [];
+    this.version += 1;
+    this.snapshot = this.createSnapshot();
+    for (const listener of this.listeners) listener();
+  }
+
   private commit(): void {
     this.version += 1;
     this.snapshot = this.createSnapshot();

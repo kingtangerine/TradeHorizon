@@ -34,6 +34,7 @@ TradeHorizon/
 │   ├── static.mjs / http.mjs    #   static files (compression, cache), security headers, helpers
 │   ├── markets.mjs              #   cached coin catalog + CoinGecko
 │   ├── alerts.mjs               #   server-side price alerts + web-push subscriptions
+│   ├── userdata.mjs             #   revisions for synced user data (conflict detection, changes since N)
 │   └── telegram.mjs             #   Telegram bot (long polling): account linking by one-time code, alert delivery
 ├── public/                      # sw.js (push), manifest.webmanifest, icons
 ├── eslint.config.js             # lint rules (`npm run lint`); CI in .github/workflows/ci.yml
@@ -124,6 +125,7 @@ When adding a new drawing tool (or modifying an existing one), follow these step
 - **Positions with DCA**: a long/short position has 3 anchors (entry, target, stop) or 4 when a DCA is added (4th = DCA, clamped between entry and stop by `clampDcaPrice`). `dcaTriggered` and `dcaSize` live in the drawing style; maths in `calculateDcaPositionMetrics` (`position.ts`).
 - **Position resize**: target and stop (anchors 1 and 2) always share one timestamp; `performEventPressedMove` copies it across when either is dragged. Newly placed or copied drawings call `#showHandles` so the library shows their handles (it has no public select API; pinned 10.0.3).
 - **Candle countdown**: `countdownState()` on the controller (pure clock + chart maths, `countdown.ts`) feeds an absolutely positioned label in `CryptoChartSurface` that is updated by direct DOM writes (1 s timer plus view-change events), never React state. Toggle lives in `preferences.ts` (account window).
+- **Sync** (`userSync.ts`, `syncMerge.ts`, `server/userdata.mjs`): every synced localStorage item has a server revision. Uploads send `baseRev`; a stale one gets 409 plus the server copy, which is merged item by item (`mergeRaw`, three-way against a fingerprint tree of the last shared copy) and uploaded again. The app polls `GET /api/data?since=<rev>` every 15 s and on focus/visibility; changed items reach React through `subscribeRemoteData` (App re-reads that item; `DrawingStore.reloadFromRepository`). `workspace:v1` is never merged: latest session wins. Never write synced data in a way that bypasses `localStorage.setItem`, and keep collections as arrays of objects with a string `id` so they merge per item.
 - **Layout folders** (`layoutFolders.ts`) reuse the `GroupState` helpers from `groups.ts`; assignments of deleted layouts are pruned in `App.tsx`.
 - **Versioning**: `__APP_VERSION__`/`__APP_BUILD__` come from `vite.config.ts`; bump with `npm run version:bump -- <patch|minor|major>` for each release and fill the changelog entry.
 - **Resume behaviour**: streams expose `nudge(force)`; the controller calls it when the page becomes visible again or the network returns, and it saves candles to `candleCache` when the page is hidden.

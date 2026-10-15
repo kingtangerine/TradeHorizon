@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [0.14.0] - 2026-10-15
+
+### Added
+- **Live sync between devices.** An open TradeHorizon picks up layouts, drawings, alerts, folders, watchlists, templates and settings saved on another device within about 15 seconds (and at once when you return to the tab), without reloading. Open chart tabs are taken over from the other device when the app starts, not while you work.
+
+### Changed
+- **Sync rebuilt so devices can no longer overwrite each other.** Every synced item has a revision on the server; an upload based on an older copy is refused, and the app merges the two copies item by item (layouts, drawings, alerts…) against the last version both devices shared. Additions on both devices are kept, a deletion on one device is applied on the other, and an item edited on both keeps both edits where they touch different fields. Edits made offline are uploaded and merged when the connection returns.
+- Tabs still running the app from before this update can no longer upload: the server refuses them until they reload.
+
+### Fixed
+- **Layouts (and drawings) created on one device missing on another.** All layouts were stored as one list and the last upload replaced it whole, so a device with an older list (a tab left open, or one starting up) wiped out the other device's new layouts. On the first start after this update each device merges its copy with the server's, so layouts that still exist on any device come back.
+
 ## [0.13.0] - 2026-10-15
 
 ### Added

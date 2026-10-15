@@ -12,6 +12,7 @@ import { applySecurityHeaders, clientIp, createThrottle, readBody, send, sendCom
 import { createMarketService } from './markets.mjs'
 import { createStaticHandler } from './static.mjs'
 import { createTelegramService } from './telegram.mjs'
+import { ensureRevisions, itemsSince, latestRevision, storeValue, writeValue } from './userdata.mjs'
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const dataDir = process.env.TH_DATA_DIR ?? join(root, 'server', 'data')
@@ -95,6 +96,7 @@ function loadUserData(userId) {
   if (!data) {
     data = readUserFile(userId)
     userData.set(userId, data)
+    if (ensureRevisions(data)) saveUserData(userId)
   }
   return data
 }
@@ -123,7 +125,7 @@ const alerts = createAlertService({
     // Reads without caching, so scanning every user at start-up does not keep every user's data in memory.
     getAlertsValue: (userId) => (userData.get(userId) ?? readUserFile(userId))[ALERTS_KEY]?.value,
     setAlertsValue: (userId, value) => {
-      loadUserData(userId)[ALERTS_KEY] = { value, updatedAtMs: Date.now() }
+      storeValue(loadUserData(userId), ALERTS_KEY, value)
       saveUserData(userId)
     },
   },
@@ -136,18 +138,23 @@ async function handleData(req, res) {
   const user = sessionUser(req)
   if (!user) return send(res, 401, { error: 'Session expired.' })
   const data = loadUserData(user.id)
-  if (req.method === 'GET') return sendCompressed(req, res, 200, { items: data })
+  if (req.method === 'GET') {
+    // ?since=N returns only what changed after revision N (the app asks every few seconds).
+    const since = Number(new URL(req.url, 'http://localhost').searchParams.get('since')) || 0
+    return sendCompressed(req, res, 200, { items: itemsSince(data, since), rev: latestRevision(data) })
+  }
   if (req.method === 'PUT') {
     const body = await readBody(req, MAX_VALUE_BYTES + 1000)
     const key = String(body.key ?? '')
     if (!DATA_KEY.test(key) || typeof body.value !== 'string') return send(res, 400, { error: 'Invalid data.' })
     if (body.value.length > MAX_VALUE_BYTES) return send(res, 413, { error: 'Data too large.' })
     if (!(key in data) && Object.keys(data).length >= MAX_KEYS) return send(res, 400, { error: 'Too many items.' })
-    const updatedAtMs = Date.now()
-    data[key] = { value: body.value, updatedAtMs }
+    const result = writeValue(data, key, body.value, body.baseRev)
+    if (result.status === 'outdated') return send(res, 409, { error: 'TradeHorizon was updated. Reload the page.', outdated: true })
+    if (result.status === 'conflict') return send(res, 409, { error: 'Changed on another device.', item: result.item })
     saveUserData(user.id)
     if (key === ALERTS_KEY) alerts.updateUserAlerts(user.id, body.value)
-    return send(res, 200, { updatedAtMs })
+    return send(res, 200, { rev: result.item.rev, updatedAtMs: result.item.updatedAtMs })
   }
   return send(res, 404, { error: 'Not found.' })
 }
