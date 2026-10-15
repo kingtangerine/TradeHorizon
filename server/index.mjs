@@ -12,9 +12,12 @@ import { applySecurityHeaders, clientIp, createThrottle, readBody, send, sendCom
 import { createMarketService } from './markets.mjs'
 import { createStaticHandler } from './static.mjs'
 import { createTelegramService } from './telegram.mjs'
+import { loadEnvFile } from './envfile.mjs'
 import { describeData, deviceFrom, ensureRevisions, itemsSince, latestRevision, storeValue, writeValue } from './userdata.mjs'
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..')
+// Settings can also come from a .env file in the app folder (hosts like Plesk do not always pass environment variables).
+const envFile = loadEnvFile(join(root, '.env'))
 const dataDir = process.env.TH_DATA_DIR ?? join(root, 'server', 'data')
 const dataFile = join(dataDir, 'users.json')
 const distDir = join(root, 'dist')
@@ -316,6 +319,8 @@ function health() {
     telegram: telegram.diagnostics(),
     // Changes between requests: the app was restarted, or Passenger runs more than one copy.
     pid: process.pid,
+    // Names (never values) of the settings found in the .env file, or null when there is none.
+    envFile: envFile.found ? envFile.keys : null,
     marketsLoaded: catalog.listings.length > 0,
     marketsAgeMin: catalog.fetchedAtMs ? Math.round((Date.now() - catalog.fetchedAtMs) / 60_000) : null,
   }

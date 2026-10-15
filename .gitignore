@@ -36,3 +36,6 @@ scratch/
 
 # Auth server data (accounts)
 server/data/
+
+# Server settings and secrets (bot token etc.); see README
+.env
