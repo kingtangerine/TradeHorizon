@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [0.18.1] - 2026-10-18
+
+### Added
+- **Lock vertical move while dragging objects**: Holding `Shift` while dragging drawings now locks vertical movement, allowing objects to be moved purely horizontally across time without altering their price levels. Pressing or releasing `Shift` dynamically toggles the vertical lock in real time during the drag.
+
+### Fixed
+- **Bar replay persisted across timeframe switches**: Switching timeframe while bar replay is active or in picking mode no longer cancels the replay. The chart loads candles for the new timeframe up to the current replay timestamp, backfills historical candles as needed, preserves playback state (playing, paused, speed, or picking), and keeps replay active until manually exited.
+
+
 ## [0.18.0] - 2026-10-15
 
 ### Added

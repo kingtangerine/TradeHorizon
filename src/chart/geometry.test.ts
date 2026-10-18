@@ -44,6 +44,15 @@ describe('translatePoints', () => {
   it('never produces a negative time', () => {
     expect(translatePoints([{ timestamp: 10, value: 1 }], -50, 0)[0].timestamp).toBe(0)
   })
+
+  it('locks vertical move when deltaValue is 0', () => {
+    const box = rectanglePoints({ timestamp: 1000, value: 50 }, { timestamp: 2000, value: 100 })
+    const moved = translatePoints(box, 500, 0)
+    expect(moved[0].value).toBe(box[0].value)
+    expect(moved[4].value).toBe(box[4].value)
+    expect(moved[0].timestamp).toBe(1500)
+    expect(moved[2].timestamp).toBe(2500)
+  })
 })
 
 describe('lockToAxis', () => {
