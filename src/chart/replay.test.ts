@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { DEFAULT_REPLAY_SPEED_MS, REPLAY_SPEEDS, replayStartCursor } from './replay'
+import { DEFAULT_REPLAY_SPEED_MS, REPLAY_SPEEDS, replayStartCursor, replayTransitionCursor } from './replay'
 
 describe('replayStartCursor', () => {
   const times = [100, 200, 300, 400]
@@ -18,6 +18,29 @@ describe('replayStartCursor', () => {
   })
 })
 
+describe('replayTransitionCursor', () => {
+  const times = [100, 200, 300, 400]
+
+  it('keeps every bar up to and including the target timestamp', () => {
+    expect(replayTransitionCursor(times, 200)).toBe(2)
+    expect(replayTransitionCursor(times, 250)).toBe(2)
+    expect(replayTransitionCursor(times, 100)).toBe(1)
+  })
+
+  it('shows all bars if target timestamp is at or past the latest bar', () => {
+    expect(replayTransitionCursor(times, 400)).toBe(4)
+    expect(replayTransitionCursor(times, 9999)).toBe(4)
+  })
+
+  it('shows at least 1 bar if target timestamp is before the first bar', () => {
+    expect(replayTransitionCursor(times, 50)).toBe(1)
+  })
+
+  it('returns 0 for empty bars array', () => {
+    expect(replayTransitionCursor([], 100)).toBe(0)
+  })
+})
+
 describe('replay speeds', () => {
   it('offers the default speed and lists faster speeds as shorter delays', () => {
     expect(REPLAY_SPEEDS.some((speed) => speed.ms === DEFAULT_REPLAY_SPEED_MS)).toBe(true)
@@ -25,3 +48,4 @@ describe('replay speeds', () => {
     expect([...delays].sort((a, b) => b - a)).toEqual(delays)
   })
 })
+

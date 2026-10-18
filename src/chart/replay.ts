@@ -17,3 +17,16 @@ export function replayStartCursor(barTimes: readonly number[], timestamp: number
   if (cursor === -1) cursor = barTimes.length
   return cursor >= 1 && cursor < barTimes.length ? cursor : null
 }
+
+/**
+ * Resolves the replay cursor when transitioning an existing replay to a new set of bars (e.g. timeframe change).
+ * Returns how many bars should be shown so that every bar up to and including `targetTimestamp` remains visible.
+ * Ensures at least 1 bar is visible if bars are present.
+ */
+export function replayTransitionCursor(barTimes: readonly number[], targetTimestamp: number): number {
+  if (barTimes.length === 0) return 0
+  let cursor = barTimes.findIndex((time) => time > targetTimestamp)
+  if (cursor === -1) cursor = barTimes.length
+  return Math.max(1, cursor)
+}
+

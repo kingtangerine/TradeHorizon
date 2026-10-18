@@ -79,7 +79,7 @@ import {
 } from './model'
 import type { CryptoMarket } from './markets'
 import { registerTradeHorizonOverlays } from './overlays'
-import { DEFAULT_REPLAY_SPEED_MS, replayStartCursor } from './replay'
+import { DEFAULT_REPLAY_SPEED_MS, replayStartCursor, replayTransitionCursor } from './replay'
 import { DRAWING_TOOLS } from './tools'
 import { candleToQuote, type ChartQuote, type ChartRuntimeState, type ChartType } from './types'
 
@@ -159,6 +159,13 @@ interface ReplaySession {
   speedMs: number
   push?: (bar: KLineData) => void
   timer?: ReturnType<typeof globalThis.setInterval>
+}
+
+interface PendingReplay {
+  targetTimeMs: number
+  speedMs: number
+  wasPlaying: boolean
+  wasPicking: boolean
 }
 
 interface PendingViewport {
@@ -266,7 +273,10 @@ export class KLineChartController {
   #magnet = false
   #dominancePoll?: ReturnType<typeof globalThis.setInterval>
   #replay?: ReplaySession
+  #pendingReplay?: PendingReplay
   #replayPicking = false
+  #shiftHeld = false
+  #lastOverlayMoveEvent?: OverlayEvent<unknown>
   readonly #viewListeners = new Set<() => void>()
   #alertLines: readonly AlertLine[] = []
   #stackLevels = new Map<string, number>()
@@ -277,6 +287,40 @@ export class KLineChartController {
   #dominanceReference?: Record<string, number>
   #dominanceIndicatorPoll?: ReturnType<typeof globalThis.setInterval>
   #dominanceEpoch = 0
+
+  readonly #handleKeyDown = (event: KeyboardEvent): void => {
+    if (event.key === 'Shift') {
+      this.#shiftHeld = true
+      if (this.#overlayMove && this.#lastOverlayMoveEvent) {
+        this.#continueOverlayMove(this.#lastOverlayMoveEvent)
+        this.#chart.overrideOverlay({
+          id: this.#overlayMove.id,
+          points: (this.#lastOverlayMoveEvent.overlay as { points: Array<Partial<Point>> }).points,
+        })
+      }
+    }
+  }
+
+  readonly #handleKeyUp = (event: KeyboardEvent): void => {
+    if (event.key === 'Shift') {
+      this.#shiftHeld = false
+      if (this.#overlayMove && this.#lastOverlayMoveEvent) {
+        this.#continueOverlayMove(this.#lastOverlayMoveEvent)
+        this.#chart.overrideOverlay({
+          id: this.#overlayMove.id,
+          points: (this.#lastOverlayMoveEvent.overlay as { points: Array<Partial<Point>> }).points,
+        })
+      }
+    }
+  }
+
+  readonly #handlePointerModifier = (event: PointerEvent): void => {
+    this.#shiftHeld = event.shiftKey
+  }
+
+  readonly #handleWindowBlur = (): void => {
+    this.#shiftHeld = false
+  }
 
   readonly #handleManualNavigation = (): void => {
     if (!this.#ignoreNavigationEvents && this.#runtimeState.followingLive) {
@@ -320,7 +364,7 @@ export class KLineChartController {
       const epoch = this.#dataEpoch
 
       // Reopening a chart (or the app) paints from the local cache at once; the live feed then fills in what is new.
-      if (type === 'init' && !this.#pendingViewport) {
+      if (type === 'init' && !this.#pendingViewport && !this.#pendingReplay) {
         const cached = await loadCachedBars(this.#market.marketId, interval)
         if (this.#disposed || epoch !== this.#dataEpoch || interval !== this.#interval) return
         const newest = cached?.at(-1)
@@ -357,8 +401,15 @@ export class KLineChartController {
 
         // After a timeframe switch, fetch enough older candles to show the same moment again.
         const pending = type === 'init' ? this.#pendingViewport : undefined
-        if (pending && !pending.followingLive && pending.centerTimeMs !== undefined) {
-          const neededFrom = pending.centerTimeMs - VIEWPORT_BACKFILL_MARGIN_BARS * this.#intervalMs()
+        const pendingReplay = type === 'init' ? this.#pendingReplay : undefined
+        const targetReplayTime = pendingReplay?.targetTimeMs
+        const targetCenterTime = pending?.followingLive ? undefined : pending?.centerTimeMs
+        const backfillTarget = targetReplayTime !== undefined
+          ? (targetCenterTime !== undefined ? Math.min(targetReplayTime, targetCenterTime) : targetReplayTime)
+          : targetCenterTime
+
+        if (backfillTarget !== undefined) {
+          const neededFrom = backfillTarget - VIEWPORT_BACKFILL_MARGIN_BARS * this.#intervalMs()
           for (
             let page = 0;
             hasPage && bars.length > 0 && bars[0].timestamp > neededFrom && page < MAX_VIEWPORT_BACKFILL_PAGES;
@@ -374,7 +425,36 @@ export class KLineChartController {
             bars = [...older.map(candleToKLineData), ...bars]
             hasPage = older.length === HISTORY_PAGE_SIZE
           }
-          if (bars.length > 0 && bars[0].timestamp > pending.centerTimeMs) pending.followingLive = true
+          if (pending && pending.centerTimeMs !== undefined && bars.length > 0 && bars[0].timestamp > pending.centerTimeMs) {
+            pending.followingLive = true
+          }
+        }
+
+        if (type === 'init' && this.#pendingReplay) {
+          const replayInfo = this.#pendingReplay
+          this.#pendingReplay = undefined
+          const cursor = replayTransitionCursor(bars.map((b) => b.timestamp), replayInfo.targetTimeMs)
+          this.#replay = { bars, cursor, speedMs: replayInfo.speedMs }
+          this.#replayPicking = replayInfo.wasPicking
+          if (replayInfo.wasPicking) {
+            this.#host.classList.add('replay-picking')
+          }
+          const shown = bars.slice(0, cursor)
+          callback(shown, { forward: hasPage, backward: false })
+          const latest = shown.at(-1)
+          this.#patchRuntime({
+            interval,
+            connection: 'live',
+            quote: latest ? barToQuote(latest) : null,
+            error: null,
+          })
+          saveCachedBars(this.#market.marketId, interval, bars)
+          this.#publishReplay()
+          this.#afterInitialData()
+          if (replayInfo.wasPlaying) {
+            this.setReplayPlaying(true)
+          }
+          return
         }
 
         callback(bars, {
@@ -390,6 +470,7 @@ export class KLineChartController {
             error: latest ? null : 'No candles were returned for this market.',
           })
           saveCachedBars(this.#market.marketId, interval, bars)
+          this.#publishReplay()
           this.#afterInitialData()
         }
       } catch (error) {
@@ -598,7 +679,12 @@ export class KLineChartController {
     globalThis.addEventListener('online', this.#handleResumeNow)
     globalThis.addEventListener('pointermove', this.#handleAxisPointerMove, true)
     globalThis.addEventListener('pointerup', this.#handleAxisPointerEnd, true)
-    globalThis.addEventListener('pointercancel', this.#handleAxisPointerEnd, true)
+    host.addEventListener('pointerdown', this.#handlePointerModifier, true)
+    globalThis.addEventListener('pointermove', this.#handlePointerModifier, true)
+    globalThis.addEventListener('pointerup', this.#handlePointerModifier, true)
+    globalThis.addEventListener('keydown', this.#handleKeyDown, true)
+    globalThis.addEventListener('keyup', this.#handleKeyUp, true)
+    globalThis.addEventListener('blur', this.#handleWindowBlur)
     host.addEventListener('mousedown', this.#blockChartWhileDrawing, true)
     host.addEventListener('touchstart', this.#blockChartWhileDrawing, true)
     host.addEventListener('contextmenu', this.#handleToolContextMenu, true)
@@ -615,11 +701,55 @@ export class KLineChartController {
     return this.#interval
   }
 
+  public get isShiftHeld(): boolean {
+    return this.#shiftHeld
+  }
+
   public setInterval(interval: MarketInterval): void {
     if (this.#disposed || interval === this.#interval) return
 
     this.cancelActiveTool()
-    this.#clearReplay()
+    const targetTimeMs = this.#replay
+      ? (this.#replay.bars[this.#replay.cursor - 1]?.timestamp ?? null)
+      : this.#pendingReplay?.targetTimeMs ?? null
+    const speedMs = this.#replay?.speedMs ?? this.#pendingReplay?.speedMs ?? DEFAULT_REPLAY_SPEED_MS
+    const wasPlaying = (this.#replay?.timer !== undefined) || (this.#pendingReplay?.wasPlaying ?? false)
+    const wasPicking = this.#replayPicking || (this.#pendingReplay?.wasPicking ?? false)
+
+    if (targetTimeMs !== null) {
+      this.#pendingReplay = { targetTimeMs, speedMs, wasPlaying, wasPicking }
+      this.#stopReplayTimer()
+      this.#replay = undefined
+      this.#patchRuntime({
+        interval,
+        connection: 'loading',
+        error: null,
+        replay: {
+          status: wasPicking ? 'picking' : 'active',
+          playing: false,
+          speedMs,
+          timeMs: targetTimeMs,
+          atEnd: false,
+        },
+      })
+    } else if (this.#replayPicking) {
+      this.#patchRuntime({
+        interval,
+        connection: 'loading',
+        error: null,
+        replay: {
+          status: 'picking',
+          playing: false,
+          speedMs: DEFAULT_REPLAY_SPEED_MS,
+          timeMs: null,
+          atEnd: false,
+        },
+      })
+    } else {
+      this.#clearReplay()
+      this.#patchRuntime({ interval, connection: 'loading', error: null })
+    }
+
     this.resetPriceView()
     this.#pendingViewport = this.#captureViewport()
     this.#historyLoader.cancel()
@@ -632,7 +762,6 @@ export class KLineChartController {
     for (const overlay of this.#chart.getOverlays({ groupId: DRAWING_GROUP_ID })) {
       this.#chart.overrideOverlay({ id: overlay.id, visible: false })
     }
-    this.#patchRuntime({ interval, connection: 'loading', error: null })
     this.#chart.setPeriod(intervalToPeriod(interval))
     this.#syncDominanceData()
   }
@@ -690,6 +819,7 @@ export class KLineChartController {
   public cancelReplaySelection(): void {
     if (!this.#replayPicking) return
     this.#replayPicking = false
+    if (this.#pendingReplay) this.#pendingReplay.wasPicking = false
     this.#host.classList.remove('replay-picking')
     this.#publishReplay()
   }
@@ -727,8 +857,8 @@ export class KLineChartController {
 
   /** Leaves replay and reloads live data. */
   public exitReplay(): void {
-    if (!this.#replay && !this.#replayPicking) return
-    const wasActive = !!this.#replay
+    if (!this.#replay && !this.#replayPicking && !this.#pendingReplay) return
+    const wasActive = !!this.#replay || !!this.#pendingReplay
     this.#clearReplay()
     if (wasActive) this.#reloadData()
   }
@@ -750,6 +880,7 @@ export class KLineChartController {
   #clearReplay(): void {
     this.#stopReplayTimer()
     this.#replay = undefined
+    this.#pendingReplay = undefined
     this.#replayPicking = false
     this.#host.classList.remove('replay-picking')
     if (this.#runtimeState.replay) this.#patchRuntime({ replay: null })
@@ -764,6 +895,7 @@ export class KLineChartController {
 
   #publishReplay(): void {
     const replay = this.#replay
+    const pending = this.#pendingReplay
     this.#patchRuntime({
       replay: replay
         ? {
@@ -773,9 +905,17 @@ export class KLineChartController {
             timeMs: replay.bars[replay.cursor - 1]?.timestamp ?? null,
             atEnd: replay.cursor >= replay.bars.length,
           }
-        : this.#replayPicking
-          ? { status: 'picking', playing: false, speedMs: DEFAULT_REPLAY_SPEED_MS, timeMs: null, atEnd: false }
-          : null,
+        : pending
+          ? {
+              status: this.#replayPicking ? 'picking' : 'active',
+              playing: pending.wasPlaying,
+              speedMs: pending.speedMs,
+              timeMs: pending.targetTimeMs,
+              atEnd: false,
+            }
+          : this.#replayPicking
+            ? { status: 'picking', playing: false, speedMs: DEFAULT_REPLAY_SPEED_MS, timeMs: null, atEnd: false }
+            : null,
     })
   }
 
@@ -1227,7 +1367,7 @@ export class KLineChartController {
   readonly #handleResumeNow = (): void => { this.#stream?.nudge?.(true) }
 
   #persistBars(): void {
-    if (this.#disposed || this.#replay || this.#market.kind === 'dominance') return
+    if (this.#disposed || this.#replay || this.#pendingReplay || this.#market.kind === 'dominance') return
     const bars = this.#chart.getDataList()
     if (bars.length >= 50) saveCachedBars(this.#market.marketId, this.#interval, bars)
   }
@@ -1503,6 +1643,12 @@ export class KLineChartController {
     globalThis.removeEventListener('pointermove', this.#handleAxisPointerMove, true)
     globalThis.removeEventListener('pointerup', this.#handleAxisPointerEnd, true)
     globalThis.removeEventListener('pointercancel', this.#handleAxisPointerEnd, true)
+    this.#host.removeEventListener('pointerdown', this.#handlePointerModifier, true)
+    globalThis.removeEventListener('pointermove', this.#handlePointerModifier, true)
+    globalThis.removeEventListener('pointerup', this.#handlePointerModifier, true)
+    globalThis.removeEventListener('keydown', this.#handleKeyDown, true)
+    globalThis.removeEventListener('keyup', this.#handleKeyUp, true)
+    globalThis.removeEventListener('blur', this.#handleWindowBlur)
     this.#host.removeEventListener('mousedown', this.#blockChartWhileDrawing, true)
     this.#host.removeEventListener('touchstart', this.#blockChartWhileDrawing, true)
     this.#host.removeEventListener('contextmenu', this.#handleToolContextMenu, true)
@@ -1536,7 +1682,7 @@ export class KLineChartController {
    * Pure client clock and chart maths; nothing is requested from the server.
    */
   public countdownState(now = Date.now()): { remainingMs: number; top: number; left: number; width: number; up: boolean } | null {
-    if (this.#disposed || this.#replay) return null
+    if (this.#disposed || this.#replay || this.#pendingReplay) return null
     const last = this.#chart.getDataList().at(-1)
     const axis = this.#chart.getDom('candle_pane', 'yAxis')?.getBoundingClientRect()
     const pane = this.#paneRect()
@@ -1626,6 +1772,32 @@ export class KLineChartController {
 
       if (type === 'init') this.#dominanceReference = page.reference
       const bars = dominanceCandles(page.rows, key)
+
+      if (type === 'init' && this.#pendingReplay) {
+        const replayInfo = this.#pendingReplay
+        this.#pendingReplay = undefined
+        const cursor = replayTransitionCursor(bars.map((b) => b.timestamp), replayInfo.targetTimeMs)
+        this.#replay = { bars, cursor, speedMs: replayInfo.speedMs }
+        this.#replayPicking = replayInfo.wasPicking
+        if (replayInfo.wasPicking) {
+          this.#host.classList.add('replay-picking')
+        }
+        const shown = bars.slice(0, cursor)
+        callback(shown, { forward: page.hasMore, backward: false })
+        const latest = shown.at(-1)
+        this.#patchRuntime({
+          connection: latest ? 'live' : 'error',
+          quote: latest ? barToQuote(latest) : null,
+          error: latest ? null : 'No dominance data was returned.',
+        })
+        this.#publishReplay()
+        this.#afterInitialData()
+        if (replayInfo.wasPlaying) {
+          this.setReplayPlaying(true)
+        }
+        return
+      }
+
       callback(bars, { forward: page.hasMore, backward: false })
 
       if (type === 'init') {
@@ -1635,6 +1807,7 @@ export class KLineChartController {
           quote: latest ? barToQuote(latest) : null,
           error: latest ? null : 'No dominance data was returned.',
         })
+        this.#publishReplay()
         this.#afterInitialData()
       }
     } catch (error) {
@@ -1805,6 +1978,7 @@ export class KLineChartController {
       onPressedMoving: (event) => this.#continueOverlayMove(event),
       onPressedMoveEnd: (event) => {
         this.#overlayMove = undefined
+        this.#lastOverlayMoveEvent = undefined
         this.#commitOverlay(event, type)
       },
       // The library deletes an overlay on right-click unless this is prevented.
@@ -1825,6 +1999,7 @@ export class KLineChartController {
    */
   #beginOverlayMove(event: OverlayEvent<unknown>): void {
     this.#overlayMove = undefined
+    this.#lastOverlayMoveEvent = undefined
     if (event.figure?.key?.startsWith(POINT_HANDLE_KEY_PREFIX)) return
     if (event.x === undefined || event.y === undefined) return
 
@@ -1850,6 +2025,7 @@ export class KLineChartController {
   #continueOverlayMove(event: OverlayEvent<unknown>): void {
     const move = this.#overlayMove
     if (!move || move.id !== event.overlay.id || event.x === undefined || event.y === undefined) return
+    this.#lastOverlayMoveEvent = event
 
     const [current] = this.#chart.convertFromPixel(
       [{ x: event.x, y: event.y }],
@@ -1859,7 +2035,8 @@ export class KLineChartController {
 
     const deltaBars = Math.round(current.dataIndex - move.startIndex)
     const overlay = event.overlay as { points: Array<Partial<Point>> }
-    overlay.points = translatePoints(move.points, deltaBars * this.#intervalMs(), current.value - move.startValue)
+    const deltaValue = this.#shiftHeld ? 0 : current.value - move.startValue
+    overlay.points = translatePoints(move.points, deltaBars * this.#intervalMs(), deltaValue)
   }
 
   #commitOverlay(event: OverlayEvent<unknown>, type: DrawingType): void {
