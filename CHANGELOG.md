@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [0.22.0] - 2026-11-01
+
+### Added
+- **Password reset by an admin**: in a user's details on the admin page, **Set temporary password** shows a new random password once (e.g. `k7Pq-Zm3x-Rt9d`) and signs that user out everywhere.
+- **Server commands** for when no admin can sign in: `npm run user:list` lists every account (email, name, joined, last active, admin), `npm run user:password -- someone@example.com` sets and prints a temporary password. They use the same database and `.env` as the app and work while it runs (Plesk: Run Node.js commands, or SSH).
+- After signing in with a temporary password the app shows a banner asking for a new password and opens the password form; the banner goes once the password is changed.
+- The login screen explains what to do on a forgotten password.
+
+### Changed
+- Database schema 2: accounts record whether their password is temporary. Existing databases are upgraded automatically on start.
+
 ## [0.21.0] - 2026-11-01
 
 ### Added

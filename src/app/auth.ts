@@ -5,6 +5,8 @@ export interface AppUser {
   readonly createdAtMs: number
   /** Set by the server for accounts listed in TH_ADMIN_EMAILS. */
   readonly isAdmin?: boolean
+  /** Signed in with a temporary password set by an admin: the app asks for a new one. */
+  readonly mustChangePassword?: boolean
 }
 
 // Accounts live on the server (server/index.mjs) so they work from any device.

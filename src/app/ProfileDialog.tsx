@@ -16,7 +16,9 @@ interface ProfileDialogProps {
   candleCountdown: boolean
   onCandleCountdown(enabled: boolean): void
   /** Scroll to and highlight a section when opening (the chart's right-click "Settings…"). */
-  focusSection?: 'chart'
+  focusSection?: 'chart' | 'password'
+  /** After a successful password change (the app refreshes the account, e.g. to drop the temporary-password prompt). */
+  onPasswordChanged?(): void
   /** Only for administrators: opens the admin page. */
   onOpenAdmin?(): void
   onLogout(): void
@@ -27,7 +29,7 @@ function formatDate(ms: number): string {
   return new Date(ms).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })
 }
 
-export function ProfileDialog({ user, theme, tabCount, layoutCount, onTheme, candleCountdown, onCandleCountdown, focusSection, onOpenAdmin, onLogout, onClose }: ProfileDialogProps) {
+export function ProfileDialog({ user, theme, tabCount, layoutCount, onTheme, candleCountdown, onCandleCountdown, focusSection, onPasswordChanged, onOpenAdmin, onLogout, onClose }: ProfileDialogProps) {
   const [current, setCurrent] = useState('')
   const [next, setNext] = useState('')
   const [confirm, setConfirm] = useState('')
@@ -37,8 +39,13 @@ export function ProfileDialog({ user, theme, tabCount, layoutCount, onTheme, can
   const [dataMessage, setDataMessage] = useState<{ ok: boolean, text: string }>()
   const fileRef = useRef<HTMLInputElement>(null)
   const chartSectionRef = useRef<HTMLElement>(null)
+  const passwordSectionRef = useRef<HTMLElement>(null)
   useEffect(() => {
     if (focusSection === 'chart') chartSectionRef.current?.scrollIntoView({ block: 'center' })
+    if (focusSection === 'password') {
+      passwordSectionRef.current?.scrollIntoView({ block: 'center' })
+      passwordSectionRef.current?.querySelector('input')?.focus()
+    }
   }, [focusSection])
 
   useEffect(() => {
@@ -56,6 +63,7 @@ export function ProfileDialog({ user, theme, tabCount, layoutCount, onTheme, can
       await changePassword(current, next)
       setCurrent(''); setNext(''); setConfirm('')
       setPasswordMessage({ ok: true, text: 'Password changed. Other devices have been signed out.' })
+      onPasswordChanged?.()
     } catch (error) {
       setPasswordMessage({ ok: false, text: error instanceof Error ? error.message : 'Could not change the password.' })
     } finally {
@@ -139,8 +147,9 @@ export function ProfileDialog({ user, theme, tabCount, layoutCount, onTheme, can
             </label>
           </section>
 
-          <section>
+          <section ref={passwordSectionRef} className={focusSection === 'password' ? 'profile-focus' : undefined}>
             <h3>Change password</h3>
+            {user.mustChangePassword && <p className="profile-note error">You signed in with a temporary password. Enter it as the current password, then choose your own.</p>}
             <form className="profile-form" onSubmit={submitPassword}>
               <input type="password" placeholder="Current password" aria-label="Current password" autoComplete="current-password" value={current} onChange={(event) => setCurrent(event.target.value)} required />
               <input type="password" placeholder="New password (8+ characters)" aria-label="New password" autoComplete="new-password" minLength={8} value={next} onChange={(event) => setNext(event.target.value)} required />

@@ -11,8 +11,8 @@ try {
 }
 
 /** Bumped when the tables change; each step below runs once, in order, on databases older than it. */
-const SCHEMA_VERSION = 1
-const MIGRATIONS = {
+const SCHEMA_VERSION = 2
+export const MIGRATIONS = {
   1: `
     CREATE TABLE users (
       id TEXT PRIMARY KEY,
@@ -44,6 +44,8 @@ const MIGRATIONS = {
     CREATE INDEX user_data_key ON user_data(key);
     CREATE TABLE meta (key TEXT PRIMARY KEY, value TEXT NOT NULL);
   `,
+  // An admin-set temporary password: the user is asked to choose their own after signing in.
+  2: 'ALTER TABLE users ADD COLUMN password_temporary INTEGER NOT NULL DEFAULT 0;',
 }
 
 const toUser = (row) => row && ({
@@ -54,6 +56,7 @@ const toUser = (row) => row && ({
   createdAtMs: row.created_at,
   lastLoginAtMs: row.last_login_at ?? undefined,
   lastSeenAtMs: row.last_seen_at ?? undefined,
+  passwordTemporary: row.password_temporary === 1,
 })
 
 const toItem = (row) => row && ({
@@ -101,7 +104,7 @@ export function openDatabase(file) {
     countUsers: db.prepare('SELECT COUNT(*) AS n FROM users'),
     insertUser: db.prepare('INSERT INTO users (id, email, display_name, password_hash, created_at, last_login_at, last_seen_at) VALUES (?, ?, ?, ?, ?, ?, ?)'),
     deleteUser: db.prepare('DELETE FROM users WHERE id = ?'),
-    setPassword: db.prepare('UPDATE users SET password_hash = ? WHERE id = ?'),
+    setPassword: db.prepare('UPDATE users SET password_hash = ?, password_temporary = ? WHERE id = ?'),
     setLastLogin: db.prepare('UPDATE users SET last_login_at = ? WHERE id = ?'),
     setLastSeen: db.prepare('UPDATE users SET last_seen_at = ? WHERE id = ?'),
     userStats: db.prepare(`SELECT
@@ -152,7 +155,8 @@ export function openDatabase(file) {
       q.insertUser.run(user.id, user.email, user.displayName, user.passwordHash, user.createdAtMs, user.lastLoginAtMs ?? null, user.lastSeenAtMs ?? null)
       return users.get(user.id)
     },
-    setPassword: (id, passwordHash) => { q.setPassword.run(passwordHash, id) },
+    /** `temporary`: set by an admin, to be replaced by the user after signing in. */
+    setPassword: (id, passwordHash, temporary = false) => { q.setPassword.run(passwordHash, temporary ? 1 : 0, id) },
     setLastLogin: (id, atMs) => { q.setLastLogin.run(atMs, id) },
     setLastSeen: (id, atMs) => { q.setLastSeen.run(atMs, id) },
     /** Removes the account; its sessions and data go with it (foreign keys). */

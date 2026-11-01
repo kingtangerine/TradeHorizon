@@ -77,6 +77,16 @@ npm run build
 
 `server/data/` and `.env` are not in git, so pulling never touches them.
 
+### Accounts and forgotten passwords
+
+Passwords are stored only as hashes, so nobody can look one up; a forgotten password is replaced with a temporary one, and the user chooses a new one after signing in.
+
+- **Admin page** → Users → the user → **Set temporary password**.
+- **On the server** (when no admin can sign in), in the app folder (Plesk: *Run Node.js commands*, or SSH):
+  - `npm run user:list`: every account with its email, so you can see which one is the admin.
+  - `npm run user:password -- someone@example.com`: prints a new temporary password for that account.
+- Admins are the emails in `TH_ADMIN_EMAILS` (`.env`); restart the app after changing it.
+
 ### Backups and restoring
 
 - **Automatic**: the server copies the whole database to `server/data/backups/tradehorizon-YYYYMMDD-HHMMSS.db` once a day and keeps the newest 14 (`TH_BACKUP_KEEP`). The admin page shows the last backup and has **Back up now** (do this before every update).

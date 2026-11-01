@@ -8,6 +8,7 @@ import {
   formatAgo,
   formatBytes,
   formatDuration,
+  setTemporaryPassword,
   signOutUser,
   sortAdminUsers,
   type AdminOverview,
@@ -193,6 +194,8 @@ function UserDetail({ id, me, onChanged, onClose }: { id: string, me: string, on
   const [confirmEmail, setConfirmEmail] = useState('')
   const [busy, setBusy] = useState(false)
   const [notice, setNotice] = useState('')
+  const [temporary, setTemporary] = useState<string>()
+  const [copied, setCopied] = useState(false)
 
   useEffect(() => {
     let live = true
@@ -217,6 +220,12 @@ function UserDetail({ id, me, onChanged, onClose }: { id: string, me: string, on
       setBusy(false)
     }
   }
+
+  const resetPassword = () => run(async () => {
+    const result = await setTemporaryPassword(id)
+    setTemporary(result.password)
+    setCopied(false)
+  }, 'Temporary password set. The user was signed out everywhere.')
 
   const user = detail?.user
   return (
@@ -266,6 +275,18 @@ function UserDetail({ id, me, onChanged, onClose }: { id: string, me: string, on
 
           <h3>Actions</h3>
           <div className="admin-actions">
+            {user.id !== me && (
+              <div className="admin-temp-password">
+                <button type="button" disabled={busy} onClick={() => void resetPassword()}>Set temporary password</button>
+                {temporary && (
+                  <div className="admin-temp-result">
+                    <code>{temporary}</code>
+                    <button type="button" onClick={() => { void navigator.clipboard?.writeText(temporary).then(() => setCopied(true)) }}>{copied ? 'Copied' : 'Copy'}</button>
+                    <small>Shown only now. Give it to {user.displayName}; they will be asked to choose their own password after signing in.</small>
+                  </div>
+                )}
+              </div>
+            )}
             <button type="button" disabled={busy || detail.sessions.length === 0} onClick={() => void run(() => signOutUser(user.id), 'Signed out on every device.')}>
               Sign out everywhere
             </button>

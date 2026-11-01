@@ -234,9 +234,11 @@ function CommittedTextInput({ value, onCommit, label }: { value: string, onCommi
 interface WorkspaceAppProps {
   user: AppUser
   onLogout(): void
+  /** Reloads the account from the server (after a password change). */
+  onUserRefresh(): void
 }
 
-function WorkspaceApp({ user, onLogout }: WorkspaceAppProps) {
+function WorkspaceApp({ user, onLogout, onUserRefresh }: WorkspaceAppProps) {
   const [workspace, setWorkspace] = useState(() => adoptActiveLayout(loadWorkspace(user.id)))
   const [drawingStore] = useState(
     () =>
@@ -270,7 +272,7 @@ function WorkspaceApp({ user, onLogout }: WorkspaceAppProps) {
   const [markets, setMarkets] = useState(() => allMarkets())
   const [alertsOpen, setAlertsOpen] = useState(false)
   const [profileOpen, setProfileOpen] = useState(false)
-  const [profileFocus, setProfileFocus] = useState<'chart'>()
+  const [profileFocus, setProfileFocus] = useState<'chart' | 'password'>()
   const [adminOpen, setAdminOpen] = useState(false)
   const openChartSettings = useCallback(() => { setProfileFocus('chart'); setProfileOpen(true) }, [])
   const [layoutMenuOpen, setLayoutMenuOpen] = useState(false)
@@ -1022,6 +1024,12 @@ function WorkspaceApp({ user, onLogout }: WorkspaceAppProps) {
 
   return (
     <div className="terminal-shell">
+      {user.mustChangePassword && (
+        <div className="temp-password-banner" role="alert">
+          <span>You signed in with a temporary password. Choose your own now so only you know it.</span>
+          <button type="button" onClick={() => { setProfileFocus('password'); setProfileOpen(true) }}>Choose a new password</button>
+        </div>
+      )}
       <nav className="chart-tabs" aria-label="Open charts">
         <div className="brand tabs-brand" aria-label="TradeHorizon">
           <HorizonLogo />
@@ -1112,6 +1120,7 @@ function WorkspaceApp({ user, onLogout }: WorkspaceAppProps) {
               onCandleCountdown={(candleCountdown) => setPreferences((current) => ({ ...current, candleCountdown }))}
               onLogout={onLogout}
               focusSection={profileFocus}
+              onPasswordChanged={onUserRefresh}
               onOpenAdmin={user.isAdmin ? () => { setProfileOpen(false); setProfileFocus(undefined); setAdminOpen(true) } : undefined}
               onClose={() => { setProfileOpen(false); setProfileFocus(undefined) }}
             />
@@ -2306,6 +2315,12 @@ function AuthScreen({ onAuthenticated }: { onAuthenticated(user: AppUser): void 
           <label><span>Password</span><input type="password" minLength={8} value={password} onChange={(event) => setPassword(event.target.value)} autoComplete={mode === 'login' ? 'current-password' : 'new-password'} required /></label>
           {error && <div className="auth-error" role="alert">{error}</div>}
           <button type="submit" className="auth-submit" disabled={busy}>{busy ? 'Please wait…' : mode === 'login' ? 'Log in' : 'Create account'}</button>
+          {mode === 'login' && (
+            <details className="auth-forgot">
+              <summary>Forgot your password?</summary>
+              <p>Ask the TradeHorizon administrator for a temporary password. After you sign in with it you will be asked to choose a new one.</p>
+            </details>
+          )}
         </form>
         <small className="auth-disclaimer">Your account is stored on the TradeHorizon server, so you can sign in from any device.</small>
       </section>
@@ -2344,6 +2359,7 @@ export function App() {
     <WorkspaceApp
       key={user.id}
       user={user}
+      onUserRefresh={() => { void verifySession().then(() => setUser((current) => restoreSession() ?? current)) }}
       onLogout={() => {
         stopUserSync()
         void logOut()

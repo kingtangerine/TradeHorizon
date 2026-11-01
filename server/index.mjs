@@ -8,7 +8,7 @@
 // Storage: SQLite database server/data/tradehorizon.db (accounts, sessions, synced data), daily copies in server/data/backups.
 import { createServer } from 'node:http'
 import { freemem, hostname, loadavg, totalmem } from 'node:os'
-import { randomBytes, randomUUID, scrypt, timingSafeEqual, createHash } from 'node:crypto'
+import { randomBytes, randomUUID, createHash } from 'node:crypto'
 import { accessSync, constants as fsConstants, mkdirSync, readFileSync, statSync } from 'node:fs'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -25,6 +25,7 @@ import { openDatabase } from './database.mjs'
 import { importLegacyJson } from './migrate.mjs'
 import { createBackupService } from './backup.mjs'
 import { createPriceFeed } from './priceFeed.mjs'
+import { makeHash, temporaryPassword, verifyHash } from './passwords.mjs'
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 // Settings can also come from a .env file in the app folder (hosts like Plesk do not always pass environment variables).
@@ -52,27 +53,20 @@ const store = openDatabase(databaseFile)
 const migration = importLegacyJson(store, dataDir)
 const backups = createBackupService({ store, dir: join(dataDir, 'backups'), keep: Number(process.env.TH_BACKUP_KEEP) || 14 })
 
-const derive = (password, salt) => new Promise((ok, fail) => {
-  scrypt(password, salt, 64, (error, key) => (error ? fail(error) : ok(key)))
-})
 const tokenHash = (token) => createHash('sha256').update(token).digest('hex')
 /** Accounts allowed on the admin page (TH_ADMIN_EMAILS). Decided here only: the app just hides the button. */
 const admins = adminEmails(process.env.TH_ADMIN_EMAILS)
 const isAdmin = (user) => admins.has(user.email)
-const publicUser = (user) => ({ id: user.id, email: user.email, displayName: user.displayName, createdAtMs: user.createdAtMs, ...(isAdmin(user) ? { isAdmin: true } : {}) })
+const publicUser = (user) => ({
+  id: user.id,
+  email: user.email,
+  displayName: user.displayName,
+  createdAtMs: user.createdAtMs,
+  ...(isAdmin(user) ? { isAdmin: true } : {}),
+  ...(user.passwordTemporary ? { mustChangePassword: true } : {}),
+})
 
 
-async function makeHash(password) {
-  const salt = randomBytes(16)
-  return `${salt.toString('hex')}:${(await derive(password, salt)).toString('hex')}`
-}
-
-async function verifyHash(password, stored) {
-  const [saltHex, keyHex] = stored.split(':')
-  const expected = Buffer.from(keyHex, 'hex')
-  const actual = await derive(password, Buffer.from(saltHex, 'hex'))
-  return expected.length === actual.length && timingSafeEqual(expected, actual)
-}
 
 function startSession(userId) {
   const token = randomBytes(32).toString('hex')
@@ -247,7 +241,7 @@ async function handleAdmin(req, res, path) {
     }
   }
 
-  const match = /^\/api\/admin\/users\/([\w-]{6,64})(?:\/(signout|delete))?$/.exec(path)
+  const match = /^\/api\/admin\/users\/([\w-]{6,64})(?:\/(signout|delete|password))?$/.exec(path)
   const target = match ? store.users.get(match[1]) : undefined
   if (!target) return send(res, 404, { error: 'No such user.' })
 
@@ -263,6 +257,14 @@ async function handleAdmin(req, res, path) {
   if (match[2] === 'signout') {
     store.sessions.removeForUser(target.id)
     return send(res, 200, { ok: true })
+  }
+  if (match[2] === 'password') {
+    if (target.id === admin.id) return send(res, 400, { error: 'Use Change password in your account window for your own account.' })
+    const password = temporaryPassword()
+    store.users.setPassword(target.id, await makeHash(password), true)
+    store.sessions.removeForUser(target.id)
+    console.log(`[admin] ${admin.email} set a temporary password for ${target.email}`)
+    return send(res, 200, { password })
   }
   // delete
   const body = await readBody(req)

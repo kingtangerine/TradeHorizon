@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
 import { createBackupService } from './backup.mjs'
-import { openDatabase } from './database.mjs'
+import { MIGRATIONS, openDatabase } from './database.mjs'
 import { importLegacyJson } from './migrate.mjs'
 
 const dirs = []
@@ -165,5 +165,29 @@ describe('backups', () => {
     const after = backups.status().lastBackupAtMs
     backups.runIfDue() // same time: not due
     expect(backups.status().lastBackupAtMs).toBe(after)
+  })
+})
+
+describe('schema upgrades', () => {
+  it('upgrades a database made by v0.19 (schema 1) without losing anything, and marks temporary passwords', async () => {
+    const { DatabaseSync } = await import('node:sqlite')
+    const dir = mkdtempSync(join(tmpdir(), 'th-db-'))
+    dirs.push(dir)
+    const file = join(dir, 'tradehorizon.db')
+    const old = new DatabaseSync(file)
+    old.exec(MIGRATIONS[1])
+    old.exec('PRAGMA user_version = 1')
+    old.prepare('INSERT INTO users (id, email, display_name, password_hash, created_at) VALUES (?, ?, ?, ?, ?)').run('u1', 'a@x.com', 'Ann', 'salt:hash', 5)
+    old.prepare('INSERT INTO user_data (user_id, key, value, updated_at, rev) VALUES (?, ?, ?, ?, ?)').run('u1', 'layouts:v1', '[]', 6, 1)
+    old.close()
+
+    const store = openDatabase(file)
+    stores.push(store)
+    expect(store.users.get('u1')).toMatchObject({ email: 'a@x.com', passwordTemporary: false })
+    expect(store.data.get('u1', 'layouts:v1')).toMatchObject({ value: '[]', rev: 1 })
+    store.users.setPassword('u1', 'temp:hash', true)
+    expect(store.users.get('u1')).toMatchObject({ passwordHash: 'temp:hash', passwordTemporary: true })
+    store.users.setPassword('u1', 'own:hash')
+    expect(store.users.get('u1').passwordTemporary).toBe(false)
   })
 })

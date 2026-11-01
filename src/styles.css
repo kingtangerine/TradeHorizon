@@ -3550,3 +3550,16 @@ button:disabled {
 .admin-db-actions button { height: 34px; padding: 0 14px; border: 1px solid var(--tv-blue, #2962ff); border-radius: 6px; color: #fff; background: var(--tv-blue, #2962ff); font: inherit; font-size: .8rem; font-weight: 600; cursor: pointer; }
 .admin-db-actions button:disabled { opacity: .6; cursor: wait; }
 .admin-db-actions .admin-notice, .admin-db-actions .admin-error { margin: 0; padding: 6px 10px; }
+
+/* Temporary password: prompt in the app, forgot-password help, admin reset */
+.temp-password-banner { position: fixed; z-index: 60; top: 0; left: 50%; display: flex; align-items: center; gap: 12px; padding: 8px 10px 8px 14px; border-radius: 0 0 8px 8px; color: #1a1300; background: #f5a623; font-size: .8rem; font-weight: 600; transform: translateX(-50%); box-shadow: 0 6px 20px rgb(0 0 0 / 35%); }
+.temp-password-banner button { height: 28px; padding: 0 10px; border: 0; border-radius: 5px; color: #fff; background: #1e222d; font: inherit; font-size: .76rem; cursor: pointer; }
+.auth-forgot { margin-top: 10px; font-size: .8rem; color: var(--muted); }
+.auth-forgot summary { cursor: pointer; }
+.auth-forgot p { margin: 6px 0 0; line-height: 1.5; }
+.admin-temp-password { display: grid; gap: 8px; }
+.admin-temp-password > button { justify-self: start; height: 34px; padding: 0 14px; border: 1px solid var(--border-strong); border-radius: 6px; color: var(--text); background: transparent; font: inherit; font-size: .8rem; cursor: pointer; }
+.admin-temp-result { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 10px; border: 1px solid #f5a623; border-radius: 8px; background: rgb(245 166 35 / 10%); }
+.admin-temp-result code { font-size: 1rem; font-weight: 700; letter-spacing: .04em; user-select: all; }
+.admin-temp-result button { height: 28px; padding: 0 10px; border: 1px solid var(--border-strong); border-radius: 5px; color: var(--text); background: transparent; font: inherit; font-size: .76rem; cursor: pointer; }
+.admin-temp-result small { flex-basis: 100%; color: var(--muted); }

@@ -126,6 +126,7 @@ export interface AdminDatabase {
 }
 
 export const backUpNow = () => call<{ ok: true, database: AdminDatabase }>('/api/admin/backup', { method: 'POST' })
+export const setTemporaryPassword = (id: string) => call<{ password: string }>(`/api/admin/users/${encodeURIComponent(id)}/password`, { method: 'POST' })
 export const signOutUser = (id: string) => call<{ ok: true }>(`/api/admin/users/${encodeURIComponent(id)}/signout`, { method: 'POST' })
 export const deleteUser = (id: string, confirmEmail: string) =>
   call<{ ok: true }>(`/api/admin/users/${encodeURIComponent(id)}/delete`, { method: 'POST', body: JSON.stringify({ confirmEmail }) })
