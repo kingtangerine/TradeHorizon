@@ -75,6 +75,12 @@ export interface AdminOverview {
     readonly marketsLoaded: number
     readonly marketsAgeMin: number | null
     readonly alertsWatched: number
+    readonly alertPrices: {
+      readonly symbols: number
+      readonly live: number
+      readonly polled: number
+      readonly feed: Readonly<Record<'binance' | 'bybit', { readonly connected: boolean, readonly symbols: number, readonly lastMessageAgoSec: number | null }>>
+    }
   }
   readonly users: {
     readonly total: number

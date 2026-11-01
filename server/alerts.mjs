@@ -1,15 +1,18 @@
 // Price alerts evaluated on the server, so they fire with the browser closed.
 //
 // A user's alerts are stored with the rest of their synced data (the `alerts:v1` item), so the
-// server simply reads that. Every few seconds it fetches the latest price for each symbol that
-// has an active alert, and when a price crosses a target it marks the alert as triggered in the
-// stored data and sends a web-push notification to the user's devices.
+// server simply reads that. Prices for the symbols with active alerts arrive live from the exchanges
+// (priceFeed.mjs, about once a second); symbols without a fresh live price are fetched every 10 seconds
+// instead. When a price crosses a target the alert is marked as triggered in the stored data and the
+// user is notified (web push and Telegram).
 import { existsSync, readFileSync, renameSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import webpush from 'web-push'
 
 export const ALERTS_KEY = 'alerts:v1'
 const POLL_MS = 10_000
+/** A live price older than this no longer counts: the symbol is fetched by polling until the feed catches up. */
+const LIVE_STALE_MS = 20_000
 const FETCH_TIMEOUT_MS = 8_000
 const BINANCE_BATCH = 100
 const MAX_SUBSCRIPTIONS_PER_USER = 10
@@ -94,28 +97,81 @@ export async function fetchLastPrices(groups, fetchImpl = (url, init) => fetch(u
  * @param store      { listUserIds(), getAlertsValue(userId), setAlertsValue(userId, value) }
  * @param exchangeOf symbol -> 'binance' | 'bybit' | 'binance-futures' | undefined (undefined = not evaluated here)
  * @param notify     async (userId, payload) => void
+ * @param feed       optional live price feed: { setSymbols({ exchange: symbols[] }) } (see priceFeed.mjs)
  */
-export function createAlertService({ store, exchangeOf, fetchPrices = fetchLastPrices, notify = async () => {}, now = () => Date.now(), log = console }) {
+export function createAlertService({ store, exchangeOf, fetchPrices = fetchLastPrices, notify = async () => {}, feed, now = () => Date.now(), log = console }) {
   /** userId -> alerts that can still fire */
   const active = new Map()
   /** symbol -> last price seen; a crossing needs a previous price to compare with */
   const lastPrice = new Map()
+  /** symbol -> when the live feed last delivered a price for it */
+  const liveAt = new Map()
+  /** symbol -> [{ userId, alert }]: what to check when a price for that symbol arrives */
+  let bySymbol = new Map()
+  /** exchange -> symbols, for the live feed and for polling */
+  let groups = {}
+  let watchedKey = ''
+  let polledSymbols = 0
   let running = false
   let timer
   /** `alertId:triggeredAtMs` already notified, so a trigger seen by both the server and a device is sent once. */
   const notified = new Set()
 
+  /** Rebuilds the per-symbol index and, when the set of symbols changed, tells the live feed. */
+  function reindex() {
+    const nextBySymbol = new Map()
+    const nextGroups = {}
+    for (const [userId, alerts] of active) {
+      for (const alert of alerts) {
+        const exchange = exchangeOf(alert.symbol)
+        if (!exchange) continue
+        const entries = nextBySymbol.get(alert.symbol) ?? []
+        if (entries.length === 0) (nextGroups[exchange] ??= []).push(alert.symbol)
+        entries.push({ userId, alert })
+        nextBySymbol.set(alert.symbol, entries)
+      }
+    }
+    bySymbol = nextBySymbol
+    groups = nextGroups
+    for (const symbol of [...lastPrice.keys()]) if (!bySymbol.has(symbol)) { lastPrice.delete(symbol); liveAt.delete(symbol) }
+    const key = JSON.stringify(Object.entries(groups).map(([exchange, symbols]) => [exchange, [...symbols].sort()]).sort())
+    if (key !== watchedKey) {
+      watchedKey = key
+      feed?.setSymbols(groups)
+    }
+  }
+
   function updateUserAlerts(userId, value) {
     const alerts = parseActiveAlerts(value)
     if (alerts.length === 0) active.delete(userId)
     else active.set(userId, alerts)
+    reindex()
   }
 
   function loadAll() {
     for (const userId of store.listUserIds()) {
       const value = store.getAlertsValue(userId)
-      if (value) updateUserAlerts(userId, value)
+      const alerts = value ? parseActiveAlerts(value) : []
+      if (alerts.length > 0) active.set(userId, alerts)
     }
+    reindex()
+  }
+
+  /** A new price for a symbol: fires every alert it crossed since the previous price. */
+  function checkPrice(symbol, price) {
+    const previous = lastPrice.get(symbol)
+    lastPrice.set(symbol, price)
+    if (previous === undefined || previous === price) return
+    for (const { userId, alert } of bySymbol.get(symbol) ?? []) {
+      if (!alertReached(alert, previous) && alertReached(alert, price)) fire(userId, alert, price)
+    }
+  }
+
+  /** From the live feed: only symbols with active alerts matter. */
+  function onLivePrice(symbol, price) {
+    if (!bySymbol.has(symbol)) return
+    liveAt.set(symbol, now())
+    checkPrice(symbol, price)
   }
 
   function send(userId, payload) {
@@ -152,33 +208,24 @@ export function createAlertService({ store, exchangeOf, fetchPrices = fetchLastP
     }
   }
 
+  /** Every 10 seconds: fetches the symbols the live feed is not covering right now (or does not cover at all). */
   async function tick() {
     if (running) return
     running = true
     try {
-      const bySymbol = new Map()
-      const groups = {}
-      for (const [userId, alerts] of active) {
-        for (const alert of alerts) {
-          const exchange = exchangeOf(alert.symbol)
-          if (!exchange) continue
-          const entries = bySymbol.get(alert.symbol) ?? []
-          if (entries.length === 0) (groups[exchange] ??= []).push(alert.symbol)
-          entries.push({ userId, alert })
-          bySymbol.set(alert.symbol, entries)
-        }
+      const stale = {}
+      let count = 0
+      for (const [exchange, symbols] of Object.entries(groups)) {
+        const due = symbols.filter((symbol) => !(now() - (liveAt.get(symbol) ?? -Infinity) < LIVE_STALE_MS))
+        if (due.length > 0) { stale[exchange] = due; count += due.length }
       }
-      for (const symbol of lastPrice.keys()) if (!bySymbol.has(symbol)) lastPrice.delete(symbol)
-      if (bySymbol.size === 0) return
-
-      const prices = await fetchPrices(groups)
+      polledSymbols = count
+      if (count === 0) return
+      const prices = await fetchPrices(stale)
       for (const [symbol, price] of prices) {
-        const previous = lastPrice.get(symbol)
-        lastPrice.set(symbol, price)
-        if (previous === undefined) continue
-        for (const { userId, alert } of bySymbol.get(symbol) ?? []) {
-          if (!alertReached(alert, previous) && alertReached(alert, price)) fire(userId, alert, price)
-        }
+        // A live price that arrived while this request was under way is newer: keep it.
+        if (now() - (liveAt.get(symbol) ?? -Infinity) < LIVE_STALE_MS) continue
+        if (bySymbol.has(symbol)) checkPrice(symbol, price)
       }
     } catch (error) {
       log.warn?.(`[alerts] price check failed: ${error.message}`)
@@ -211,6 +258,13 @@ export function createAlertService({ store, exchangeOf, fetchPrices = fetchLastP
     relayTriggered,
     eventsSince,
     tick,
+    onLivePrice,
+    /** For /healthz and the admin page: how many symbols are watched, live and polled. */
+    watchStatus() {
+      const watched = bySymbol.size
+      const live = [...bySymbol.keys()].filter((symbol) => now() - (liveAt.get(symbol) ?? -Infinity) < LIVE_STALE_MS).length
+      return { symbols: watched, live, polled: polledSymbols }
+    },
     /** Test and diagnostics helper. */
     activeCount: () => [...active.values()].reduce((sum, alerts) => sum + alerts.length, 0),
   }

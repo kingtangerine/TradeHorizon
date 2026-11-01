@@ -150,7 +150,22 @@ function OverviewTab({ overview, onChanged }: { overview: AdminOverview, onChang
             tone={services.keepAlive.lastPingOk ? 'ok' : services.keepAlive.lastPingAtMs ? 'bad' : 'warn'}
             note={`${services.keepAlive.origin ?? 'address not known yet'} · last ping ${formatAgo(services.keepAlive.lastPingAtMs)}`}
           />
-          <Stat label="Alerts being watched" value={services.alertsWatched} note="Checked every 10 seconds" />
+          <Stat
+            label="Alerts being watched"
+            value={services.alertsWatched}
+            tone={services.alertPrices.symbols > 0 && services.alertPrices.live === 0 ? 'warn' : services.alertsWatched > 0 ? 'ok' : undefined}
+            note={services.alertPrices.symbols === 0
+              ? 'No active alerts'
+              : `${services.alertPrices.symbols} coins · ${services.alertPrices.live} with live prices, ${services.alertPrices.polled} checked every 10 s`}
+          />
+          <Stat
+            label="Live price feeds"
+            value={(['binance', 'bybit'] as const).filter((name) => services.alertPrices.feed[name].connected).length + ' connected'}
+            tone={(['binance', 'bybit'] as const).some((name) => services.alertPrices.feed[name].symbols > 0 && !services.alertPrices.feed[name].connected) ? 'warn' : undefined}
+            note={(['binance', 'bybit'] as const)
+              .map((name) => `${name === 'binance' ? 'Binance' : 'Bybit'}: ${services.alertPrices.feed[name].symbols ? `${services.alertPrices.feed[name].symbols} coins, ${services.alertPrices.feed[name].connected ? 'live' : 'reconnecting'}` : 'idle'}`)
+              .join(' · ')}
+          />
           <Stat
             label="Market list"
             value={services.marketsLoaded}

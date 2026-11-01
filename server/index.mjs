@@ -24,6 +24,7 @@ import { describeData, deviceFrom } from './userdata.mjs'
 import { openDatabase } from './database.mjs'
 import { importLegacyJson } from './migrate.mjs'
 import { createBackupService } from './backup.mjs'
+import { createPriceFeed } from './priceFeed.mjs'
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 // Settings can also come from a .env file in the app folder (hosts like Plesk do not always pass environment variables).
@@ -115,7 +116,10 @@ const telegram = createTelegramService({
   apiBase: process.env.TH_TELEGRAM_API || undefined, // tests only: a stand-in for api.telegram.org
   userName: (userId) => store.users.get(userId)?.displayName,
 })
+// Live prices for the coins that have alerts (one WebSocket per exchange); polling covers the rest.
+const priceFeed = createPriceFeed({ onPrice: (symbol, price) => alerts.onLivePrice(symbol, price) })
 const alerts = createAlertService({
+  feed: priceFeed,
   store: {
     listUserIds: () => store.data.usersWithKey(ALERTS_KEY),
     getAlertsValue: (userId) => store.data.value(userId, ALERTS_KEY),
@@ -207,6 +211,7 @@ function adminOverview() {
       marketsLoaded: catalog.listings.length,
       marketsAgeMin: catalog.fetchedAtMs ? Math.round((now - catalog.fetchedAtMs) / 60_000) : null,
       alertsWatched: alerts.activeCount(),
+      alertPrices: { ...alerts.watchStatus(), feed: priceFeed.status() },
     },
     users: {
       ...store.users.stats(now),
@@ -439,6 +444,7 @@ function health() {
       const status = databaseStatus()
       return { users: status.users, items: status.items, bytes: status.bytes, lastBackupAtMs: status.backups.lastBackupAtMs, backups: status.backups.count, backupError: status.backups.lastError }
     })(),
+    alerts: { active: alerts.activeCount(), ...alerts.watchStatus(), feed: priceFeed.status() },
     syncProtocol: SYNC_PROTOCOL,
     pushReady: Boolean(push.publicKey),
     telegramReady: Boolean(telegram.botUsername()),
@@ -484,6 +490,7 @@ for (const signal of ['SIGINT', 'SIGTERM']) {
   process.on(signal, () => {
     markets.stop()
     alerts.stop()
+    priceFeed.stop()
     telegram.stop()
     keepAlive.stop()
     backups.stop()

@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [0.20.0] - 2026-11-01
+
+### Changed
+- **Price alerts are checked against live prices.** The server keeps one WebSocket connection to Binance and one to Bybit, subscribed only to the coins that have active alerts, and checks every price as it arrives (about once a second) instead of asking the exchanges every 10 seconds. Alerts fire within seconds, quick wicks are much less likely to be missed, and no request is made per coin, so Bybit rate limits are no longer a risk. Connections reconnect by themselves and a feed that goes silent for a minute is reopened.
+- Coins without a live feed (Binance Futures such as BTCDOM) or whose live price has gone quiet for 20 seconds are still checked every 10 seconds, so a dropped connection delays alerts but never loses them.
+- `/healthz` (`alerts`) and the admin page show how many coins are watched, how many have live prices and the state of each feed.
+
 ## [0.19.0] - 2026-11-01
 
 ### Added
