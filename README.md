@@ -60,13 +60,29 @@ npm run build
 | `TH_TRUST_PROXY=1` | Set when running behind nginx/Cloudflare so login limits use the real visitor IP and HTTPS is detected. |
 | `TH_TELEGRAM_TOKEN` | Bot token from @BotFather. Turns on Telegram alerts (see below). Leave unset to keep the feature off. |
 | `TH_ADMIN_EMAILS` | Comma-separated emails of the accounts that may open the admin page (users, storage, server health). |
+| `TH_BACKUP_KEEP` | How many daily database backups to keep (default 14). |
 | `TH_PUBLIC_URL` | The site's address (e.g. `https://example.com`) for the keep-alive ping that stops hosts like Plesk from shutting the idle app down. Optional: otherwise learned from the first visit after a start. |
 | `TH_VAPID_SUBJECT` | Contact URL or `mailto:` sent to browser push services (optional). |
 
 - **HTTPS is required** for the service worker, installing the app, and background alert notifications (browsers only allow them on HTTPS; `localhost` is exempt). Terminate TLS in nginx/Cloudflare and forward `X-Forwarded-For` and `X-Forwarded-Proto`.
 - `GET /healthz` returns `{"ok":true,...}` for uptime monitors.
 - The server caches Binance/Bybit coin lists and CoinGecko market caps for all users, and watches prices for **price alerts**, sending a web-push notification when one triggers (indices such as BTC.D are only evaluated while the app is open).
-- `server/data/` holds `users.json`, `userdata/`, `vapid.json` (push keys; losing it silently disconnects every device's notifications), `push.json` and `catalog.json`.
+- `server/data/` holds `tradehorizon.db` (SQLite: accounts, sessions and every user's synced data), `backups/` (daily copies of the database), `vapid.json` (push keys; losing it silently disconnects every device's notifications), `push.json`, `telegram.json` and `catalog.json`. Node.js 22.13 or newer is required (built-in SQLite).
+
+### Updating the live server
+
+1. On your computer: commit and `git push`.
+2. On the server (Plesk: *Git* to pull, or SSH into the app folder): `git pull`, then **NPM install** (`npm ci`) and the build (`npm run build`).
+3. **Restart App** (Plesk Node.js page), open the site once, then check `/healthz`: `version` is the new one and `database` shows your accounts.
+
+`server/data/` and `.env` are not in git, so pulling never touches them.
+
+### Backups and restoring
+
+- **Automatic**: the server copies the whole database to `server/data/backups/tradehorizon-YYYYMMDD-HHMMSS.db` once a day and keeps the newest 14 (`TH_BACKUP_KEEP`). The admin page shows the last backup and has **Back up now** (do this before every update).
+- **Off the server**: download the newest file from `server/data/backups/` now and then (Plesk File Manager), or include `server/data` in Plesk *Backup Manager*. A backup on the same disk does not survive the disk.
+- **Restore**: stop the app (Plesk: *Disable Node.js*), copy a backup over `server/data/tradehorizon.db`, delete `tradehorizon.db-wal` and `tradehorizon.db-shm` if present, then enable / restart the app.
+- **From the JSON era**: the first start of v0.19.0 moved `users.json` and `userdata/` into the database and kept them as `*.migrated-<date>`. To go back to an older app version, stop the app, rename them back (drop the `.migrated-…` part) and deploy the older version; changes made since the move are then missing.
 
 ### Telegram alerts
 

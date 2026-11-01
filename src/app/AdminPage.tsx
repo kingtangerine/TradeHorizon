@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import {
+  backUpNow,
   deleteUser,
   fetchAdminOverview,
   fetchAdminUser,
@@ -39,8 +40,24 @@ function Stat({ label, value, note, tone }: { label: string, value: string | num
   )
 }
 
-function OverviewTab({ overview }: { overview: AdminOverview }) {
-  const { server, services, users } = overview
+function OverviewTab({ overview, onChanged }: { overview: AdminOverview, onChanged(): void }) {
+  const { server, services, users, database } = overview
+  const [backupBusy, setBackupBusy] = useState(false)
+  const [backupMessage, setBackupMessage] = useState('')
+  const backupAgeH = database.backups.lastBackupAtMs ? (Date.now() - database.backups.lastBackupAtMs) / 3_600_000 : Infinity
+  const backup = async () => {
+    setBackupBusy(true)
+    setBackupMessage('')
+    try {
+      const result = await backUpNow()
+      setBackupMessage(`Backup saved: ${result.database.backups.newest?.name ?? 'done'}`)
+      onChanged()
+    } catch (failure) {
+      setBackupMessage(failure instanceof Error ? failure.message : 'Backup failed.')
+    } finally {
+      setBackupBusy(false)
+    }
+  }
   const disk = server.disk
   const diskUsed = disk ? 1 - disk.freeBytes / disk.totalBytes : 0
   const hostUsed = 1 - server.hostMemoryMb.free / server.hostMemoryMb.total
@@ -75,6 +92,29 @@ function OverviewTab({ overview }: { overview: AdminOverview }) {
             note={`${server.hostMemoryMb.free} MB free of ${server.hostMemoryMb.total} MB`}
           />
           <Stat label="Load (1 / 5 / 15 min)" value={server.loadAverage.join(' / ')} note={server.hostname} />
+        </div>
+      </section>
+
+      <section>
+        <h2>Database</h2>
+        <div className="admin-stats">
+          <Stat label="Database" value={formatBytes(database.bytes)} note={`${countLabel(database.users, 'accounts')} · ${countLabel(database.items, 'saved items')} · ${countLabel(database.sessions, 'sessions')}`} />
+          <Stat
+            label="Backups"
+            value={database.backups.count}
+            tone={database.backups.lastError ? 'bad' : backupAgeH > 30 ? 'warn' : 'ok'}
+            note={database.backups.lastError ?? `last ${formatAgo(database.backups.lastBackupAtMs)} · daily, newest ${database.backups.keep} kept`}
+          />
+          <Stat
+            label="Moved from JSON files"
+            value={database.migratedFromJsonAtMs ? new Date(database.migratedFromJsonAtMs).toLocaleDateString() : 'n/a'}
+            note={database.migratedFromJsonAtMs ? 'Old files kept as *.migrated-…' : 'Started on the database'}
+          />
+        </div>
+        <div className="admin-db-actions">
+          <button type="button" onClick={() => void backup()} disabled={backupBusy}>{backupBusy ? 'Backing up…' : 'Back up now'}</button>
+          {backupMessage && <span className={backupMessage.startsWith('Backup saved') ? 'admin-notice' : 'admin-error'} role="status">{backupMessage}</span>}
+          <span className="admin-muted">{database.backups.dir}</span>
         </div>
       </section>
 
@@ -277,7 +317,7 @@ export function AdminPage({ myUserId, onClose }: { myUserId: string, onClose(): 
         </header>
         {error && <p className="admin-error" role="alert">{error}</p>}
 
-        {tab === 'overview' && overview && <OverviewTab overview={overview} />}
+        {tab === 'overview' && overview && <OverviewTab overview={overview} onChanged={() => void load()} />}
 
         {tab === 'users' && (
           <>

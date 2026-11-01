@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [0.19.0] - 2026-11-01
+
+### Added
+- **Daily database backups**: a full copy of the database in `server/data/backups/` once a day, the newest 14 kept (`TH_BACKUP_KEEP`). The admin page shows the database (size, accounts, saved items, sessions) and the backups, with **Back up now**. `/healthz` reports the database and the last backup.
+- README: how to update the live server, take backups off the server and restore one.
+
+### Changed
+- **Accounts, sessions and synced user data are stored in a SQLite database** (`server/data/tradehorizon.db`, Node's built-in SQLite, nothing to install) instead of JSON files. A save now writes one row instead of rewriting a whole file (and `users.json` on every login), sessions are looked up by index, crashes cannot leave half-written files, and the revision rules for sync are unchanged.
+- **Existing data moves automatically**: the first start of this version imports `users.json` and `userdata/*.json` in one transaction, checks the counts, then renames the old files to `*.migrated-<date>` (kept, not deleted) and makes a first backup. Everyone stays signed in, and saved items keep their revisions so devices continue syncing where they left off. If the old files cannot be read the server stops with a clear message instead of starting empty.
+- Requires Node.js 22.13 or newer (`engines` in package.json).
+
 ## [0.18.1] - 2026-10-18
 
 ### Added

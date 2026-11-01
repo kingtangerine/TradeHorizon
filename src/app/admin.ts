@@ -65,6 +65,7 @@ export interface AdminOverview {
     readonly disk: { readonly freeBytes: number, readonly totalBytes: number } | null
     readonly envFile: readonly string[] | null
   }
+  readonly database: AdminDatabase
   readonly services: {
     readonly telegram: { readonly state: string, readonly bot?: string | null, readonly problem?: string }
     readonly telegramLinkedUsers: number
@@ -100,6 +101,24 @@ async function call<T>(path: string, init: RequestInit = {}): Promise<T> {
 export const fetchAdminOverview = () => call<AdminOverview>('/api/admin/overview')
 export const fetchAdminUsers = () => call<{ users: AdminUser[] }>('/api/admin/users').then((body) => body.users)
 export const fetchAdminUser = (id: string) => call<AdminUserDetail>(`/api/admin/users/${encodeURIComponent(id)}`)
+export interface AdminDatabase {
+  readonly file: string
+  readonly bytes: number
+  readonly users: number
+  readonly items: number
+  readonly sessions: number
+  readonly migratedFromJsonAtMs: number | null
+  readonly backups: {
+    readonly dir: string
+    readonly keep: number
+    readonly count: number
+    readonly lastBackupAtMs: number | null
+    readonly newest: { readonly name: string, readonly bytes: number, readonly createdAtMs: number } | null
+    readonly lastError: string | null
+  }
+}
+
+export const backUpNow = () => call<{ ok: true, database: AdminDatabase }>('/api/admin/backup', { method: 'POST' })
 export const signOutUser = (id: string) => call<{ ok: true }>(`/api/admin/users/${encodeURIComponent(id)}/signout`, { method: 'POST' })
 export const deleteUser = (id: string, confirmEmail: string) =>
   call<{ ok: true }>(`/api/admin/users/${encodeURIComponent(id)}/delete`, { method: 'POST', body: JSON.stringify({ confirmEmail }) })

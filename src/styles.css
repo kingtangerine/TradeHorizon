@@ -3545,3 +3545,8 @@ button:disabled {
 .color-none-option { display: flex; align-items: center; gap: 8px; width: 100%; height: 28px; margin-bottom: 8px; padding: 0 6px; border: 1px solid var(--border-strong); border-radius: 5px; color: var(--text); background: transparent; font: inherit; font-size: .76rem; cursor: pointer; }
 .color-none-option .color-none { width: 16px; height: 16px; flex: 0 0 auto; }
 .color-none-option:hover, .color-none-option.selected { border-color: var(--tv-blue, #2962ff); }
+
+.admin-db-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; margin-top: 12px; }
+.admin-db-actions button { height: 34px; padding: 0 14px; border: 1px solid var(--tv-blue, #2962ff); border-radius: 6px; color: #fff; background: var(--tv-blue, #2962ff); font: inherit; font-size: .8rem; font-weight: 600; cursor: pointer; }
+.admin-db-actions button:disabled { opacity: .6; cursor: wait; }
+.admin-db-actions .admin-notice, .admin-db-actions .admin-error { margin: 0; padding: 6px 10px; }

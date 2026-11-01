@@ -40,14 +40,24 @@ export function storeValue(data, key, value, now = Date.now(), by = { id: 'serve
  * - `outdated`: no `baseRev`, i.e. a tab still running the app from before revisions; refused so it cannot overwrite newer data
  */
 export function writeValue(data, key, value, baseRev, now = Date.now(), by = { id: 'unknown', name: 'Unknown device' }) {
+  const decision = decideWrite(data[key], value, baseRev)
+  if (decision.status !== 'store') return decision
+  return { status: 'ok', item: storeValue(data, key, value, now, by) }
+}
+
+/**
+ * The rule for a device's write, shared by every storage (the JSON objects here and the SQLite database):
+ * `outdated` / `conflict` (with the current item) are refused, `ok` (with the current item) needs no change,
+ * and `store` means the value must be stored as a new revision.
+ */
+export function decideWrite(current, value, baseRev) {
   if (typeof baseRev !== 'number' || !Number.isSafeInteger(baseRev) || baseRev < 0) return { status: 'outdated' }
-  const current = data[key]
   if ((current?.rev ?? 0) !== baseRev) {
     if (current) return { status: 'conflict', item: current }
     // The item does not exist (any more): nothing to merge with, so the write simply creates it.
   }
   if (current && current.value === value) return { status: 'ok', item: current }
-  return { status: 'ok', item: storeValue(data, key, value, now, by) }
+  return { status: 'store' }
 }
 
 /** The device a write came from, as sent by the app ({ id, name }); anything odd is replaced. */

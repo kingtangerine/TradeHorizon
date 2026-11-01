@@ -3,11 +3,13 @@
 // serves dist/ and /api from one port.
 //   Environment: PORT, HOST, TH_DATA_DIR, TH_TRUST_PROXY=1 (behind nginx/Cloudflare), TH_VAPID_SUBJECT, TH_TELEGRAM_TOKEN (bot token from @BotFather, enables Telegram alerts),
 //   TH_ADMIN_EMAILS (comma-separated emails of the accounts that may open the admin page),
-//   TH_PUBLIC_URL (optional: the site's address for the keep-alive ping; otherwise learned from requests).
+//   TH_PUBLIC_URL (optional: the site's address for the keep-alive ping; otherwise learned from requests),
+//   TH_BACKUP_KEEP (how many daily database backups to keep, default 14).
+// Storage: SQLite database server/data/tradehorizon.db (accounts, sessions, synced data), daily copies in server/data/backups.
 import { createServer } from 'node:http'
 import { freemem, hostname, loadavg, totalmem } from 'node:os'
 import { randomBytes, randomUUID, scrypt, timingSafeEqual, createHash } from 'node:crypto'
-import { accessSync, constants as fsConstants, existsSync, mkdirSync, readdirSync, readFileSync, renameSync, statSync, unlinkSync, writeFileSync } from 'node:fs'
+import { accessSync, constants as fsConstants, mkdirSync, readFileSync, statSync } from 'node:fs'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { ALERTS_KEY, createAlertService, createPushService } from './alerts.mjs'
@@ -18,13 +20,16 @@ import { createTelegramService } from './telegram.mjs'
 import { loadEnvFile } from './envfile.mjs'
 import { adminEmails, describeUserItems, diskSpace, folderSize, summarizeUserData } from './admin.mjs'
 import { createKeepAlive, recordStart, startsWithinDay } from './keepalive.mjs'
-import { describeData, deviceFrom, ensureRevisions, itemsSince, latestRevision, storeValue, writeValue } from './userdata.mjs'
+import { describeData, deviceFrom } from './userdata.mjs'
+import { openDatabase } from './database.mjs'
+import { importLegacyJson } from './migrate.mjs'
+import { createBackupService } from './backup.mjs'
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 // Settings can also come from a .env file in the app folder (hosts like Plesk do not always pass environment variables).
 const envFile = loadEnvFile(join(root, '.env'))
 const dataDir = process.env.TH_DATA_DIR ?? join(root, 'server', 'data')
-const dataFile = join(dataDir, 'users.json')
+const databaseFile = join(dataDir, 'tradehorizon.db')
 const distDir = join(root, 'dist')
 const port = Number(process.env.PORT ?? 8787)
 const host = process.env.HOST ?? '0.0.0.0'
@@ -41,16 +46,10 @@ mkdirSync(dataDir, { recursive: true })
 const processStarts = recordStart(dataDir)
 // Hosts like Plesk stop an idle app, which would stop price alerts and the Telegram bot: ping ourselves.
 const keepAlive = createKeepAlive({ publicUrl: process.env.TH_PUBLIC_URL, trustProxy: process.env.TH_TRUST_PROXY === '1' })
-let db = { users: [], sessions: [] }
-if (existsSync(dataFile)) {
-  try { db = { users: [], sessions: [], ...JSON.parse(readFileSync(dataFile, 'utf8')) } } catch { /* start empty */ }
-}
-
-function save() {
-  const tmp = `${dataFile}.tmp`
-  writeFileSync(tmp, JSON.stringify(db))
-  renameSync(tmp, dataFile)
-}
+// Accounts, sessions and synced data live in SQLite. The first start after the update moves the old JSON files in.
+const store = openDatabase(databaseFile)
+const migration = importLegacyJson(store, dataDir)
+const backups = createBackupService({ store, dir: join(dataDir, 'backups'), keep: Number(process.env.TH_BACKUP_KEEP) || 14 })
 
 const derive = (password, salt) => new Promise((ok, fail) => {
   scrypt(password, salt, 64, (error, key) => (error ? fail(error) : ok(key)))
@@ -61,12 +60,6 @@ const admins = adminEmails(process.env.TH_ADMIN_EMAILS)
 const isAdmin = (user) => admins.has(user.email)
 const publicUser = (user) => ({ id: user.id, email: user.email, displayName: user.displayName, createdAtMs: user.createdAtMs, ...(isAdmin(user) ? { isAdmin: true } : {}) })
 
-// "Last active" for the admin page: noted at most once a minute per user and written a little later.
-let saveTimer
-function saveSoon() {
-  saveTimer ??= setTimeout(() => { saveTimer = undefined; save() }, 30_000)
-  saveTimer.unref?.()
-}
 
 async function makeHash(password) {
   const salt = randomBytes(16)
@@ -83,21 +76,17 @@ async function verifyHash(password, stored) {
 function startSession(userId) {
   const token = randomBytes(32).toString('hex')
   const now = Date.now()
-  db.sessions = db.sessions.filter((s) => s.expiresAtMs > now)
-  db.sessions.push({ tokenHash: tokenHash(token), userId, expiresAtMs: now + SESSION_TTL_MS })
+  store.sessions.create(tokenHash(token), userId, now + SESSION_TTL_MS, now)
   return token
 }
 
 function sessionUser(req) {
   const header = req.headers.authorization ?? ''
   if (!header.startsWith('Bearer ')) return undefined
-  const hash = tokenHash(header.slice(7))
-  const session = db.sessions.find((s) => s.tokenHash === hash && s.expiresAtMs > Date.now())
-  const user = session ? db.users.find((u) => u.id === session.userId) : undefined
-  if (user && Date.now() - (user.lastSeenAtMs ?? 0) > 60_000) {
-    user.lastSeenAtMs = Date.now()
-    saveSoon()
-  }
+  const now = Date.now()
+  const user = store.sessions.user(tokenHash(header.slice(7)), now)
+  // "Last active" for the admin page, noted at most once a minute per user.
+  if (user && now - (user.lastSeenAtMs ?? 0) > 60_000) store.users.setLastSeen(user.id, now)
   return user
 }
 
@@ -108,33 +97,11 @@ const throttled = (req) => isThrottled(clientIp(req))
 const errorReportThrottled = createThrottle(10, 60_000)
 const telegramThrottled = createThrottle(10, 60_000)
 
-// Per-user synced data (layouts, drawings, alerts, workspace): one JSON file per user, last write wins.
-const userDataDir = join(dataDir, 'userdata')
-mkdirSync(userDataDir, { recursive: true })
-const userData = new Map()
+// Per-user synced data (layouts, drawings, alerts, workspace): one database row per item, with revisions.
 const DATA_KEY = /^[a-z0-9:_-]{1,64}$/i
 const MAX_VALUE_BYTES = 5_000_000
 const MAX_KEYS = 50
 
-function readUserFile(userId) {
-  try { return JSON.parse(readFileSync(join(userDataDir, `${userId}.json`), 'utf8')) } catch { return {} }
-}
-
-function loadUserData(userId) {
-  let data = userData.get(userId)
-  if (!data) {
-    data = readUserFile(userId)
-    userData.set(userId, data)
-    if (ensureRevisions(data)) saveUserData(userId)
-  }
-  return data
-}
-
-function saveUserData(userId) {
-  const file = join(userDataDir, `${userId}.json`)
-  writeFileSync(`${file}.tmp`, JSON.stringify(userData.get(userId)))
-  renameSync(`${file}.tmp`, file)
-}
 
 // Services
 const markets = createMarketService({ dataDir })
@@ -146,17 +113,13 @@ const telegram = createTelegramService({
   dataDir,
   token: process.env.TH_TELEGRAM_TOKEN?.trim(),
   apiBase: process.env.TH_TELEGRAM_API || undefined, // tests only: a stand-in for api.telegram.org
-  userName: (userId) => db.users.find((user) => user.id === userId)?.displayName,
+  userName: (userId) => store.users.get(userId)?.displayName,
 })
 const alerts = createAlertService({
   store: {
-    listUserIds: () => readdirSync(userDataDir).filter((name) => name.endsWith('.json')).map((name) => name.slice(0, -5)),
-    // Reads without caching, so scanning every user at start-up does not keep every user's data in memory.
-    getAlertsValue: (userId) => (userData.get(userId) ?? readUserFile(userId))[ALERTS_KEY]?.value,
-    setAlertsValue: (userId, value) => {
-      storeValue(loadUserData(userId), ALERTS_KEY, value)
-      saveUserData(userId)
-    },
+    listUserIds: () => store.data.usersWithKey(ALERTS_KEY),
+    getAlertsValue: (userId) => store.data.value(userId, ALERTS_KEY),
+    setAlertsValue: (userId, value) => { store.data.store(userId, ALERTS_KEY, value) },
   },
   exchangeOf: (symbol) => markets.exchangeOf(symbol),
   // Every channel the user has set up; one failing channel never blocks the others.
@@ -166,23 +129,21 @@ const alerts = createAlertService({
 async function handleData(req, res) {
   const user = sessionUser(req)
   if (!user) return send(res, 401, { error: 'Session expired.' })
-  const data = loadUserData(user.id)
   if (req.method === 'GET') {
     // ?since=N returns only what changed after revision N (the app asks every few seconds).
     const since = Number(new URL(req.url, 'http://localhost').searchParams.get('since')) || 0
-    return sendCompressed(req, res, 200, { items: itemsSince(data, since), rev: latestRevision(data) })
+    return sendCompressed(req, res, 200, { items: store.data.since(user.id, since), rev: store.data.latestRev(user.id) })
   }
   if (req.method === 'PUT') {
     const body = await readBody(req, MAX_VALUE_BYTES + 1000)
     const key = String(body.key ?? '')
     if (!DATA_KEY.test(key) || typeof body.value !== 'string') return send(res, 400, { error: 'Invalid data.' })
     if (body.value.length > MAX_VALUE_BYTES) return send(res, 413, { error: 'Data too large.' })
-    if (!(key in data) && Object.keys(data).length >= MAX_KEYS) return send(res, 400, { error: 'Too many items.' })
-    const previousValue = data[key]?.value
-    const result = writeValue(data, key, body.value, body.baseRev, Date.now(), deviceFrom(body.device))
+    const previousValue = store.data.value(user.id, key)
+    if (previousValue === undefined && store.data.keyCount(user.id) >= MAX_KEYS) return send(res, 400, { error: 'Too many items.' })
+    const result = store.data.write(user.id, key, body.value, body.baseRev, Date.now(), deviceFrom(body.device))
     if (result.status === 'outdated') return send(res, 409, { error: 'TradeHorizon was updated. Reload the page.', outdated: true })
     if (result.status === 'conflict') return send(res, 409, { error: 'Changed on another device.', item: result.item })
-    saveUserData(user.id)
     if (key === ALERTS_KEY) {
       alerts.updateUserAlerts(user.id, body.value)
       alerts.relayTriggered(user.id, previousValue, body.value)
@@ -194,12 +155,6 @@ async function handleData(req, res) {
 
 // --- Admin page (TH_ADMIN_EMAILS) ------------------------------------------------------------------------
 
-/** A user's stored data without putting it in the cache (the admin page may list every account). */
-const storedDataOf = (userId) => userData.get(userId) ?? readUserFile(userId)
-
-function storageBytes(userId) {
-  try { return statSync(join(userDataDir, `${userId}.json`)).size } catch { return 0 }
-}
 
 function adminUserRow(user) {
   const now = Date.now()
@@ -211,17 +166,16 @@ function adminUserRow(user) {
     lastLoginAtMs: user.lastLoginAtMs ?? null,
     lastSeenAtMs: user.lastSeenAtMs ?? null,
     isAdmin: isAdmin(user),
-    sessions: db.sessions.filter((session) => session.userId === user.id && session.expiresAtMs > now).length,
+    sessions: store.sessions.countForUser(user.id, now),
     telegram: telegram.status(user.id).linked,
     pushDevices: push.count(user.id),
-    storageBytes: storageBytes(user.id),
-    ...summarizeUserData(storedDataOf(user.id)),
+    storageBytes: store.data.bytes(user.id),
+    ...summarizeUserData(store.data.all(user.id)),
   }
 }
 
 function adminOverview() {
   const now = Date.now()
-  const day = 24 * 60 * 60 * 1000
   const memory = process.memoryUsage()
   const megabytes = (bytes) => Math.round(bytes / 1048576)
   const catalog = markets.getCatalog()
@@ -243,6 +197,7 @@ function adminOverview() {
       disk: diskSpace(dataDir),
       envFile: envFile.found ? envFile.keys : null,
     },
+    database: databaseStatus(),
     services: {
       telegram: telegram.diagnostics(),
       telegramLinkedUsers: telegram.linkedCount(),
@@ -254,24 +209,16 @@ function adminOverview() {
       alertsWatched: alerts.activeCount(),
     },
     users: {
-      total: db.users.length,
-      admins: db.users.filter(isAdmin).length,
-      signups24h: db.users.filter((user) => now - user.createdAtMs < day).length,
-      signups7d: db.users.filter((user) => now - user.createdAtMs < 7 * day).length,
-      active24h: db.users.filter((user) => now - (user.lastSeenAtMs ?? 0) < day).length,
-      active7d: db.users.filter((user) => now - (user.lastSeenAtMs ?? 0) < 7 * day).length,
-      activeSessions: db.sessions.filter((session) => session.expiresAtMs > now).length,
+      ...store.users.stats(now),
+      admins: store.users.all().filter(isAdmin).length,
+      activeSessions: store.sessions.countActive(now),
     },
   }
 }
 
 /** Removes an account and everything stored for it. */
 function deleteAccount(userId) {
-  db.users = db.users.filter((user) => user.id !== userId)
-  db.sessions = db.sessions.filter((session) => session.userId !== userId)
-  save()
-  userData.delete(userId)
-  try { unlinkSync(join(userDataDir, `${userId}.json`)) } catch { /* had no synced data */ }
+  store.users.remove(userId) // sessions and synced data go with it
   telegram.unlink(userId)
   push.removeUser(userId)
   alerts.updateUserAlerts(userId, '[]')
@@ -283,25 +230,32 @@ async function handleAdmin(req, res, path) {
   if (!isAdmin(admin)) return send(res, 403, { error: 'Administrators only.' })
 
   if (path === '/api/admin/overview' && req.method === 'GET') return send(res, 200, adminOverview())
-  if (path === '/api/admin/users' && req.method === 'GET') return sendCompressed(req, res, 200, { users: db.users.map(adminUserRow) })
+  if (path === '/api/admin/users' && req.method === 'GET') return sendCompressed(req, res, 200, { users: store.users.all().map(adminUserRow) })
+  if (path === '/api/admin/backup' && req.method === 'POST') {
+    try {
+      const copy = backups.run()
+      console.log(`[admin] ${admin.email} made a database backup: ${copy.name}`)
+      return send(res, 200, { ok: true, backup: copy, database: databaseStatus() })
+    } catch (error) {
+      return send(res, 500, { error: `Backup failed: ${error.message}` })
+    }
+  }
 
   const match = /^\/api\/admin\/users\/([\w-]{6,64})(?:\/(signout|delete))?$/.exec(path)
-  const target = match ? db.users.find((user) => user.id === match[1]) : undefined
+  const target = match ? store.users.get(match[1]) : undefined
   if (!target) return send(res, 404, { error: 'No such user.' })
 
   if (!match[2] && req.method === 'GET') {
     const now = Date.now()
     return send(res, 200, {
       user: adminUserRow(target),
-      items: describeUserItems(storedDataOf(target.id)),
-      sessions: db.sessions.filter((session) => session.userId === target.id && session.expiresAtMs > now)
-        .map((session) => ({ expiresAtMs: session.expiresAtMs })),
+      items: describeUserItems(store.data.all(target.id)),
+      sessions: store.sessions.forUser(target.id, now),
     })
   }
   if (req.method !== 'POST') return send(res, 404, { error: 'Not found.' })
   if (match[2] === 'signout') {
-    db.sessions = db.sessions.filter((session) => session.userId !== target.id)
-    save()
+    store.sessions.removeForUser(target.id)
     return send(res, 200, { ok: true })
   }
   // delete
@@ -320,8 +274,7 @@ async function handleApi(req, res, path) {
   if (path === '/api/sync/status' && req.method === 'GET') {
     const user = sessionUser(req)
     if (!user) return send(res, 401, { error: 'Session expired.' })
-    const data = loadUserData(user.id)
-    return send(res, 200, { protocol: SYNC_PROTOCOL, version, serverTimeMs: Date.now(), rev: latestRevision(data), items: describeData(data) })
+    return send(res, 200, { protocol: SYNC_PROTOCOL, version, serverTimeMs: Date.now(), rev: store.data.latestRev(user.id), items: describeData(store.data.all(user.id)) })
   }
 
   // Public market data, cached here so browsers do not each download it from the exchanges.
@@ -406,9 +359,7 @@ async function handleApi(req, res, path) {
   if (path === '/api/auth/logout' && req.method === 'POST') {
     const header = req.headers.authorization ?? ''
     if (header.startsWith('Bearer ')) {
-      const hash = tokenHash(header.slice(7))
-      db.sessions = db.sessions.filter((s) => s.tokenHash !== hash)
-      save()
+      store.sessions.remove(tokenHash(header.slice(7)))
     }
     return send(res, 200, { ok: true })
   }
@@ -422,11 +373,9 @@ async function handleApi(req, res, path) {
     if (!(await verifyHash(String(body.currentPassword ?? ''), user.passwordHash))) {
       return send(res, 403, { error: 'Current password is incorrect.' })
     }
-    user.passwordHash = await makeHash(next)
+    store.users.setPassword(user.id, await makeHash(next))
     // Sign the account out everywhere else; this device stays signed in.
-    const keep = tokenHash((req.headers.authorization ?? '').slice(7))
-    db.sessions = db.sessions.filter((session) => session.userId !== user.id || session.tokenHash === keep)
-    save()
+    store.sessions.removeOthers(user.id, tokenHash((req.headers.authorization ?? '').slice(7)))
     return send(res, 200, { ok: true })
   }
   if (req.method !== 'POST' || (path !== '/api/auth/signup' && path !== '/api/auth/login')) {
@@ -443,24 +392,35 @@ async function handleApi(req, res, path) {
     if (displayName.length < 2) return send(res, 400, { error: 'Enter a display name of at least 2 characters.' })
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return send(res, 400, { error: 'Enter a valid email address.' })
     if (password.length < 8) return send(res, 400, { error: 'Password must contain at least 8 characters.' })
-    if (db.users.some((u) => u.email === email)) return send(res, 409, { error: 'An account already exists for this email.' })
-    const legacyId = typeof body.legacyId === 'string' && /^[0-9a-f-]{36}$/i.test(body.legacyId) && !db.users.some((u) => u.id === body.legacyId) ? body.legacyId : undefined
-    const user = { id: legacyId ?? randomUUID(), email, displayName, createdAtMs: Date.now(), passwordHash: await makeHash(password) }
-    db.users.push(user)
-    user.lastLoginAtMs = Date.now()
+    if (store.users.byEmail(email)) return send(res, 409, { error: 'An account already exists for this email.' })
+    const legacyId = typeof body.legacyId === 'string' && /^[0-9a-f-]{36}$/i.test(body.legacyId) && !store.users.get(body.legacyId) ? body.legacyId : undefined
+    const passwordHash = await makeHash(password)
+    // Checked again after the slow password hash: another sign-up for the same email may have finished meanwhile.
+    if (store.users.byEmail(email)) return send(res, 409, { error: 'An account already exists for this email.' })
+    const now = Date.now()
+    const user = store.users.create({ id: legacyId ?? randomUUID(), email, displayName, createdAtMs: now, passwordHash, lastLoginAtMs: now })
     const token = startSession(user.id)
-    save()
     return send(res, 201, { user: publicUser(user), token })
   }
 
-  const user = db.users.find((u) => u.email === email)
+  const user = store.users.byEmail(email)
   // Always run a hash so unknown emails and wrong passwords take similar time.
   const ok = user ? await verifyHash(password, user.passwordHash) : (await makeHash(password), false)
   if (!user || !ok) return send(res, 401, { error: 'Email or password is incorrect.' })
-  user.lastLoginAtMs = Date.now()
+  store.users.setLastLogin(user.id, Date.now())
   const token = startSession(user.id)
-  save()
   return send(res, 200, { user: publicUser(user), token })
+}
+
+function databaseStatus() {
+  const fileSize = (suffix) => { try { return statSync(databaseFile + suffix).size } catch { return 0 } }
+  return {
+    file: databaseFile,
+    bytes: fileSize('') + fileSize('-wal'),
+    ...store.counts(),
+    migratedFromJsonAtMs: Number(store.meta.get('migratedFromJsonAtMs')) || null,
+    backups: backups.status(),
+  }
 }
 
 function health() {
@@ -475,6 +435,10 @@ function health() {
     startsLast24h: startsWithinDay(processStarts),
     keepAlive: keepAlive.status(),
     dataWritable,
+    database: (() => {
+      const status = databaseStatus()
+      return { users: status.users, items: status.items, bytes: status.bytes, lastBackupAtMs: status.backups.lastBackupAtMs, backups: status.backups.count, backupError: status.backups.lastError }
+    })(),
     syncProtocol: SYNC_PROTOCOL,
     pushReady: Boolean(push.publicKey),
     telegramReady: Boolean(telegram.botUsername()),
@@ -508,7 +472,8 @@ const server = createServer(async (req, res) => {
 })
 
 server.listen(port, host, () => {
-  console.log(`TradeHorizon ${version} listening on http://${host}:${port}  (data: ${dataDir})`)
+  console.log(`TradeHorizon ${version} listening on http://${host}:${port}  (database: ${databaseFile}${migration.imported ? `, just moved ${migration.users} accounts in from the JSON files` : ''})`)
+  backups.start()
   markets.start()
   alerts.start()
   telegram.start()
@@ -521,7 +486,8 @@ for (const signal of ['SIGINT', 'SIGTERM']) {
     alerts.stop()
     telegram.stop()
     keepAlive.stop()
-    server.close(() => process.exit(0))
+    backups.stop()
+    server.close(() => { store.close(); process.exit(0) })
     setTimeout(() => process.exit(0), 2000).unref()
   })
 }
