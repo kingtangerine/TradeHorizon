@@ -75,6 +75,7 @@ export interface AdminOverview {
     readonly marketsLoaded: number
     readonly marketsAgeMin: number | null
     readonly alertsWatched: number
+    readonly notificationQueues: Readonly<Record<'telegram' | 'push', { readonly pending: number, readonly sent: number, readonly retried: number, readonly failed: number, readonly dropped: number, readonly pausedForSec: number, readonly lastError: string | null }>>
     readonly alertPrices: {
       readonly symbols: number
       readonly live: number

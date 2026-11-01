@@ -8,6 +8,7 @@
 import { existsSync, readFileSync, renameSync, writeFileSync } from 'node:fs'
 import { randomBytes } from 'node:crypto'
 import { join } from 'node:path'
+import { createSendQueue } from './sendQueue.mjs'
 
 const API = 'https://api.telegram.org'
 const CODE_TTL_MS = 10 * 60_000
@@ -62,6 +63,8 @@ export function createTelegramService({ dataDir, token, apiBase = API, userName 
   /** code -> { userId, expiresAtMs } (memory only: a restart simply invalidates open codes) */
   const codes = new Map()
   let botUsername
+  // Telegram allows about 30 messages a second per bot and 1 a second per chat: stay under both.
+  const queue = createSendQueue({ name: 'telegram', perSecond: 25, perKeyGapMs: 1000, log, now })
   /** The latest reason the bot is not working, in plain words (cleared by a successful poll). */
   let problem
   let startedPollingAtMs
@@ -79,6 +82,8 @@ export function createTelegramService({ dataDir, token, apiBase = API, userName 
     if (!response.ok || !payload.ok) {
       const error = new Error(payload.description ?? `Telegram answered ${response.status}`)
       error.status = response.status
+      // 429 answers say how long to wait.
+      if (payload.parameters?.retry_after) error.retryAfterMs = payload.parameters.retry_after * 1000
       throw error
     }
     return payload.result
@@ -189,7 +194,8 @@ export function createTelegramService({ dataDir, token, apiBase = API, userName 
       return { state: problem ? 'error' : 'starting', bot: botUsername ? `@${botUsername}` : null, problem: problem ?? 'Contacting Telegram… reload in a few seconds.' }
     },
     start() { if (enabled) void loop() },
-    stop() { stopped = true; stopSignal.abort() },
+    stop() { stopped = true; stopSignal.abort(); queue.stop() },
+    queueStatus: () => queue.status(),
     pollOnce,
     handleMessage,
 
@@ -217,16 +223,20 @@ export function createTelegramService({ dataDir, token, apiBase = API, userName 
     },
 
     /** Sends to every chat linked to the user. Chats that blocked the bot or were deleted are forgotten. */
+    /** Queues the message for every chat linked to the user; settles when each was delivered or given up on. */
     async send(userId, payload) {
-      if (!enabled) return
-      for (const { chatId } of state.links[userId] ?? []) {
+      if (!enabled) return []
+      const text = formatAlertMessage(payload)
+      return Promise.all((state.links[userId] ?? []).map(({ chatId }) => queue.enqueue(chatId, async () => {
         try {
-          await reply(chatId, formatAlertMessage(payload))
+          await reply(chatId, text)
         } catch (error) {
-          if (error.status === 403 || (error.status === 400 && /chat not found/i.test(error.message))) dropChat(chatId)
-          else log.warn?.(`[telegram] delivery failed: ${error.message}`)
+          // The chat blocked the bot or no longer exists: forget it. Other 400s will not succeed on a retry either.
+          if (error.status === 403 || (error.status === 400 && /chat not found/i.test(error.message))) { dropChat(chatId); error.permanent = true }
+          else if (error.status === 400 || error.status === 401 || error.status === 404) error.permanent = true
+          throw error
         }
-      }
+      })))
     },
   }
 }

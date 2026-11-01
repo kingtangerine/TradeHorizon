@@ -159,6 +159,15 @@ function OverviewTab({ overview, onChanged }: { overview: AdminOverview, onChang
               : `${services.alertPrices.symbols} coins · ${services.alertPrices.live} with live prices, ${services.alertPrices.polled} checked every 10 s`}
           />
           <Stat
+            label="Notifications sent"
+            value={services.notificationQueues.telegram.sent + services.notificationQueues.push.sent}
+            tone={services.notificationQueues.telegram.failed + services.notificationQueues.push.failed > 0 ? 'warn' : undefined}
+            note={(['telegram', 'push'] as const).map((name) => {
+              const queue = services.notificationQueues[name]
+              return `${name === 'telegram' ? 'Telegram' : 'Push'}: ${queue.sent} sent${queue.pending ? `, ${queue.pending} waiting` : ''}${queue.retried ? `, ${queue.retried} retried` : ''}${queue.failed ? `, ${queue.failed} failed` : ''}${queue.pausedForSec ? ` (paused ${queue.pausedForSec}s)` : ''}`
+            }).join(' · ') + ' since start'}
+          />
+          <Stat
             label="Live price feeds"
             value={(['binance', 'bybit'] as const).filter((name) => services.alertPrices.feed[name].connected).length + ' connected'}
             tone={(['binance', 'bybit'] as const).some((name) => services.alertPrices.feed[name].symbols > 0 && !services.alertPrices.feed[name].connected) ? 'warn' : undefined}

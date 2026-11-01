@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [0.21.0] - 2026-11-01
+
+### Added
+- **Notification send queue** for Telegram and browser push. Messages go out at a pace the services accept (Telegram: 25 a second per bot and 1 a second per chat), a "too many requests" answer pauses the queue for as long as the service asks, network and server errors are retried with growing pauses (up to 5 attempts), and errors that cannot succeed later (a chat that blocked the bot, an expired browser subscription) are not retried and the chat or subscription is removed. In a test with 150 alerts for 60 users at the same moment against Telegram's limits, 30 were delivered before and all 150 now.
+- The admin page shows notifications sent, waiting, retried and failed; `/healthz` reports `notificationQueues`.
+
+### Changed
+- "Send test" for Telegram now reports a failure if Telegram did not accept the message.
+
 ## [0.20.0] - 2026-11-01
 
 ### Changed

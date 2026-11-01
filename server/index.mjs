@@ -212,6 +212,7 @@ function adminOverview() {
       marketsAgeMin: catalog.fetchedAtMs ? Math.round((now - catalog.fetchedAtMs) / 60_000) : null,
       alertsWatched: alerts.activeCount(),
       alertPrices: { ...alerts.watchStatus(), feed: priceFeed.status() },
+      notificationQueues: { telegram: telegram.queueStatus(), push: push.queueStatus() },
     },
     users: {
       ...store.users.stats(now),
@@ -342,8 +343,9 @@ async function handleApi(req, res, path) {
     if (path === '/api/telegram/test') {
       if (telegramThrottled(clientIp(req))) return send(res, 429, { error: 'Too many attempts. Wait a minute and try again.' })
       if (!telegram.status(user.id).linked) return send(res, 409, { error: 'Telegram is not connected.' })
-      await telegram.send(user.id, { title: 'TradeHorizon test alert', body: 'If you can read this, Telegram alerts work.' })
-      return send(res, 200, { ok: true })
+      const results = await telegram.send(user.id, { title: 'TradeHorizon test alert', body: 'If you can read this, Telegram alerts work.' })
+      const failed = results.find((result) => !result.ok)
+      return failed ? send(res, 502, { error: `Telegram did not accept the message: ${failed.error}` }) : send(res, 200, { ok: true })
     }
     return send(res, 404, { error: 'Not found.' })
   }
@@ -445,6 +447,7 @@ function health() {
       return { users: status.users, items: status.items, bytes: status.bytes, lastBackupAtMs: status.backups.lastBackupAtMs, backups: status.backups.count, backupError: status.backups.lastError }
     })(),
     alerts: { active: alerts.activeCount(), ...alerts.watchStatus(), feed: priceFeed.status() },
+    notificationQueues: { telegram: telegram.queueStatus(), push: push.queueStatus() },
     syncProtocol: SYNC_PROTOCOL,
     pushReady: Boolean(push.publicKey),
     telegramReady: Boolean(telegram.botUsername()),
@@ -492,6 +495,7 @@ for (const signal of ['SIGINT', 'SIGTERM']) {
     alerts.stop()
     priceFeed.stop()
     telegram.stop()
+    push.stop()
     keepAlive.stop()
     backups.stop()
     server.close(() => { store.close(); process.exit(0) })

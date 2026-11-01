@@ -8,6 +8,7 @@
 import { existsSync, readFileSync, renameSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import webpush from 'web-push'
+import { createSendQueue } from './sendQueue.mjs'
 
 export const ALERTS_KEY = 'alerts:v1'
 const POLL_MS = 10_000
@@ -272,6 +273,7 @@ export function createAlertService({ store, exchangeOf, fetchPrices = fetchLastP
 
 /** Web-push: VAPID keys, each user's browser subscriptions, and delivery. */
 export function createPushService({ dataDir, subject, log = console, sender = webpush }) {
+  const queue = createSendQueue({ name: 'push', perSecond: 50, log })
   const vapidFile = join(dataDir, 'vapid.json')
   const subsFile = join(dataDir, 'push.json')
 
@@ -335,23 +337,31 @@ export function createPushService({ dataDir, subject, log = console, sender = we
       persist()
     },
 
+    queueStatus: () => queue.status(),
+    stop: () => queue.stop(),
+
+    /** Queues the notification for every device of the user; settles when each was delivered or given up on. */
     async send(userId, payload) {
-      const list = subscriptions[userId] ?? []
-      const gone = []
-      await Promise.all(list.map(async (subscription) => {
+      const body = JSON.stringify(payload)
+      return Promise.all((subscriptions[userId] ?? []).map((subscription) => queue.enqueue(subscription.endpoint, async () => {
         try {
-          await sender.sendNotification({ endpoint: subscription.endpoint, keys: subscription.keys }, JSON.stringify(payload), { TTL: 3600 })
+          await sender.sendNotification({ endpoint: subscription.endpoint, keys: subscription.keys }, body, { TTL: 3600 })
         } catch (error) {
-          // 404/410: the browser dropped the subscription; forget it.
-          if (error?.statusCode === 404 || error?.statusCode === 410) gone.push(subscription.endpoint)
-          else log.warn?.(`[push] delivery failed (${error?.statusCode ?? error?.message})`)
+          const status = error?.statusCode
+          if (status === 404 || status === 410) {
+            // The browser dropped the subscription: forget it, retrying cannot help.
+            const rest = (subscriptions[userId] ?? []).filter((item) => item.endpoint !== subscription.endpoint)
+            if (rest.length === 0) delete subscriptions[userId]
+            else subscriptions[userId] = rest
+            persist()
+            throw Object.assign(new Error(`subscription gone (${status})`), { permanent: true })
+          }
+          const retryAfter = Number(error?.headers?.['retry-after'])
+          if (status === 429 && retryAfter > 0) error.retryAfterMs = retryAfter * 1000
+          else if (status >= 400 && status < 500 && status !== 429) error.permanent = true
+          throw Object.assign(error instanceof Error ? error : new Error(String(error)), { message: `push service answered ${status ?? error?.message}` })
         }
-      }))
-      if (gone.length > 0) {
-        subscriptions[userId] = list.filter((item) => !gone.includes(item.endpoint))
-        if (subscriptions[userId].length === 0) delete subscriptions[userId]
-        persist()
-      }
+      })))
     },
   }
 }
