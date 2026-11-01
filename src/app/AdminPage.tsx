@@ -85,6 +85,12 @@ function OverviewTab({ overview, onChanged }: { overview: AdminOverview, onChang
             tone={server.startsLast24h > 5 ? 'bad' : server.startsLast24h > 2 ? 'warn' : 'ok'}
             note={server.startsLast24h > 2 ? 'The host keeps restarting the app' : 'Stable'}
           />
+          <Stat
+            label="Responsiveness"
+            value={`${server.eventLoopDelayMs.p99} ms`}
+            tone={server.eventLoopDelayMs.p99 > 200 ? 'bad' : server.eventLoopDelayMs.p99 > 50 ? 'warn' : 'ok'}
+            note={`worst 1% wait in the last minute (typical ${server.eventLoopDelayMs.p50} ms, worst ${server.eventLoopDelayMs.max} ms)`}
+          />
           <Stat label="App memory" value={`${server.memoryMb.app} MB`} note={`${server.memoryMb.heapUsed} MB in use by JavaScript`} />
           <Stat
             label="Server memory"

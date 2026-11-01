@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [0.23.0] - 2026-11-01
+
+### Added
+- **Responsiveness monitor**: the server measures how long requests wait because it is busy (event-loop delay over the last minute). `/healthz` reports `eventLoopDelayMs` and `memoryMb`; the admin page shows it as *Responsiveness* (green under 50 ms, red over 200 ms).
+- **Load test** (`scripts/loadtest.mjs`): simulates many users doing what the app does (download at start, a sync check every 15 s, saving layouts and drawings) against a test server on its own data folder; it creates test accounts directly in that test database and refuses to touch one that holds real accounts. Prints response times per kind of request and the server's busy-wait.
+- Measured locally (Windows PC, load generator on the same machine): 1,000 users and 2,000 users with no errors; at 2,000 users (~150 requests a second) half of the requests took 2 ms, 99% under 65 ms, and the server was idle 87% of the time.
+
 ## [0.22.0] - 2026-11-01
 
 ### Added

@@ -58,6 +58,7 @@ export interface AdminOverview {
     readonly uptimeSec: number
     readonly startsLast24h: number
     readonly memoryMb: { readonly app: number, readonly heapUsed: number }
+    readonly eventLoopDelayMs: { readonly p50: number, readonly p99: number, readonly max: number }
     readonly hostMemoryMb: { readonly total: number, readonly free: number }
     readonly loadAverage: readonly number[]
     readonly dataDir: string

@@ -26,6 +26,7 @@ import { importLegacyJson } from './migrate.mjs'
 import { createBackupService } from './backup.mjs'
 import { createPriceFeed } from './priceFeed.mjs'
 import { makeHash, temporaryPassword, verifyHash } from './passwords.mjs'
+import { createLoopLagMonitor } from './loopLag.mjs'
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 // Settings can also come from a .env file in the app folder (hosts like Plesk do not always pass environment variables).
@@ -40,6 +41,9 @@ const version = (() => {
   try { return JSON.parse(readFileSync(join(root, 'package.json'), 'utf8')).version } catch { return 'unknown' }
 })()
 const startedAtMs = Date.now()
+// How long requests wait because the server is busy (last minute), for /healthz and the admin page.
+const loopLag = createLoopLagMonitor()
+loopLag.start()
 /** Bumped when the sync API changes; the app compares it to warn about a server that was not restarted. */
 const SYNC_PROTOCOL = 2
 
@@ -188,6 +192,7 @@ function adminOverview() {
       uptimeSec: Math.round((now - startedAtMs) / 1000),
       startsLast24h: startsWithinDay(processStarts),
       memoryMb: { app: megabytes(memory.rss), heapUsed: megabytes(memory.heapUsed) },
+      eventLoopDelayMs: loopLag.status(),
       hostMemoryMb: { total: megabytes(totalmem()), free: megabytes(freemem()) },
       loadAverage: loadavg().map((value) => Math.round(value * 100) / 100),
       dataDir,
@@ -443,6 +448,9 @@ function health() {
     // More than a few a day means the host keeps stopping the app (alerts are not checked while it is stopped).
     startsLast24h: startsWithinDay(processStarts),
     keepAlive: keepAlive.status(),
+    // Busy-wait over the last minute: a few ms is healthy, hundreds mean the server is not keeping up.
+    eventLoopDelayMs: loopLag.status(),
+    memoryMb: Math.round(process.memoryUsage().rss / 1048576),
     dataWritable,
     database: (() => {
       const status = databaseStatus()

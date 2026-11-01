@@ -77,6 +77,17 @@ npm run build
 
 `server/data/` and `.env` are not in git, so pulling never touches them.
 
+### Load testing
+
+Simulate many users against a **test** copy of the server (never the live data folder):
+
+```bash
+TH_DATA_DIR=/tmp/th-load PORT=8899 node server/index.mjs        # test server, its own empty data folder
+node scripts/loadtest.mjs --data-dir /tmp/th-load --base http://127.0.0.1:8899 --users 1000 --minutes 3
+```
+
+Each simulated user downloads its data once, checks for changes every 15 s, saves a 5 KB layouts item about every 45 s and a 60 KB drawings item about every 3 minutes. The report lists response times per kind of request (typical, 95%, 99%, worst) and errors. On the live server watch *Responsiveness* on the admin page (or `eventLoopDelayMs` in `/healthz`): a few ms is healthy, hundreds of ms mean it is not keeping up. Running the test on the live machine takes CPU from real users: do it at a quiet time.
+
 ### Accounts and forgotten passwords
 
 Passwords are stored only as hashes, so nobody can look one up; a forgotten password is replaced with a temporary one, and the user chooses a new one after signing in.
