@@ -3563,3 +3563,22 @@ button:disabled {
 .admin-temp-result code { font-size: 1rem; font-weight: 700; letter-spacing: .04em; user-select: all; }
 .admin-temp-result button { height: 28px; padding: 0 10px; border: 1px solid var(--border-strong); border-radius: 5px; color: var(--text); background: transparent; font: inherit; font-size: .76rem; cursor: pointer; }
 .admin-temp-result small { flex-basis: 100%; color: var(--muted); }
+
+/* Legend values follow the crosshair; open/high/low/close take the candle's colour like TradingView */
+.chart-ohlc-row i { font-style: normal; }
+.chart-ohlc-row i.price-up { color: var(--mint, #089981); }
+.chart-ohlc-row i.price-down { color: var(--red, #f23645); }
+
+/* Time zone selector in the status bar */
+.time-zone-menu { position: relative; display: inline-flex; }
+.status-time-zone { padding: 0 6px; border: 0; border-radius: 4px; color: inherit; background: transparent; font: inherit; font-size: inherit; cursor: pointer; }
+.status-time-zone:hover, .status-time-zone[aria-expanded="true"] { color: var(--text); background: var(--tv-hover, rgb(255 255 255 / 6%)); }
+.time-zone-list { position: absolute; z-index: 40; bottom: calc(100% + 6px); left: 0; display: grid; width: 240px; max-height: 360px; padding: 5px; overflow-y: auto; border: 1px solid var(--border-strong); border-radius: 8px; background: var(--tv-raised, var(--panel-raised)); box-shadow: 0 10px 32px rgb(0 0 0 / 45%); }
+.time-zone-list button { height: 28px; padding: 0 10px; border: 0; border-radius: 4px; color: var(--text); background: transparent; font: inherit; font-size: .78rem; text-align: left; white-space: nowrap; cursor: pointer; }
+.time-zone-list button:hover { background: var(--tv-hover, rgb(255 255 255 / 7%)); }
+.time-zone-list button.selected { color: var(--tv-blue, #2962ff); font-weight: 600; }
+.time-zone-separator { height: 1px; margin: 4px 2px; background: var(--border-strong); }
+.profile-select { display: grid; gap: 6px; margin-top: 10px; }
+.profile-select span { display: grid; gap: 2px; }
+.profile-select small { color: var(--muted); font-size: .78rem; }
+.profile-select select { height: 34px; padding: 0 10px; border: 1px solid var(--border-strong); border-radius: 6px; color: var(--text); background: var(--bg); font: inherit; font-size: .82rem; }

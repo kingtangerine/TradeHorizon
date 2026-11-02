@@ -17,6 +17,10 @@ interface CryptoChartSurfaceProps {
   chartType: ChartType
   /** Show the time left in the current candle under the last price. */
   countdown?: boolean
+  /** IANA time zone for the time axis and crosshair date. */
+  timeZone?: string
+  /** Labels at the highest and lowest visible price. */
+  highLowLabels?: boolean
   onRuntimeState(state: ChartRuntimeState): void
   onControllerChange(controller: KLineChartController | null): void
   onToolSettled(): void
@@ -40,6 +44,8 @@ export function CryptoChartSurface({
   magnet,
   chartType,
   countdown = false,
+  timeZone = 'UTC',
+  highLowLabels = false,
   onRuntimeState,
   onControllerChange,
   onToolSettled,
@@ -52,6 +58,8 @@ export function CryptoChartSurface({
   theme = 'dark',
 }: CryptoChartSurfaceProps) {
   const themeRef = useRef(theme)
+  const displayRef = useRef({ timeZone, highLowLabels })
+  displayRef.current = { timeZone, highLowLabels }
   themeRef.current = theme
   const [priceViewManual, setPriceViewManual] = useState(false)
   const [alertHover, setAlertHover] = useState<{ top: number, left: number, price: number } | null>(null)
@@ -88,6 +96,8 @@ export function CryptoChartSurface({
       controller.setMagnet(magnetRef.current)
       controller.setChartType(chartTypeRef.current)
       controller.setTheme(themeRef.current)
+      controller.setTimeZone(displayRef.current.timeZone)
+      controller.setHighLowLabels(displayRef.current.highLowLabels)
       onControllerChange(controller)
 
       return () => {
@@ -129,6 +139,14 @@ export function CryptoChartSurface({
   useEffect(() => {
     controllerRef.current?.setTheme(theme)
   }, [theme])
+
+  useEffect(() => {
+    controllerRef.current?.setTimeZone(timeZone)
+  }, [timeZone])
+
+  useEffect(() => {
+    controllerRef.current?.setHighLowLabels(highLowLabels)
+  }, [highLowLabels])
 
   useEffect(() => {
     controllerRef.current?.setAlertLines(alertLines ?? [])

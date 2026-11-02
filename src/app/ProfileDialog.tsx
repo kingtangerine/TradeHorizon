@@ -6,6 +6,7 @@ import { CloseIcon, UserIcon } from './Icons'
 import { SyncPanel } from './SyncPanel'
 import type { Theme } from './theme'
 import { versionDetails } from '../version'
+import { AUTO_TIME_ZONE, TIME_ZONES, browserTimeZone, timeZoneLabel } from './timeZones'
 
 interface ProfileDialogProps {
   user: AppUser
@@ -15,6 +16,10 @@ interface ProfileDialogProps {
   onTheme(theme: Theme): void
   candleCountdown: boolean
   onCandleCountdown(enabled: boolean): void
+  timeZone: string
+  onTimeZone(zone: string): void
+  highLowLabels: boolean
+  onHighLowLabels(show: boolean): void
   /** Scroll to and highlight a section when opening (the chart's right-click "Settings…"). */
   focusSection?: 'chart' | 'password'
   /** After a successful password change (the app refreshes the account, e.g. to drop the temporary-password prompt). */
@@ -29,7 +34,7 @@ function formatDate(ms: number): string {
   return new Date(ms).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })
 }
 
-export function ProfileDialog({ user, theme, tabCount, layoutCount, onTheme, candleCountdown, onCandleCountdown, focusSection, onPasswordChanged, onOpenAdmin, onLogout, onClose }: ProfileDialogProps) {
+export function ProfileDialog({ user, theme, tabCount, layoutCount, onTheme, candleCountdown, onCandleCountdown, timeZone, onTimeZone, highLowLabels, onHighLowLabels, focusSection, onPasswordChanged, onOpenAdmin, onLogout, onClose }: ProfileDialogProps) {
   const [current, setCurrent] = useState('')
   const [next, setNext] = useState('')
   const [confirm, setConfirm] = useState('')
@@ -144,6 +149,20 @@ export function ProfileDialog({ user, theme, tabCount, layoutCount, onTheme, can
                 <b>Candle countdown</b>
                 <small>Show the time left until the current candle closes, under the last price.</small>
               </span>
+            </label>
+            <label className="profile-toggle">
+              <input type="checkbox" checked={highLowLabels} onChange={(event) => onHighLowLabels(event.target.checked)} />
+              <span>
+                <b>High and low price labels</b>
+                <small>Mark the highest and lowest price on screen (off in TradingView by default).</small>
+              </span>
+            </label>
+            <label className="profile-select">
+              <span><b>Time zone</b><small>Time axis and crosshair date. Daily candles still open at 00:00 UTC, as on the exchange.</small></span>
+              <select value={timeZone} onChange={(event) => onTimeZone(event.target.value)}>
+                <option value={AUTO_TIME_ZONE}>Your computer · {timeZoneLabel(browserTimeZone())}</option>
+                {TIME_ZONES.map(({ zone }) => <option value={zone} key={zone}>{timeZoneLabel(zone)}</option>)}
+              </select>
             </label>
           </section>
 

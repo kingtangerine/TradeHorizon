@@ -5,9 +5,13 @@ export interface Preferences {
   readonly candleCountdown: boolean
   /** Price alerts drawn as lines on the chart. */
   readonly alertLines: boolean
+  /** "auto" (the computer's zone, the default) or an IANA zone such as "Asia/Dubai". */
+  readonly timeZone: string
+  /** Labels at the highest and lowest visible price (TradingView keeps them off by default). */
+  readonly highLowLabels: boolean
 }
 
-export const DEFAULT_PREFERENCES: Preferences = { candleCountdown: true, alertLines: true }
+export const DEFAULT_PREFERENCES: Preferences = { candleCountdown: true, alertLines: true, timeZone: 'auto', highLowLabels: false }
 
 export function preferencesKey(userId: string): string {
   return `trade-horizon:user:${userId}:prefs:v1`
@@ -19,6 +23,8 @@ export function parsePreferences(value: unknown): Preferences {
   return {
     candleCountdown: typeof raw.candleCountdown === 'boolean' ? raw.candleCountdown : DEFAULT_PREFERENCES.candleCountdown,
     alertLines: typeof raw.alertLines === 'boolean' ? raw.alertLines : DEFAULT_PREFERENCES.alertLines,
+    timeZone: typeof raw.timeZone === 'string' && raw.timeZone.length <= 64 ? raw.timeZone : DEFAULT_PREFERENCES.timeZone,
+    highLowLabels: typeof raw.highLowLabels === 'boolean' ? raw.highLowLabels : DEFAULT_PREFERENCES.highLowLabels,
   }
 }
 

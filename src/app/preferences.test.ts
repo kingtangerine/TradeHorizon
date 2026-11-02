@@ -13,3 +13,11 @@ describe('parsePreferences', () => {
     expect(parsePreferences({ candleCountdown: false }).candleCountdown).toBe(false)
   })
 })
+
+describe('time zone and price-label preferences', () => {
+  it('defaults to the computer time zone and no high/low labels, and keeps a saved choice', () => {
+    expect(DEFAULT_PREFERENCES).toMatchObject({ timeZone: 'auto', highLowLabels: false })
+    expect(parsePreferences({ timeZone: 'Asia/Dubai', highLowLabels: true })).toMatchObject({ timeZone: 'Asia/Dubai', highLowLabels: true })
+    expect(parsePreferences({ timeZone: 42 }).timeZone).toBe('auto')
+  })
+})

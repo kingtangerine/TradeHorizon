@@ -22,6 +22,8 @@ import {
 import { MARKET_INTERVALS, MARKET_INTERVAL_SPECS, type MarketInterval } from '../market'
 import { alertReached, isTriggered, loadAlerts, moveAlert, saveAlerts, type AlertDirection, type PriceAlert } from './alerts'
 import { AlertsPanel } from './AlertsPanel'
+import { TimeZoneMenu } from './TimeZoneMenu'
+import { resolveTimeZone } from './timeZones'
 import { ColorPicker } from './ColorPicker'
 import { getTelegramStatus, sendTelegramTest, startTelegramLink, unlinkTelegram, type TelegramStatus } from './telegram'
 import { disablePush, enablePush, fetchAlertEvents, getPushStatus, type PushStatus } from './backgroundAlerts'
@@ -260,6 +262,7 @@ function WorkspaceApp({ user, onLogout, onUserRefresh }: WorkspaceAppProps) {
   const [objectTreeOpen, setObjectTreeOpen] = useState(false)
   const [groupState, setGroupState] = useState(() => loadGroups(user.id))
   const [preferences, setPreferences] = useState(() => loadPreferences(user.id))
+  const chartTimeZone = useMemo(() => resolveTimeZone(preferences.timeZone), [preferences.timeZone])
   const [layoutFolders, setLayoutFolders] = useState(() => loadLayoutFolders(user.id))
   const [theme, setTheme] = useState<Theme>(() => loadUserTheme(user.id))
   const [groupSelectMode, setGroupSelectMode] = useState(false)
@@ -1118,6 +1121,10 @@ function WorkspaceApp({ user, onLogout, onUserRefresh }: WorkspaceAppProps) {
               onTheme={setTheme}
               candleCountdown={preferences.candleCountdown}
               onCandleCountdown={(candleCountdown) => setPreferences((current) => ({ ...current, candleCountdown }))}
+              timeZone={preferences.timeZone}
+              onTimeZone={(timeZone) => setPreferences((current) => ({ ...current, timeZone }))}
+              highLowLabels={preferences.highLowLabels}
+              onHighLowLabels={(highLowLabels) => setPreferences((current) => ({ ...current, highLowLabels }))}
               onLogout={onLogout}
               focusSection={profileFocus}
               onPasswordChanged={onUserRefresh}
@@ -1593,6 +1600,8 @@ function WorkspaceApp({ user, onLogout, onUserRefresh }: WorkspaceAppProps) {
                 chartType={workspace.chartType ?? 'candles'}
                 theme={theme}
                 countdown={preferences.candleCountdown}
+                timeZone={chartTimeZone}
+                highLowLabels={preferences.highLowLabels}
                 alerts={alerts}
                 alertLinesVisible={preferences.alertLines}
                 onMoveAlert={moveAlertTo}
@@ -2247,7 +2256,7 @@ function WorkspaceApp({ user, onLogout, onUserRefresh }: WorkspaceAppProps) {
 
       <footer className="statusbar">
         <span>{market.venue.toUpperCase()} {marketKindLabel(market).toUpperCase()}</span>
-        <span>UTC</span>
+        <TimeZoneMenu value={preferences.timeZone} onChange={(timeZone) => setPreferences((current) => ({ ...current, timeZone }))} />
         <span className="status-separator" />
         <span>{marketDrawings.length} saved drawing{marketDrawings.length === 1 ? '' : 's'} for {market.symbol}</span>
         <span className="status-spacer" />

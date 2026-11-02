@@ -11,6 +11,8 @@ import {
   type Point,
 } from 'klinecharts'
 import { candleCloseMs } from './countdown'
+import { buildTimeTicks, formatCrosshairTime } from './timeAxis'
+import { VOLUME_OVERLAY_NAME, registerVolumeOverlay } from './volumeOverlay'
 import { ALERT_LINE_OVERLAY_NAME } from './overlayNames'
 import { QVWAP_INDICATOR_NAME, VWAP_INDICATOR_NAME, registerVwapIndicators } from './vwapIndicator'
 import { VWAP_ANCHORS } from './vwap'
@@ -107,13 +109,32 @@ const DOMINANCE_POLL_MS = 20_000
 const DOMINANCE_INDICATOR_REFRESH_MS = 60_000
 const DAY_MS = 24 * 60 * 60 * 1000
 const POINT_HANDLE_KEY_PREFIX = 'overlay_figure_point_'
-const VOLUME_PANE_ID = 'trade-horizon:volume'
 // The HTML legend lists moving averages, so the library's own overlapping label is blanked.
+/** Bar width when the chart opens or its view is reset (Alt+R). */
+const DEFAULT_BAR_SPACE = 10
 const HIDDEN_INDICATOR_TOOLTIP = { name: '', calcParamsText: '', features: [], legends: [] }
 
 registerTradeHorizonOverlays()
 registerDominanceIndicators()
 registerVwapIndicators()
+registerVolumeOverlay()
+
+/** The candle under the crosshair, for the legend (TradingView shows the hovered candle's values). */
+export interface HoverState {
+  readonly index: number
+  readonly bar: { readonly timestamp: number, readonly open: number, readonly high: number, readonly low: number, readonly close: number, readonly volume?: number }
+  readonly previousClose?: number
+  /** The newest candle: the legend shows live values instead. */
+  readonly latest: boolean
+}
+
+/** Indicator values for one candle, in the order the legend lists them. */
+export interface IndicatorValues {
+  readonly sma: ReadonlyArray<number | undefined>
+  readonly ema: ReadonlyArray<number | undefined>
+  readonly vwap?: number
+  readonly qvwap?: number
+}
 
 interface ToolSession {
   type: DrawingType
@@ -278,6 +299,9 @@ export class KLineChartController {
   #shiftHeld = false
   #lastOverlayMoveEvent?: OverlayEvent<unknown>
   readonly #viewListeners = new Set<() => void>()
+  #timeZone = 'UTC'
+  #hover: HoverState | null = null
+  readonly #hoverListeners = new Set<() => void>()
   #alertLines: readonly AlertLine[] = []
   #stackLevels = new Map<string, number>()
   readonly #movingAverageIds = new Map<MovingAverageKind, string>()
@@ -596,6 +620,8 @@ export class KLineChartController {
           },
           tooltip: { showRule: 'none' },
           priceMark: {
+            high: { show: false },
+            low: { show: false },
             last: {
               line: { show: true, style: 'dashed', size: 1, dashedValue: [4, 4] },
             },
@@ -640,6 +666,10 @@ export class KLineChartController {
     if (!chart) throw new Error('The chart could not be initialized.')
     this.#chart = chart
     chart.overrideYAxis({ paneId: 'candle_pane', createRange: this.#createPriceRange })
+    // TradingView-style time axis and crosshair date, in the user's time zone.
+    chart.overrideXAxis({ createTicks: this.#createTimeTicks })
+    chart.setFormatter({ formatDate: ({ timestamp }) => formatCrosshairTime(timestamp, this.#timeZone, this.#intervalMs()) })
+    chart.subscribeAction('onCrosshairChange', this.#handleCrosshair)
     // The chart area never scrolls the page, so every finger drag belongs to the chart (pan, pinch, price pan).
     host.style.touchAction = 'none'
     // Without this a finger dragging on the price axis would be taken by the browser as a page gesture.
@@ -688,6 +718,7 @@ export class KLineChartController {
     host.addEventListener('mousedown', this.#blockChartWhileDrawing, true)
     host.addEventListener('touchstart', this.#blockChartWhileDrawing, true)
     host.addEventListener('contextmenu', this.#handleToolContextMenu, true)
+    host.addEventListener('pointerleave', this.#handleHostLeave)
     globalThis.addEventListener('pointermove', this.#handleToolPointerMove, true)
     globalThis.addEventListener('pointerup', this.#handleToolPointerUp, true)
     globalThis.addEventListener('pointercancel', this.#handleToolPointerUp, true)
@@ -928,27 +959,117 @@ export class KLineChartController {
     this.#chart.resetData()
   }
 
+  /** Draws the chart in this IANA time zone (axis labels, crosshair date). */
+  public setTimeZone(timeZone: string): void {
+    if (this.#disposed || timeZone === this.#timeZone) return
+    this.#timeZone = timeZone
+    this.#chart.setTimezone(timeZone)
+    this.#chart.overrideXAxis({ createTicks: this.#createTimeTicks })
+  }
+
+  /** Labels at the highest and lowest visible price. */
+  public setHighLowLabels(show: boolean): void {
+    if (this.#disposed) return
+    this.#chart.setStyles({ candle: { priceMark: { high: { show }, low: { show } } } })
+  }
+
+  /** TradingView's "Reset chart view" (Alt+R): automatic price scale, default zoom, latest candles. */
+  public resetView(): void {
+    if (this.#disposed) return
+    this.resetPriceView()
+    this.#chart.setBarSpace(DEFAULT_BAR_SPACE)
+    this.goToLive()
+  }
+
+  /** The chart as a PNG data URL, drawings included, and its size in CSS pixels. */
+  public snapshot(background: string): { url: string, width: number, height: number } | null {
+    if (this.#disposed) return null
+    const url = this.#chart.getConvertPictureUrl(true, 'png', background)
+    return url ? { url, width: this.#host.clientWidth, height: this.#host.clientHeight } : null
+  }
+
+  public readonly subscribeHover = (listener: () => void): (() => void) => {
+    this.#hoverListeners.add(listener)
+    return () => { this.#hoverListeners.delete(listener) }
+  }
+
+  public readonly getHover = (): HoverState | null => this.#hover
+
+  /** Close of the candle before the newest one (the legend's change is measured from it). */
+  public latestPreviousClose(): number | undefined {
+    const list = this.#chart.getDataList()
+    return list[list.length - 2]?.close
+  }
+
+  /** Moving average and VWAP values for a candle (the newest when `index` is undefined). */
+  public indicatorValuesAt(index?: number): IndicatorValues {
+    const at = index ?? this.#chart.getDataList().length - 1
+    const row = (id: string | undefined): Record<string, number | undefined> | undefined => {
+      if (!id) return undefined
+      const indicator = this.#chart.getIndicators({ id })[0] as { result?: Array<Record<string, number | undefined>> } | undefined
+      return indicator?.result?.[at]
+    }
+    const series = (kind: MovingAverageKind, prefix: string): Array<number | undefined> => {
+      const values = row(this.#movingAverageIds.get(kind))
+      return values ? Object.keys(values).filter((key) => key.startsWith(prefix)).sort((a, b) => Number(a.slice(prefix.length)) - Number(b.slice(prefix.length))).map((key) => values[key]) : []
+    }
+    return {
+      sma: series('sma', 'ma'),
+      ema: series('ema', 'ema'),
+      vwap: row(this.#vwapIds.get('vwap'))?.vwap,
+      qvwap: row(this.#vwapIds.get('qvwap'))?.vwap,
+    }
+  }
+
+  #setHover(next: HoverState | null): void {
+    if (next === this.#hover || (next && this.#hover && next.index === this.#hover.index && next.bar === this.#hover.bar)) return
+    this.#hover = next
+    for (const listener of this.#hoverListeners) listener()
+  }
+
+  readonly #handleCrosshair = (data?: unknown): void => {
+    const x = (data as { x?: number } | undefined)?.x
+    if (typeof x !== 'number' || this.#disposed) return
+    const list = this.#chart.getDataList()
+    if (list.length === 0) return
+    const [point] = this.#chart.convertFromPixel([{ x }], { paneId: 'candle_pane' }) as Array<Partial<Point>>
+    if (point?.dataIndex === undefined) return
+    const index = Math.max(0, Math.min(list.length - 1, point.dataIndex))
+    this.#setHover({ index, bar: list[index], previousClose: list[index - 1]?.close, latest: index === list.length - 1 })
+  }
+
+  readonly #handleHostLeave = (): void => { this.#setHover(null) }
+
+  /** Time-axis labels on round times in the user's zone (see timeAxis.ts), also over the empty space to the right. */
+  readonly #createTimeTicks = ({ range, defaultTicks }: { range: { realFrom: number, realTo: number }, defaultTicks: Array<{ coord: number, value: number | string, text: string }> }) => {
+    const data = this.#chart.getDataList()
+    if (data.length === 0) return defaultTicks
+    const intervalMs = this.#intervalMs()
+    const last = data[data.length - 1]
+    const bars: Array<{ index: number, timestamp: number }> = []
+    for (let index = Math.max(0, Math.floor(range.realFrom) - 1); index <= Math.ceil(range.realTo); index += 1) {
+      bars.push({ index, timestamp: index < data.length ? data[index].timestamp : last.timestamp + (index - data.length + 1) * intervalMs })
+    }
+    const ticks = buildTimeTicks(bars, { barSpacePx: this.#chart.getBarSpace().bar, intervalMs, timeZone: this.#timeZone })
+    return ticks.map((tick) => ({
+      coord: (this.#chart.convertToPixel({ dataIndex: tick.index }, { paneId: 'candle_pane' }) as Partial<Coordinate>).x ?? 0,
+      value: tick.timestamp,
+      text: tick.text,
+    }))
+  }
+
   public setVolumeVisible(requested: boolean): void {
     if (this.#disposed) return
     // An index has no traded volume, so its pane would always be empty.
     const visible = requested && this.#market.kind !== 'dominance'
 
     if (visible && !this.#volumeIndicatorId) {
-      const id = this.#chart.createIndicator({
-        name: 'VOL',
-        paneId: VOLUME_PANE_ID,
-        styles: {
-          bars: [{
-            upColor: 'rgba(8, 153, 129, 0.5)',
-            downColor: 'rgba(242, 54, 69, 0.5)',
-            noChangeColor: 'rgba(127, 141, 163, 0.48)',
-          }],
-        },
-      })
-      if (id) {
-        this.#volumeIndicatorId = id
-        this.#chart.setPaneOptions({ id: VOLUME_PANE_ID, height: 128, minHeight: 76 })
-      }
+      // Along the bottom of the price pane, behind the candles (negative zLevel), like TradingView.
+      const id = this.#chart.createIndicator(
+        { name: VOLUME_OVERLAY_NAME, paneId: 'candle_pane', zLevel: -1, createTooltipDataSource: () => HIDDEN_INDICATOR_TOOLTIP },
+        true,
+      )
+      if (id) this.#volumeIndicatorId = id
       return
     }
 
@@ -1652,6 +1773,9 @@ export class KLineChartController {
     this.#host.removeEventListener('mousedown', this.#blockChartWhileDrawing, true)
     this.#host.removeEventListener('touchstart', this.#blockChartWhileDrawing, true)
     this.#host.removeEventListener('contextmenu', this.#handleToolContextMenu, true)
+    this.#host.removeEventListener('pointerleave', this.#handleHostLeave)
+    this.#chart.unsubscribeAction('onCrosshairChange', this.#handleCrosshair)
+    this.#hoverListeners.clear()
     globalThis.removeEventListener('pointermove', this.#handleToolPointerMove, true)
     globalThis.removeEventListener('pointerup', this.#handleToolPointerUp, true)
     globalThis.removeEventListener('pointercancel', this.#handleToolPointerUp, true)

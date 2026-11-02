@@ -15,9 +15,9 @@ import type { CryptoMarket } from '../chart/markets'
 import type { ChartRuntimeState, ChartType } from '../chart/types'
 import type { DrawingStore } from '../drawings'
 import type { MarketInterval } from '../market'
-import { formatCompact, formatPrice } from './format'
 import { EyeIcon, EyeOffIcon, RefreshIcon } from './Icons'
 import { ChartContextMenu } from './ChartContextMenu'
+import { LegendIndicatorValues, LegendOhlc, LegendVolume } from './LegendValues'
 import type { PriceAlert } from './alerts'
 import { capTier, coinSymbol, formatUsdCompact, loadMarketCaps, type MarketCapInfo } from './marketCap'
 import type { AlertLine } from '../chart/KLineChartController'
@@ -37,6 +37,8 @@ interface ChartPaneProps {
   chartType: ChartType
   theme: 'dark' | 'light'
   countdown: boolean
+  timeZone: string
+  highLowLabels: boolean
   alerts: readonly PriceAlert[]
   alertLinesVisible: boolean
   onMoveAlert(id: string, price: number, lastPrice: number | undefined): void
@@ -79,6 +81,8 @@ export function ChartPane({
   chartType,
   theme,
   countdown,
+  timeZone,
+  highLowLabels,
   alerts,
   alertLinesVisible,
   onMoveAlert,
@@ -147,7 +151,6 @@ export function ChartPane({
   }, [active])
 
   const quote = runtime.quote
-  const isPositive = (quote?.changePercent ?? 0) >= 0
   const blockingLoad = !quote && runtime.connection !== 'error'
   const classes = ['chart-pane', framed ? 'framed' : '', framed && active ? 'active' : ''].filter(Boolean).join(' ')
 
@@ -160,13 +163,7 @@ export function ChartPane({
       </div>
 
       <div className="chart-legend" aria-label="Current market and indicators">
-        <div className="chart-ohlc-row">
-          <span><b>O</b>{formatPrice(quote?.open, market.pricePrecision)}</span>
-          <span><b>H</b>{formatPrice(quote?.high, market.pricePrecision)}</span>
-          <span><b>L</b>{formatPrice(quote?.low, market.pricePrecision)}</span>
-          <span><b>C</b>{formatPrice(quote?.close, market.pricePrecision)}</span>
-          <span className={isPositive ? 'price-up' : 'price-down'}>{quote ? `${isPositive ? '+' : ''}${quote.changePercent.toFixed(2)}%` : '—'}</span>
-        </div>
+        <LegendOhlc controller={controller} quote={quote} precision={market.pricePrecision} />
         {capShown && (
           <div
             className="chart-cap-row"
@@ -195,7 +192,7 @@ export function ChartPane({
           title={volumeVisible ? 'Hide Volume' : 'Show Volume'}
         >
           <span>Volume · {market.baseAsset}</span>
-          <b>{formatCompact(quote?.volume)}</b>
+          <LegendVolume controller={controller} quote={quote} />
           {volumeVisible ? <EyeIcon /> : <EyeOffIcon />}
         </button>}
         {(['sma', 'ema'] as const).filter((kind) => movingAverageActive(indicators[kind])).map((kind) => (
@@ -206,24 +203,28 @@ export function ChartPane({
             onClick={() => onToggleMovingAverage(kind)}
             title={`Hide ${MOVING_AVERAGE_LABELS[kind]}`}
           >
-            <span>{MOVING_AVERAGE_LABELS[kind]}</span>
-            {indicators[kind].periods.map((period, position) => (
-              <b key={period} style={{ color: MOVING_AVERAGE_COLORS[kind][position % MOVING_AVERAGE_COLORS[kind].length] }}>{period}</b>
-            ))}
+            <span>{MOVING_AVERAGE_LABELS[kind]} {indicators[kind].periods.join(' ')}</span>
+            <LegendIndicatorValues
+              controller={controller}
+              quote={quote}
+              pick={(values) => values[kind]}
+              colors={MOVING_AVERAGE_COLORS[kind]}
+              precision={market.pricePrecision}
+            />
             <EyeIcon />
           </button>
         ))}
         {market.kind !== 'dominance' && indicators.vwap.visible && (
           <button type="button" className="chart-indicator-row" onClick={() => onToggleVwap('vwap')} title="Hide VWAP">
             <span>VWAP · {VWAP_ANCHOR_LABELS[indicators.vwap.anchor]}</span>
-            <b style={{ color: VWAP_COLORS.vwap }}>●</b>
+            <LegendIndicatorValues controller={controller} quote={quote} pick={(values) => [values.vwap]} colors={[VWAP_COLORS.vwap]} precision={market.pricePrecision} />
             <EyeIcon />
           </button>
         )}
         {market.kind !== 'dominance' && indicators.qvwap.visible && (
           <button type="button" className="chart-indicator-row" onClick={() => onToggleVwap('qvwap')} title="Hide QVWAP">
             <span>QVWAP</span>
-            <b style={{ color: VWAP_COLORS.qvwap }}>●</b>
+            <LegendIndicatorValues controller={controller} quote={quote} pick={(values) => [values.qvwap]} colors={[VWAP_COLORS.qvwap]} precision={market.pricePrecision} />
             <EyeIcon />
           </button>
         )}
@@ -248,6 +249,8 @@ export function ChartPane({
         onAlertDelete={onDeleteAlert}
         theme={theme}
         countdown={countdown}
+        timeZone={timeZone}
+        highLowLabels={highLowLabels}
       />
 
       {contextMenu && (

@@ -23,7 +23,8 @@ export interface DrawingToolSpec {
   readonly defaultStyle: DrawingStyle
 }
 
-const LINE_STYLE: DrawingStyle = { color: '#f4b860', lineWidth: 2, lineStyle: 'solid' }
+// TradingView's default drawing colour; drawings store their colour, so existing ones keep theirs.
+const LINE_STYLE: DrawingStyle = { color: '#2962ff', lineWidth: 2, lineStyle: 'solid' }
 const POSITION_STYLE: DrawingStyle = {
   targetColor: '#16a085',
   stopColor: '#f0445e',
