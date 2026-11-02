@@ -9,6 +9,8 @@ interface SymbolSearchProps {
   current: CryptoMarket
   onSelect(market: CryptoMarket): void
   onClose(): void
+  /** Opened by typing on the chart: start with what was typed instead of the current symbol. */
+  initialQuery?: string
 }
 
 function matchRank(item: CryptoMarket, needle: string): number {
@@ -41,8 +43,8 @@ function badgeColor(item: CryptoMarket): string {
   return `hsl(${hash} 55% 42%)`
 }
 
-export function SymbolSearch({ markets, current, onSelect, onClose }: SymbolSearchProps) {
-  const [query, setQuery] = useState(current.symbol)
+export function SymbolSearch({ markets, current, onSelect, onClose, initialQuery }: SymbolSearchProps) {
+  const [query, setQuery] = useState(initialQuery ?? current.symbol)
   const [category, setCategory] = useState<(typeof CATEGORIES)[number]>('All')
   const [highlight, setHighlight] = useState(0)
   const inputRef = useRef<HTMLInputElement>(null)
@@ -53,7 +55,9 @@ export function SymbolSearch({ markets, current, onSelect, onClose }: SymbolSear
 
   useEffect(() => {
     inputRef.current?.focus()
-    inputRef.current?.select()
+    // Typed on the chart: keep typing after the first letter. Otherwise select the symbol to replace it.
+    if (initialQuery === undefined) inputRef.current?.select()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   useEffect(() => {

@@ -23,7 +23,10 @@ import { MARKET_INTERVALS, MARKET_INTERVAL_SPECS, type MarketInterval } from '..
 import { alertReached, isTriggered, loadAlerts, moveAlert, saveAlerts, type AlertDirection, type PriceAlert } from './alerts'
 import { AlertsPanel } from './AlertsPanel'
 import { TimeZoneMenu } from './TimeZoneMenu'
-import { resolveTimeZone } from './timeZones'
+import { INTERVAL_INPUT_CHARS, isChartTypingKey, parseIntervalInput } from './hotkeys'
+import { offsetLabel, resolveTimeZone } from './timeZones'
+import { composeSnapshot, copyImage, downloadBlob, snapshotFileName, snapshotValues } from './snapshot'
+import { formatCrosshairTime } from '../chart/timeAxis'
 import { ColorPicker } from './ColorPicker'
 import { getTelegramStatus, sendTelegramTest, startTelegramLink, unlinkTelegram, type TelegramStatus } from './telegram'
 import { disablePush, enablePush, fetchAlertEvents, getPushStatus, type PushStatus } from './backgroundAlerts'
@@ -125,6 +128,7 @@ import {
   SplitIcon,
   StarIcon,
   MidlineIcon,
+  CameraIcon,
 } from './Icons'
 
 const INITIAL_INTERVAL: MarketInterval = '15m'
@@ -275,6 +279,12 @@ function WorkspaceApp({ user, onLogout, onUserRefresh }: WorkspaceAppProps) {
   const [symbolSearch, setSymbolSearch] = useState<'change' | 'new' | 'watchlist' | null>(null)
   const [markets, setMarkets] = useState(() => allMarkets())
   const [alertsOpen, setAlertsOpen] = useState(false)
+  // Typing on the chart (TradingView): letters open symbol search with them, digits open the timeframe box.
+  const [searchSeed, setSearchSeed] = useState<string>()
+  const [intervalInput, setIntervalInput] = useState<string | null>(null)
+  const [intervalError, setIntervalError] = useState('')
+  /** Alt+A: the alert form opens at the current price (the key remounts the panel with it). */
+  const [alertSeed, setAlertSeed] = useState<{ price: string, key: number }>()
   const [profileOpen, setProfileOpen] = useState(false)
   const [profileFocus, setProfileFocus] = useState<'chart' | 'password'>()
   const [adminOpen, setAdminOpen] = useState(false)
@@ -303,6 +313,8 @@ function WorkspaceApp({ user, onLogout, onUserRefresh }: WorkspaceAppProps) {
   const paneTotal = panes.length
   const market = paneMarkets[activePaneIdx]
   const interval = panes[activePaneIdx].interval
+  /** Timeframe buttons in the toolbar: the standard ones, then the user's own. */
+  const toolbarIntervals = useMemo<readonly MarketInterval[]>(() => [...DISPLAY_INTERVALS, ...workspace.customIntervals.filter((value) => !(DISPLAY_INTERVALS as readonly MarketInterval[]).includes(value))], [workspace.customIntervals])
   const [layoutNotice, setLayoutNotice] = useState('')
   const [alerts, setAlerts] = useState<PriceAlert[]>(() => loadAlerts(user.id))
   const [pushStatus, setPushStatus] = useState<PushStatus>('off')
@@ -317,6 +329,8 @@ function WorkspaceApp({ user, onLogout, onUserRefresh }: WorkspaceAppProps) {
   const profileMenuRef = useRef<HTMLDivElement>(null)
   const layoutMenuRef = useRef<HTMLDivElement>(null)
   const timeframeMenuRef = useRef<HTMLDivElement>(null)
+  const snapshotMenuRef = useRef<HTMLDivElement>(null)
+  const [snapshotMenuOpen, setSnapshotMenuOpen] = useState(false)
   const indicatorMenuRef = useRef<HTMLDivElement>(null)
   const splitMenuRef = useRef<HTMLDivElement>(null)
   const [runtime, setRuntime] = useState<ChartRuntimeState>({
@@ -759,10 +773,74 @@ function WorkspaceApp({ user, onLogout, onUserRefresh }: WorkspaceAppProps) {
     setTimeframeMenuOpen(false)
   }, [changeInterval, customIntervalAmount, customIntervalUnit])
 
+  /** Camera button (TradingView): the active chart as a PNG with a header naming the symbol, timeframe and prices. */
+  const takeSnapshot = useCallback((mode: 'download' | 'copy') => {
+    setSnapshotMenuOpen(false)
+    if (!controller) return
+    const now = Date.now()
+    const candle = controller.latestCandle()
+    const fileName = snapshotFileName(market.symbol, interval, now, chartTimeZone)
+    const image = (async () => {
+      const chart = await controller.snapshot()
+      if (!chart) throw new Error('The chart is not ready yet')
+      return composeSnapshot({
+        chart,
+        title: `${market.pair} · ${MARKET_INTERVAL_SPECS[interval].label} · ${market.venue}`,
+        values: candle ? snapshotValues(candle, market.pricePrecision) : [],
+        stamp: `TradeHorizon · ${formatCrosshairTime(now, chartTimeZone, 60_000)} (${offsetLabel(chartTimeZone)})`,
+        dark: theme === 'dark',
+      })
+    })()
+    if (mode === 'copy') {
+      copyImage(image).then(
+        () => showToast('Chart image copied'),
+        (error: unknown) => showToast(error instanceof Error && error.message.startsWith('This browser') ? 'This browser cannot copy images. Use Download image.' : 'Could not copy the image'),
+      )
+    } else {
+      image.then((blob) => { downloadBlob(blob, fileName); showToast('Chart image saved') }, () => showToast('Could not create the image'))
+    }
+  }, [chartTimeZone, controller, interval, market, showToast, theme])
+
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
       const target = event.target
       if (target instanceof HTMLInputElement || target instanceof HTMLTextAreaElement) return
+
+      // The timeframe box takes the keys while it is open.
+      if (intervalInput !== null) {
+        if (event.key === 'Escape') { setIntervalInput(null); event.preventDefault(); return }
+        if (event.key === 'Backspace') { event.preventDefault(); setIntervalError(''); setIntervalInput((value) => (value && value.length > 1 ? value.slice(0, -1) : null)); return }
+        if (event.key === 'Enter') {
+          event.preventDefault()
+          const next = parseIntervalInput(intervalInput)
+          if (next) { changeInterval(next); setIntervalInput(null) } else setIntervalError(`"${intervalInput}" is not a timeframe the exchange offers`)
+          return
+        }
+        if (isChartTypingKey(event, target) && INTERVAL_INPUT_CHARS.test(event.key)) { event.preventDefault(); setIntervalError(''); setIntervalInput((value) => `${value ?? ''}${event.key}`.slice(0, 6)); return }
+        if (!event.ctrlKey && !event.metaKey && !event.altKey) return
+      }
+      if ((event.ctrlKey || event.metaKey) && event.code === 'KeyS' && (event.altKey || event.shiftKey)) {
+        event.preventDefault()
+        takeSnapshot(event.altKey ? 'download' : 'copy')
+        return
+      }
+      if (event.altKey && !event.ctrlKey && !event.metaKey && event.code === 'KeyR') {
+        event.preventDefault()
+        controller?.resetView()
+        return
+      }
+      if (event.altKey && !event.ctrlKey && !event.metaKey && event.code === 'KeyA') {
+        event.preventDefault()
+        const last = controller?.latestCandle()?.close
+        setAlertSeed({ price: last !== undefined && Number.isFinite(last) ? last.toFixed(market.pricePrecision) : '', key: Date.now() })
+        setAlertsOpen(true)
+        return
+      }
+      const otherWindowOpen = symbolSearch !== null || profileOpen || adminOpen || superchartOpen || document.querySelector('[role="dialog"], [role="menu"]') !== null
+      if (!otherWindowOpen && isChartTypingKey(event, target)) {
+        if (/^[0-9]$/.test(event.key)) { event.preventDefault(); setIntervalError(''); setIntervalInput(event.key); return }
+        if (/^[a-zA-Z]$/.test(event.key)) { event.preventDefault(); setSearchSeed(event.key.toUpperCase()); setSymbolSearch('change'); return }
+      }
 
       if (event.key === 'Escape') chooseCursor()
       if (event.shiftKey && replayActive && event.key === 'ArrowRight') {
@@ -801,7 +879,20 @@ function WorkspaceApp({ user, onLogout, onUserRefresh }: WorkspaceAppProps) {
 
     globalThis.addEventListener('keydown', handleKeyDown)
     return () => globalThis.removeEventListener('keydown', handleKeyDown)
-  }, [chooseCursor, chooseTool, controller, drawingStore, replayActive, replayPlaying, selectedDrawingId])
+  }, [adminOpen, changeInterval, chooseCursor, chooseTool, controller, drawingStore, intervalInput, market.pricePrecision, profileOpen, replayActive, replayPlaying, selectedDrawingId, superchartOpen, symbolSearch, takeSnapshot])
+
+  // A click anywhere closes the timeframe box, as in TradingView.
+  useEffect(() => {
+    if (intervalInput === null) return
+    const close = () => setIntervalInput(null)
+    globalThis.addEventListener('pointerdown', close, true)
+    return () => globalThis.removeEventListener('pointerdown', close, true)
+  }, [intervalInput])
+
+  // The Alt+A price is for that one opening; the bell button opens an empty form.
+  useEffect(() => {
+    if (!alertsOpen) setAlertSeed(undefined)
+  }, [alertsOpen])
 
   useEffect(() => {
     setSelectedDrawingId(undefined)
@@ -872,6 +963,7 @@ function WorkspaceApp({ user, onLogout, onUserRefresh }: WorkspaceAppProps) {
       if (!profileMenuRef.current?.contains(target)) setProfileOpen(false)
       if (!layoutMenuRef.current?.contains(target)) setLayoutMenuOpen(false)
       if (!timeframeMenuRef.current?.contains(target)) setTimeframeMenuOpen(false)
+      if (!snapshotMenuRef.current?.contains(target)) setSnapshotMenuOpen(false)
       if (!indicatorMenuRef.current?.contains(target)) setIndicatorMenuOpen(false)
       if (!splitMenuRef.current?.contains(target)) setSplitMenuOpen(false)
     }
@@ -1156,7 +1248,7 @@ function WorkspaceApp({ user, onLogout, onUserRefresh }: WorkspaceAppProps) {
         <span className="toolbar-divider" />
 
         <div className="timeframe-group" aria-label="Chart timeframe">
-          {[...DISPLAY_INTERVALS, ...workspace.customIntervals.filter((value) => !(DISPLAY_INTERVALS as readonly MarketInterval[]).includes(value))].map((value) => (
+          {toolbarIntervals.map((value) => (
             <button
               className={interval === value ? 'timeframe-button active' : 'timeframe-button'}
               type="button"
@@ -1177,7 +1269,7 @@ function WorkspaceApp({ user, onLogout, onUserRefresh }: WorkspaceAppProps) {
             aria-expanded={timeframeMenuOpen}
             onClick={() => setTimeframeMenuOpen((open) => !open)}
           >
-            More
+            {toolbarIntervals.includes(interval) ? 'More' : <span className="current-timeframe">{MARKET_INTERVAL_SPECS[interval].label}</span>}
           </button>
           {timeframeMenuOpen && (
             <div className="top-menu timeframe-menu">
@@ -1504,6 +1596,27 @@ function WorkspaceApp({ user, onLogout, onUserRefresh }: WorkspaceAppProps) {
               <button type="button" onClick={() => { setSuperchartOpen(true); setLayoutMenuOpen(false) }}>
                 Manage layouts <span>{savedLayouts.length}</span>
               </button>
+            </div>
+          )}
+        </div>
+
+        <div className="toolbar-popover-control" ref={snapshotMenuRef}>
+          <button
+            type="button"
+            className="indicators-button snapshot-button"
+            aria-label="Take a snapshot"
+            title="Take a snapshot"
+            aria-haspopup="menu"
+            aria-expanded={snapshotMenuOpen}
+            onClick={() => setSnapshotMenuOpen((open) => !open)}
+            disabled={!controller || !quote}
+          >
+            <CameraIcon />
+          </button>
+          {snapshotMenuOpen && (
+            <div className="top-menu layout-menu snapshot-menu" role="menu">
+              <button type="button" role="menuitem" onClick={() => takeSnapshot('download')}>Download image <span>Ctrl+Alt+S</span></button>
+              <button type="button" role="menuitem" onClick={() => takeSnapshot('copy')}>Copy image <span>Ctrl+Shift+S</span></button>
             </div>
           )}
         </div>
@@ -2138,6 +2251,8 @@ function WorkspaceApp({ user, onLogout, onUserRefresh }: WorkspaceAppProps) {
 
       {alertsOpen && (
         <AlertsPanel
+          key={alertSeed?.key ?? 0}
+          initialPrice={alertSeed?.price}
           alerts={alerts}
           market={market}
           lastPrice={quote?.close}
@@ -2203,17 +2318,29 @@ function WorkspaceApp({ user, onLogout, onUserRefresh }: WorkspaceAppProps) {
         <SymbolSearch
           markets={markets}
           current={market}
+          initialQuery={searchSeed}
           onSelect={(next) => {
             if (symbolSearch === 'new') createChartTab(next.symbol)
             else if (symbolSearch === 'watchlist') setWatchlistState((current) => addSymbol(current, next.symbol))
             else changeMarket(next)
             setSymbolSearch(null)
+            setSearchSeed(undefined)
           }}
-          onClose={() => setSymbolSearch(null)}
+          onClose={() => { setSymbolSearch(null); setSearchSeed(undefined) }}
         />
       )}
 
       {toast && <div className="toast" role="status">{toast}</div>}
+
+      {intervalInput !== null && (
+        <div className="interval-prompt" role="dialog" aria-label="Change interval">
+          <small>Change interval</small>
+          <strong>{intervalInput}</strong>
+          <span className={intervalError ? 'interval-prompt-error' : ''}>
+            {intervalError || (parseIntervalInput(intervalInput) ? `Enter: ${parseIntervalInput(intervalInput)}` : 'm minutes · h hours · D day · W week · M month')}
+          </span>
+        </div>
+      )}
 
       {saveAsOpen && (
         <div className="superchart-backdrop" role="presentation" onMouseDown={() => setSaveAsOpen(false)}>

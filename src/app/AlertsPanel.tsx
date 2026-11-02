@@ -1,9 +1,11 @@
-import { useMemo, useState, type ReactNode } from 'react'
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { groupAlerts, isTriggered, type AlertDirection, type AlertFilter, type PriceAlert } from './alerts'
 import { BellIcon, ChevronIcon, CloseIcon, EyeIcon, EyeOffIcon, PauseIcon, PlayIcon, SearchIcon, TrashIcon } from './Icons'
 import type { CryptoMarket } from '../chart/markets'
 
 interface AlertsPanelProps {
+  /** Alt+A: start the form at this price and put the cursor in it. */
+  initialPrice?: string
   alerts: readonly PriceAlert[]
   market: CryptoMarket
   /** Latest price of the chart's symbol, for the "distance" column and the form placeholder. */
@@ -38,13 +40,18 @@ function formatTime(ms: number): string {
 /** Price alerts side panel. Stays tidy with many alerts: filtered, searchable and grouped per coin. */
 export function AlertsPanel({
   alerts, market, lastPrice, linesVisible, onToggleLines, onCreate, onToggle, onDelete, onClearTriggered, onOpenSymbol, onClose,
-  notificationSummary, notifications,
+  notificationSummary, notifications, initialPrice,
 }: AlertsPanelProps) {
   const [filter, setFilter] = useState<AlertFilter>('active')
   const [query, setQuery] = useState('')
   const [collapsed, setCollapsed] = useState<ReadonlySet<string>>(new Set())
   const [direction, setDirection] = useState<AlertDirection>('above')
-  const [price, setPrice] = useState('')
+  const [price, setPrice] = useState(initialPrice ?? '')
+  const priceRef = useRef<HTMLInputElement>(null)
+  useEffect(() => {
+    if (initialPrice !== undefined) { priceRef.current?.focus(); priceRef.current?.select() }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
   const [notificationsOpen, setNotificationsOpen] = useState(true)
 
   const counts = useMemo(() => {
@@ -102,6 +109,7 @@ export function AlertsPanel({
             <option value="below">Crosses below</option>
           </select>
           <input
+            ref={priceRef}
             type="number"
             min="0"
             step="any"

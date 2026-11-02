@@ -50,7 +50,8 @@ export const DRAWING_TOOLS: Readonly<Record<DrawingType, DrawingToolSpec>> = {
     overlayName: 'rayLine',
     placement: 'twoPoint',
     hint: 'Click two points or drag. The line extends past the second point.',
-    shortcut: 'R',
+    // Alt+R is TradingView's "reset chart view", so the ray takes Alt+Y.
+    shortcut: 'Y',
     defaultStyle: LINE_STYLE,
   },
   horizontalLine: {

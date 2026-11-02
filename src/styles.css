@@ -3582,3 +3582,16 @@ button:disabled {
 .profile-select span { display: grid; gap: 2px; }
 .profile-select small { color: var(--muted); font-size: .78rem; }
 .profile-select select { height: 34px; padding: 0 10px; border: 1px solid var(--border-strong); border-radius: 6px; color: var(--text); background: var(--bg); font: inherit; font-size: .82rem; }
+
+/* Timeframe box opened by typing a number on the chart (TradingView) */
+.interval-prompt { position: fixed; z-index: 70; top: 120px; left: 50%; display: grid; justify-items: center; gap: 4px; min-width: 220px; padding: 14px 20px; border: 1px solid var(--border-strong); border-radius: 10px; background: var(--tv-raised, var(--panel-raised)); box-shadow: 0 14px 40px rgb(0 0 0 / 50%); transform: translateX(-50%); }
+.interval-prompt small { color: var(--muted); font-size: .72rem; letter-spacing: .04em; text-transform: uppercase; }
+.interval-prompt strong { font-size: 1.6rem; font-variant-numeric: tabular-nums; }
+.interval-prompt span { color: var(--muted); font-size: .74rem; }
+.interval-prompt span.interval-prompt-error { color: #f23645; }
+.more-timeframes-button .current-timeframe { color: var(--tv-blue, #2962ff); }
+
+/* Camera button: chart picture */
+.snapshot-button { padding: 0 7px; }
+.snapshot-menu { width: 230px; }
+.snapshot-menu > button span { font-size: .72rem; }

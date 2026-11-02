@@ -7,6 +7,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [0.24.0] - 2026-11-02
+
+Closer to TradingView, part 1.
+
+### Added
+- **The legend follows the crosshair**: hovering a candle shows its open, high, low, close, change from the previous close, volume and the moving-average and VWAP values at that candle. Leaving the chart shows the live values again.
+- **Time zone**: the time axis and the crosshair date use your computer's time zone. Pick another one from the status bar (bottom left) or the account window. Daily candles still open at 00:00 UTC, as on the exchange.
+- **Typing on the chart**:
+  - Typing a letter opens symbol search with that letter already typed.
+  - Typing a number opens a *Change interval* box, applied with Enter (Esc closes it). For example: `15` is 15 minutes, `60` or `1h` is 1 hour, `240` is 4 hours, then `1d`, `1w`, and `1M` for 1 month.
+- **Alt+R** resets the chart view (automatic price scale, default zoom, latest candles). **Alt+A** opens the alert form with the current price filled in.
+- **Chart image**: a camera button at the right of the top toolbar.
+  - *Download image* (Ctrl+Alt+S) saves a PNG; *Copy image* (Ctrl+Shift+S) copies it.
+  - The image has a header with the symbol, timeframe, exchange, prices and time, and includes drawings but not the crosshair.
+- **Layouts save themselves**: when a chart belongs to a saved layout, changes are saved to that layout about a second later. This covers symbol, timeframe, split view and indicators. The toolbar shows *Autosaved*, and just opening a layout does not count as a change.
+- Account window: a *High and low price labels* option.
+
+### Changed
+- **Time axis labels look like TradingView's**: round times (00:00, 04:00 …), the day number at midnight, the month name when a month starts and the year when a year starts. Labels never crowd each other.
+- **Volume is drawn at the bottom of the price pane**, like TradingView's default, instead of in its own pane with a moving average.
+- **High and low price labels are off by default.**
+- New drawings are blue (#2962FF), as in TradingView. Existing drawings keep their colour.
+- The **ray** tool's shortcut is now **Alt+Y**, because Alt+R resets the chart as in TradingView.
+
+### Fixed
+- When the chart used a timeframe from the *More* list (such as 3m), no toolbar button showed it. The *More* button now shows it instead.
+
 ## [0.23.0] - 2026-11-01
 
 ### Added

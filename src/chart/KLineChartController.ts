@@ -110,6 +110,15 @@ const DOMINANCE_INDICATOR_REFRESH_MS = 60_000
 const DAY_MS = 24 * 60 * 60 * 1000
 const POINT_HANDLE_KEY_PREFIX = 'overlay_figure_point_'
 // The HTML legend lists moving averages, so the library's own overlapping label is blanked.
+/** The colour behind the chart (its canvases are transparent), for pictures of it. */
+function chartBackground(element: HTMLElement): string {
+  for (let node: HTMLElement | null = element; node; node = node.parentElement) {
+    const color = getComputedStyle(node).backgroundColor
+    if (color && color !== 'transparent' && !/^rgba\(.*,\s*0\)$/.test(color)) return color
+  }
+  return '#131722'
+}
+
 /** Bar width when the chart opens or its view is reset (Alt+R). */
 const DEFAULT_BAR_SPACE = 10
 const HIDDEN_INDICATOR_TOOLTIP = { name: '', calcParamsText: '', features: [], legends: [] }
@@ -981,11 +990,21 @@ export class KLineChartController {
     this.goToLive()
   }
 
-  /** The chart as a PNG data URL, drawings included, and its size in CSS pixels. */
-  public snapshot(background: string): { url: string, width: number, height: number } | null {
+  /**
+   * The chart as a PNG data URL with its drawings, its size in CSS pixels and the colour behind it. The crosshair is
+   * hidden first (TradingView's pictures have none); the library redraws on the next animation frame, so this waits.
+   */
+  public async snapshot(): Promise<{ url: string, width: number, height: number, background: string } | null> {
     if (this.#disposed) return null
+    this.#chart.executeAction('onCrosshairChange', null as never)
+    await new Promise<void>((resolve) => {
+      globalThis.setTimeout(resolve, 120)
+      requestAnimationFrame(() => requestAnimationFrame(() => resolve()))
+    })
+    if (this.#disposed) return null
+    const background = chartBackground(this.#host)
     const url = this.#chart.getConvertPictureUrl(true, 'png', background)
-    return url ? { url, width: this.#host.clientWidth, height: this.#host.clientHeight } : null
+    return url ? { url, width: this.#host.clientWidth, height: this.#host.clientHeight, background } : null
   }
 
   public readonly subscribeHover = (listener: () => void): (() => void) => {
@@ -994,6 +1013,14 @@ export class KLineChartController {
   }
 
   public readonly getHover = (): HoverState | null => this.#hover
+
+  /** The newest candle on the chart and the close before it, read when needed (no React state follows every tick). */
+  public latestCandle(): { open: number, high: number, low: number, close: number, volume?: number, previousClose?: number } | undefined {
+    if (this.#disposed) return undefined
+    const list = this.#chart.getDataList()
+    const last = list[list.length - 1]
+    return last ? { open: last.open, high: last.high, low: last.low, close: last.close, volume: last.volume, previousClose: list[list.length - 2]?.close } : undefined
+  }
 
   /** Close of the candle before the newest one (the legend's change is measured from it). */
   public latestPreviousClose(): number | undefined {
