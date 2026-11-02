@@ -79,6 +79,7 @@ import {
   loadSavedLayouts,
   loadWorkspace,
   saveSavedLayouts,
+  autosaveLayouts,
   saveWorkspace,
   splitTabFromPanes,
   type ChartTab,
@@ -824,6 +825,11 @@ function WorkspaceApp({ user, onLogout, onUserRefresh }: WorkspaceAppProps) {
 
   useEffect(() => saveWorkspace(user.id, workspace), [user.id, workspace])
   useEffect(() => saveSavedLayouts(user.id, savedLayouts), [savedLayouts, user.id])
+  // Layouts save themselves as you work, like TradingView: shortly after the open tabs change, each open layout follows.
+  useEffect(() => {
+    const timer = globalThis.setTimeout(() => setSavedLayouts((current) => autosaveLayouts(current, workspace, Date.now()) as SavedLayout[]), 1200)
+    return () => globalThis.clearTimeout(timer)
+  }, [workspace])
   useEffect(() => saveAlerts(user.id, alerts), [alerts, user.id])
   useEffect(() => saveGroups(user.id, groupState), [groupState, user.id])
 
@@ -1478,7 +1484,7 @@ function WorkspaceApp({ user, onLogout, onUserRefresh }: WorkspaceAppProps) {
           >
             <LayersIcon />
             <span>{currentLayout?.name ?? workspace.layoutName}</span>
-            <small>{layoutNotice || (currentLayout ? 'Saved layout' : 'Unsaved')}</small>
+            <small title={currentLayout ? 'Changes to this layout are saved automatically' : 'Your open tabs are kept, but they are not part of a saved layout yet'}>{layoutNotice || (currentLayout ? 'Autosaved' : 'Not saved as layout')}</small>
           </button>
           {layoutMenuOpen && (
             <div className="top-menu layout-menu" role="menu">

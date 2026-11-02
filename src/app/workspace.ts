@@ -290,3 +290,43 @@ export function loadSavedLayouts(userId: string): SavedLayout[] {
 export function saveSavedLayouts(userId: string, layouts: readonly SavedLayout[]): void {
   localStorage.setItem(layoutsKey(userId), JSON.stringify(layouts))
 }
+
+/** What a saved layout holds, without anything that changes merely by opening it (tab ids, dates). */
+function layoutContent(layout: Pick<SavedLayout, 'tabs' | 'activeTabId' | 'volumeVisible' | 'customIntervals' | 'indicators'>): string {
+  return JSON.stringify({
+    tabs: layout.tabs.map(({ id: _id, createdAtMs: _created, layoutId: _layout, ...tab }) => tab),
+    active: layout.tabs.findIndex((tab) => tab.id === layout.activeTabId),
+    volumeVisible: layout.volumeVisible,
+    customIntervals: layout.customIntervals,
+    indicators: layout.indicators ?? null,
+  })
+}
+
+/**
+ * TradingView saves a layout as you work. Every saved layout that is open in the tab bar is kept in step with its
+ * tabs; the layout of the active tab also takes the workspace-wide settings (volume, timeframes, indicators).
+ * Returns the same array when nothing changed, so it can run after every workspace change.
+ */
+export function autosaveLayouts(layouts: readonly SavedLayout[], workspace: UserWorkspace, now: number): readonly SavedLayout[] {
+  const activeLayoutId = workspace.tabs.find((tab) => tab.id === workspace.activeTabId)?.layoutId
+  let changed = false
+  const next = layouts.map((layout) => {
+    const group = workspace.tabs.filter((tab) => tab.layoutId === layout.id)
+    if (group.length === 0) return layout
+    const activeTabId = group.some((tab) => tab.id === workspace.activeTabId)
+      ? workspace.activeTabId
+      : group.some((tab) => tab.id === layout.activeTabId) ? layout.activeTabId : group[0].id
+    const candidate: SavedLayout = {
+      ...layout,
+      tabs: group.map(({ layoutId: _layoutId, ...tab }) => tab),
+      activeTabId,
+      ...(layout.id === activeLayoutId
+        ? { volumeVisible: workspace.volumeVisible, customIntervals: workspace.customIntervals, ...(workspace.indicators ? { indicators: workspace.indicators } : {}) }
+        : {}),
+    }
+    if (layoutContent(candidate) === layoutContent(layout)) return layout
+    changed = true
+    return { ...candidate, updatedAtMs: now }
+  })
+  return changed ? next : layouts
+}
