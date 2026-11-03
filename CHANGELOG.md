@@ -7,6 +7,36 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [0.25.0] - 2026-11-03
+
+Closer to TradingView, part 2.
+
+### Added
+- **Indicator library**: search the Indicators menu and add any of these:
+  - Relative Strength Index, MACD and Stochastic RSI, each in its own pane with guide levels and the values in the pane's legend.
+  - Average True Range, also in its own pane.
+  - Bollinger Bands, Ichimoku Cloud (with the cloud filled), Supertrend and Volume Profile (visible range), all drawn on the candles.
+  - Up to 10 indicators at a time.
+  - Each has eye, settings and remove buttons in the legend; its settings window changes inputs (lengths, factors) and line colours.
+  - Indicators are saved with the chart and its layouts.
+- **Chart types**: bars, candles, hollow candles, Heikin Ashi, line, area and baseline, from one menu in the toolbar.
+- **Bar under the chart**, as in TradingView:
+  - Date ranges (1D, 5D, 1M, 3M, 6M, YTD, 1Y, 5Y, All). Each picks a fitting timeframe and fits that period on screen.
+  - **Go to date**: jumps to a date and time, loading older candles first. If the date is further back than the timeframe can load, it says so.
+  - **%** (percent) and **log** price scales, and **fullscreen**.
+- **Chart settings window** (right-click → Settings):
+  - Candle up and down colours (volume and Heikin Ashi follow them) and wicks.
+  - Background colour, grid lines and the last-price line.
+  - Price scale, countdown, high/low labels, alert lines and time zone.
+- **Drawing editing**:
+  - Double-click a drawing to open its settings window. **Style** covers colours, width, line style, fill and text. **Coordinates** lets you type exact prices and times. **Visibility** chooses which timeframes (minutes, hours, days, weeks, months) it shows on.
+  - Fibonacci retracement levels can be edited: add, remove or reset to the defaults.
+  - Right-click a drawing for its menu: Settings, Visibility, Clone, Lock, Hide, Remove.
+  - **Multi-select** with Ctrl+click or Shift+click. The group moves together (one undo step), and can be cloned, locked, hidden or deleted together.
+  - Tool rail: **Stay in drawing mode** (the tool stays selected after each drawing), **Lock all drawings** and **Hide all drawings**.
+
+### Fixed
+- After a timeframe change, or when jumping to a drawing from the object tree, the chart now centres that moment instead of putting it at the right edge.
 ## [0.24.0] - 2026-11-02
 
 Closer to TradingView, part 1.

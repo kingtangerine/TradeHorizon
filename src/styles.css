@@ -3663,3 +3663,20 @@ button:disabled {
 .study-settings-dialog { width: min(440px, 100%); height: auto; max-height: min(640px, 100%); }
 .study-settings-dialog .chart-settings-panel { padding: 8px 18px 14px; }
 .study-input { width: 110px; height: 30px; padding: 0 8px; border: 1px solid var(--border-strong); border-radius: 6px; color: var(--text); background: var(--bg); font: inherit; font-size: .82rem; }
+
+/* Drawing editing */
+.drawing-settings-dialog { height: min(560px, 100%); }
+.study-input.wide { width: 200px; }
+.coordinate-row { padding-bottom: 6px; border-bottom: 1px solid var(--border); }
+.coordinate-row:last-of-type { border-bottom: 0; }
+.chart-settings-note.error { color: #f23645; }
+.fib-levels { display: flex; flex-wrap: wrap; gap: 6px; }
+.fib-level { display: inline-flex; align-items: center; gap: 4px; height: 26px; padding: 0 4px 0 9px; border: 1px solid var(--border-strong); border-radius: 13px; font-size: .78rem; font-variant-numeric: tabular-nums; }
+.fib-level button { width: 18px; height: 18px; padding: 0; border: 0; border-radius: 50%; color: var(--muted); background: transparent; cursor: pointer; }
+.fib-level button:hover:not(:disabled) { color: var(--text); background: var(--tv-hover); }
+.small-button { height: 30px; padding: 0 10px; border: 1px solid var(--border-strong); border-radius: 6px; color: var(--text); background: transparent; font: inherit; font-size: .78rem; cursor: pointer; }
+.drawing-context-menu { position: fixed; z-index: 2100; }
+.drawing-context-menu kbd { margin-left: auto; color: var(--muted); font: inherit; font-size: .72rem; }
+.drawing-context-menu button.danger { color: #f23645; }
+.context-menu-title { padding: 6px 10px 4px; color: var(--muted); font-size: .72rem; font-weight: 600; }
+.toolbar-count { padding: 0 6px; font-size: .78rem; white-space: nowrap; }

@@ -15,6 +15,7 @@ import type { ChartRuntimeState } from '../chart/types'
 import {
   DrawingStore,
   createLocalStorageDrawingRepository,
+  batchDrawings,
   deleteDrawing,
   updateDrawing,
   type DrawingType,
@@ -32,6 +33,9 @@ import { ChartTypeIcon } from './ChartTypeIcon'
 import { BottomBar, ScaleToggles } from './BottomBar'
 import { ChartSettingsDialog } from './ChartSettingsDialog'
 import { StudySettingsDialog } from './StudySettingsDialog'
+import { DrawingSettingsDialog, type DrawingSettingsTab } from './DrawingSettingsDialog'
+import { DrawingContextMenu } from './DrawingContextMenu'
+import type { DrawingModes } from '../chart/KLineChartController'
 import { MAX_STUDIES, STUDIES, STUDY_TYPES, newStudy, type Study, type StudyType } from '../chart/studies'
 import { ColorPicker } from './ColorPicker'
 import { getTelegramStatus, sendTelegramTest, startTelegramLink, unlinkTelegram, type TelegramStatus } from './telegram'
@@ -133,6 +137,7 @@ import {
   StarIcon,
   MidlineIcon,
   CameraIcon,
+  PencilLockIcon,
 } from './Icons'
 
 const INITIAL_INTERVAL: MarketInterval = '15m'
@@ -268,6 +273,10 @@ function WorkspaceApp({ user, onLogout, onUserRefresh }: WorkspaceAppProps) {
   const [controller, setController] = useState<KLineChartController | null>(null)
   const [activeTool, setActiveTool] = useState<'cursor' | DrawingType>('cursor')
   const [selectedDrawingId, setSelectedDrawingId] = useState<string>()
+  // Drawing editing: settings window (double-click), right-click menu, Ctrl/Shift+click multi-selection.
+  const [drawingSettings, setDrawingSettings] = useState<{ id: string, tab: DrawingSettingsTab }>()
+  const [drawingMenu, setDrawingMenu] = useState<{ id: string, left: number, top: number }>()
+  const [multiSelection, setMultiSelection] = useState<readonly string[]>([])
   const [objectTreeOpen, setObjectTreeOpen] = useState(false)
   const [groupState, setGroupState] = useState(() => loadGroups(user.id))
   const [preferences, setPreferences] = useState(() => loadPreferences(user.id))
@@ -319,6 +328,11 @@ function WorkspaceApp({ user, onLogout, onUserRefresh }: WorkspaceAppProps) {
   const market = paneMarkets[activePaneIdx]
   const interval = panes[activePaneIdx].interval
   const chartType: ChartType = workspace.chartType ?? 'candles'
+  const drawingModes = useMemo<DrawingModes>(() => ({
+    stayInDrawingMode: workspace.stayInDrawingMode === true,
+    lockAll: workspace.lockAllDrawings === true,
+    hideAll: workspace.hideAllDrawings === true,
+  }), [workspace.stayInDrawingMode, workspace.lockAllDrawings, workspace.hideAllDrawings])
   /** Timeframe buttons in the toolbar: the standard ones, then the user's own. */
   const toolbarIntervals = useMemo<readonly MarketInterval[]>(() => [...DISPLAY_INTERVALS, ...workspace.customIntervals.filter((value) => !(DISPLAY_INTERVALS as readonly MarketInterval[]).includes(value))], [workspace.customIntervals])
   const [layoutNotice, setLayoutNotice] = useState('')
@@ -795,6 +809,20 @@ function WorkspaceApp({ user, onLogout, onUserRefresh }: WorkspaceAppProps) {
     setTimeframeMenuOpen(false)
   }, [changeInterval, customIntervalAmount, customIntervalUnit])
 
+  useEffect(() => {
+    if (!controller) return
+    setMultiSelection([])
+    return controller.subscribeDrawingEvents((event) => {
+      if (event.kind === 'selection') setMultiSelection(event.ids)
+      else if (event.kind === 'contextMenu') setDrawingMenu({ id: event.id, left: event.clientX, top: event.clientY })
+      else {
+        const drawing = drawingStore.getSnapshot().drawings.find((item) => item.id === event.id)
+        if (drawing && isPositionTool(drawing.type)) setPositionSettingsOpen(true)
+        else if (drawing) setDrawingSettings({ id: event.id, tab: 'style' })
+      }
+    })
+  }, [controller, drawingStore])
+
   /** Camera button (TradingView): the active chart as a PNG with a header naming the symbol, timeframe and prices. */
   const takeSnapshot = useCallback((mode: 'download' | 'copy') => {
     setSnapshotMenuOpen(false)
@@ -858,7 +886,7 @@ function WorkspaceApp({ user, onLogout, onUserRefresh }: WorkspaceAppProps) {
         setAlertsOpen(true)
         return
       }
-      const otherWindowOpen = symbolSearch !== null || profileOpen || adminOpen || superchartOpen || chartSettingsOpen || studySettingsId !== undefined || document.querySelector('[role="dialog"], [role="menu"]') !== null
+      const otherWindowOpen = symbolSearch !== null || profileOpen || adminOpen || superchartOpen || chartSettingsOpen || studySettingsId !== undefined || drawingSettings !== undefined || document.querySelector('[role="dialog"], [role="menu"]') !== null
       if (!otherWindowOpen && isChartTypingKey(event, target)) {
         if (/^[0-9]$/.test(event.key)) { event.preventDefault(); setIntervalError(''); setIntervalInput(event.key); return }
         if (/^[a-zA-Z]$/.test(event.key)) { event.preventDefault(); setSearchSeed(event.key.toUpperCase()); setSymbolSearch('change'); return }
@@ -901,7 +929,7 @@ function WorkspaceApp({ user, onLogout, onUserRefresh }: WorkspaceAppProps) {
 
     globalThis.addEventListener('keydown', handleKeyDown)
     return () => globalThis.removeEventListener('keydown', handleKeyDown)
-  }, [adminOpen, chartSettingsOpen, studySettingsId, changeInterval, chooseCursor, chooseTool, controller, drawingStore, intervalInput, market.pricePrecision, profileOpen, replayActive, replayPlaying, selectedDrawingId, superchartOpen, symbolSearch, takeSnapshot])
+  }, [adminOpen, chartSettingsOpen, studySettingsId, drawingSettings, changeInterval, chooseCursor, chooseTool, controller, drawingStore, intervalInput, market.pricePrecision, profileOpen, replayActive, replayPlaying, selectedDrawingId, superchartOpen, symbolSearch, takeSnapshot])
 
   // A click anywhere closes the timeframe box, as in TradingView.
   useEffect(() => {
@@ -1138,6 +1166,13 @@ function WorkspaceApp({ user, onLogout, onUserRefresh }: WorkspaceAppProps) {
         price: decimalString(clampDcaPrice(Number(entry.price), Number(stop.price))),
       }],
     }))
+  }
+
+  /** Lock or hide every drawing of the multi-selection (locking unlocks all when all were locked). */
+  const setGroupFlag = (flag: 'locked' | 'hidden') => {
+    const drawings = drawingSnapshot.drawings.filter((drawing) => multiSelection.includes(drawing.id))
+    const value = flag === 'hidden' ? true : !drawings.every((drawing) => drawing.locked)
+    drawingStore.execute(batchDrawings(drawings.map((drawing) => updateDrawing(drawing.id, { [flag]: value }))))
   }
 
   const updateSelectedStyle = (changes: Record<string, string | number | boolean>) => {
@@ -1731,6 +1766,45 @@ function WorkspaceApp({ user, onLogout, onUserRefresh }: WorkspaceAppProps) {
           >
             <MagnetIcon />
           </button>
+          <button
+            type="button"
+            className={workspace.stayInDrawingMode ? 'tool-button active' : 'tool-button'}
+            aria-label="Stay in drawing mode"
+            aria-pressed={!!workspace.stayInDrawingMode}
+            title={workspace.stayInDrawingMode ? 'Stay in drawing mode: on (the tool stays selected after each drawing)' : 'Stay in drawing mode: off'}
+            onClick={() => setWorkspace((current) => {
+              const { stayInDrawingMode, ...rest } = current
+              return stayInDrawingMode ? rest : { ...rest, stayInDrawingMode: true }
+            })}
+          >
+            <PencilLockIcon />
+          </button>
+          <button
+            type="button"
+            className={workspace.lockAllDrawings ? 'tool-button active' : 'tool-button'}
+            aria-label="Lock all drawings"
+            aria-pressed={!!workspace.lockAllDrawings}
+            title={workspace.lockAllDrawings ? 'All drawings locked' : 'Lock all drawings'}
+            onClick={() => setWorkspace((current) => {
+              const { lockAllDrawings, ...rest } = current
+              return lockAllDrawings ? rest : { ...rest, lockAllDrawings: true }
+            })}
+          >
+            {workspace.lockAllDrawings ? <LockIcon /> : <UnlockIcon />}
+          </button>
+          <button
+            type="button"
+            className={workspace.hideAllDrawings ? 'tool-button active' : 'tool-button'}
+            aria-label="Hide all drawings"
+            aria-pressed={!!workspace.hideAllDrawings}
+            title={workspace.hideAllDrawings ? 'Show all drawings' : 'Hide all drawings'}
+            onClick={() => setWorkspace((current) => {
+              const { hideAllDrawings, ...rest } = current
+              return hideAllDrawings ? rest : { ...rest, hideAllDrawings: true }
+            })}
+          >
+            {workspace.hideAllDrawings ? <EyeOffIcon /> : <EyeIcon />}
+          </button>
 
           <span className="tool-divider" />
 
@@ -1787,6 +1861,7 @@ function WorkspaceApp({ user, onLogout, onUserRefresh }: WorkspaceAppProps) {
                 highLowLabels={preferences.highLowLabels}
                 scaleMode={workspace.scaleMode ?? 'normal'}
                 appearance={preferences.appearance}
+                drawingModes={drawingModes}
                 alerts={alerts}
                 alertLinesVisible={preferences.alertLines}
                 onMoveAlert={moveAlertTo}
@@ -1866,7 +1941,20 @@ function WorkspaceApp({ user, onLogout, onUserRefresh }: WorkspaceAppProps) {
             )
           })()}
 
-          {selectedDrawing && (
+          {multiSelection.length > 1 && (
+            <div className="floating-object-toolbar" role="toolbar" aria-label="Selected drawings">
+              <span className="toolbar-grip" aria-hidden="true" />
+              <strong className="toolbar-count">{multiSelection.length} drawings</strong>
+              <span className="toolbar-separator" />
+              <button type="button" className="toolbar-action" aria-label="Clone selected drawings" title="Clone" onClick={() => { for (const id of multiSelection) controller?.cloneDrawing(id) }}><CopyIcon /></button>
+              <button type="button" className="toolbar-action" aria-label="Lock selected drawings" title="Lock or unlock all" onClick={() => setGroupFlag('locked')}><LockIcon /></button>
+              <button type="button" className="toolbar-action" aria-label="Hide selected drawings" title="Hide" onClick={() => setGroupFlag('hidden')}><EyeOffIcon /></button>
+              <button type="button" className="toolbar-action delete" aria-label="Delete selected drawings" title="Delete (Del)" onClick={() => controller?.deleteSelected()}><TrashIcon /></button>
+              <button type="button" className="toolbar-action" aria-label="Clear selection" title="Clear selection" onClick={() => { controller?.clearSelection(); controller?.clearDrawingSelection() }}><CloseIcon /></button>
+            </div>
+          )}
+
+          {selectedDrawing && multiSelection.length < 2 && (
             <div className="floating-object-toolbar" role="toolbar" aria-label="Selected object properties">
               <span className="toolbar-grip" aria-hidden="true" />
               <div className="toolbar-object-type" title={DRAWING_TOOLS[selectedDrawing.type].label}>
@@ -2464,6 +2552,42 @@ function WorkspaceApp({ user, onLogout, onUserRefresh }: WorkspaceAppProps) {
           onClose={() => setStudySettingsId(undefined)}
         />
       )}
+
+      {drawingSettings && drawingSnapshot.drawings.some((drawing) => drawing.id === drawingSettings.id) && (
+        <DrawingSettingsDialog
+          key={drawingSettings.id + drawingSettings.tab}
+          drawing={drawingSnapshot.drawings.find((drawing) => drawing.id === drawingSettings.id)!}
+          timeZone={chartTimeZone}
+          pricePrecision={market.pricePrecision}
+          initialTab={drawingSettings.tab}
+          onUpdate={(changes) => drawingStore.execute(updateDrawing(drawingSettings.id, changes))}
+          onClose={() => setDrawingSettings(undefined)}
+        />
+      )}
+
+      {drawingMenu && (() => {
+        const drawing = drawingSnapshot.drawings.find((item) => item.id === drawingMenu.id)
+        if (!drawing) return null
+        const group = multiSelection.length > 1 && multiSelection.includes(drawing.id)
+        const ids = group ? [...multiSelection] : [drawing.id]
+        const targets = drawingSnapshot.drawings.filter((item) => ids.includes(item.id))
+        const locked = targets.every((item) => item.locked)
+        return (
+          <DrawingContextMenu
+            left={drawingMenu.left}
+            top={drawingMenu.top}
+            locked={locked}
+            count={ids.length}
+            onSettings={() => (isPositionTool(drawing.type) ? setPositionSettingsOpen(true) : setDrawingSettings({ id: drawing.id, tab: 'style' }))}
+            onVisibility={() => setDrawingSettings({ id: drawing.id, tab: 'visibility' })}
+            onClone={() => { for (const id of ids) controller?.cloneDrawing(id) }}
+            onLock={() => drawingStore.execute(batchDrawings(targets.map((item) => updateDrawing(item.id, { locked: !locked }))))}
+            onHide={() => drawingStore.execute(batchDrawings(targets.map((item) => updateDrawing(item.id, { hidden: true }))))}
+            onDelete={() => (group ? controller?.deleteSelected() : drawingStore.execute(deleteDrawing(drawing.id)))}
+            onClose={() => setDrawingMenu(undefined)}
+          />
+        )
+      })()}
 
       {chartSettingsOpen && (
         <ChartSettingsDialog

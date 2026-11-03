@@ -24,6 +24,10 @@ export interface UserWorkspace {
   readonly magnet?: boolean
   /** Regular price scale is the default and is not stored. */
   readonly scaleMode?: 'log' | 'percent'
+  /** Tool-rail toggles; off by default and not stored when off. */
+  readonly stayInDrawingMode?: true
+  readonly lockAllDrawings?: true
+  readonly hideAllDrawings?: true
   /** Candles are the default and are not stored. */
   readonly chartType?: Exclude<ChartType, 'candles'>
 }
@@ -244,6 +248,9 @@ export function loadWorkspace(userId: string): UserWorkspace {
       ...(value.indicators ? { indicators: normalizeIndicators(value.indicators) } : {}),
       ...(value.magnet === true ? { magnet: true } : {}),
       ...(value.scaleMode === 'log' || value.scaleMode === 'percent' ? { scaleMode: value.scaleMode } : {}),
+      ...(value.stayInDrawingMode === true ? { stayInDrawingMode: true as const } : {}),
+      ...(value.lockAllDrawings === true ? { lockAllDrawings: true as const } : {}),
+      ...(value.hideAllDrawings === true ? { hideAllDrawings: true as const } : {}),
       ...(isChartType(value.chartType) && (value.chartType as string) !== 'candles' ? { chartType: value.chartType as Exclude<ChartType, 'candles'> } : {}),
     }
   } catch {

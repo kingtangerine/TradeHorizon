@@ -596,7 +596,9 @@ export function registerTradeHorizonOverlays(): void {
         const fillOpacity = numericStyle(overlay.styles, 'fillOpacity', 8)
         const lineWidth = numericStyle(overlay.styles, 'lineWidth', 1)
         const lineStyle = stringStyle(overlay.styles, 'lineStyle', 'solid')
-        const levels = FIB_LEVELS.map((level, index) => {
+        const stored = stringStyle(overlay.styles, 'fibLevels', '')
+        const levelList = stored ? stored.split(',').map(Number).filter(Number.isFinite) : [...FIB_LEVELS]
+        const levels = levelList.map((level, index) => {
           const price = fibLevelPrice(first, second, level)
           return { level, price, y: yAxis.convertToPixel(price), color: FIB_COLORS[index % FIB_COLORS.length] }
         })

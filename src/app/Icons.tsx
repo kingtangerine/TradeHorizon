@@ -263,6 +263,16 @@ export function PlusIcon(props: IconProps) {
   return <IconBase {...props}><path d="M12 5v14M5 12h14" /></IconBase>
 }
 
+export function PencilLockIcon(props: IconProps) {
+  return (
+    <IconBase {...props}>
+      <path d="M4 20l1-4L15 6l3 3L8 19l-4 1Z" />
+      <rect x="15" y="15" width="6" height="5" rx="1" />
+      <path d="M16.5 15v-1.5a1.5 1.5 0 0 1 3 0V15" />
+    </IconBase>
+  )
+}
+
 export function CameraIcon(props: IconProps) {
   return (
     <IconBase {...props}>

@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import type { DrawingStore } from '../drawings'
 import type { MarketInterval } from '../market'
-import { KLineChartController, type AlertLine, type ChartAppearanceStyle, type ScaleMode } from './KLineChartController'
+import { KLineChartController, type AlertLine, type ChartAppearanceStyle, type DrawingModes, type ScaleMode } from './KLineChartController'
 import type { ChartRuntimeState, ChartType } from './types'
 import type { IndicatorSettings } from './indicators'
 import type { CryptoMarket } from './markets'
@@ -24,6 +24,7 @@ interface CryptoChartSurfaceProps {
   /** Price scale: regular, logarithmic or percent. */
   scaleMode?: ScaleMode
   appearance?: ChartAppearanceStyle
+  drawingModes?: DrawingModes
   onRuntimeState(state: ChartRuntimeState): void
   onControllerChange(controller: KLineChartController | null): void
   onToolSettled(): void
@@ -51,6 +52,7 @@ export function CryptoChartSurface({
   highLowLabels = false,
   scaleMode = 'normal',
   appearance,
+  drawingModes,
   onRuntimeState,
   onControllerChange,
   onToolSettled,
@@ -63,8 +65,8 @@ export function CryptoChartSurface({
   theme = 'dark',
 }: CryptoChartSurfaceProps) {
   const themeRef = useRef(theme)
-  const displayRef = useRef({ timeZone, highLowLabels, scaleMode, appearance })
-  displayRef.current = { timeZone, highLowLabels, scaleMode, appearance }
+  const displayRef = useRef({ timeZone, highLowLabels, scaleMode, appearance, drawingModes })
+  displayRef.current = { timeZone, highLowLabels, scaleMode, appearance, drawingModes }
   themeRef.current = theme
   const [priceViewManual, setPriceViewManual] = useState(false)
   const [alertHover, setAlertHover] = useState<{ top: number, left: number, price: number } | null>(null)
@@ -105,6 +107,7 @@ export function CryptoChartSurface({
       controller.setHighLowLabels(displayRef.current.highLowLabels)
       controller.setScaleMode(displayRef.current.scaleMode)
       if (displayRef.current.appearance) controller.setAppearance(displayRef.current.appearance)
+      if (displayRef.current.drawingModes) controller.setDrawingModes(displayRef.current.drawingModes)
       onControllerChange(controller)
 
       return () => {
@@ -162,6 +165,10 @@ export function CryptoChartSurface({
   useEffect(() => {
     if (appearance) controllerRef.current?.setAppearance(appearance)
   }, [appearance])
+
+  useEffect(() => {
+    if (drawingModes) controllerRef.current?.setDrawingModes(drawingModes)
+  }, [drawingModes])
 
   useEffect(() => {
     controllerRef.current?.setAlertLines(alertLines ?? [])

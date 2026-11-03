@@ -17,7 +17,9 @@ export interface DrawingUpdate {
 export type DrawingCommand =
   | { readonly kind: "create"; readonly drawing: Drawing }
   | { readonly kind: "update"; readonly id: string; readonly changes: DrawingUpdate }
-  | { readonly kind: "delete"; readonly id: string };
+  | { readonly kind: "delete"; readonly id: string }
+  /** Several changes as one undo step (moving or deleting a multi-selection). Fails as a whole if any part fails. */
+  | { readonly kind: "batch"; readonly commands: readonly DrawingCommand[] };
 
 export function createDrawing(drawing: Drawing): DrawingCommand {
   return { kind: "create", drawing };
@@ -29,6 +31,10 @@ export function updateDrawing(id: string, changes: DrawingUpdate): DrawingComman
 
 export function deleteDrawing(id: string): DrawingCommand {
   return { kind: "delete", id };
+}
+
+export function batchDrawings(commands: readonly DrawingCommand[]): DrawingCommand {
+  return commands.length === 1 ? commands[0] : { kind: "batch", commands };
 }
 
 export interface DrawingStoreSnapshot {
@@ -103,6 +109,17 @@ function applyCommand(
       const index = drawings.findIndex((drawing) => drawing.id === command.id);
       if (index < 0) return null;
       return [...drawings.slice(0, index), ...drawings.slice(index + 1)];
+    }
+
+    case "batch": {
+      if (command.commands.length === 0) return null;
+      let next: readonly Drawing[] = drawings;
+      for (const part of command.commands) {
+        const applied = applyCommand(next, part);
+        if (!applied) return null;
+        next = applied;
+      }
+      return next;
     }
   }
 }

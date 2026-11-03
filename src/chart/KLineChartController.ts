@@ -16,11 +16,13 @@ import { VOLUME_OVERLAY_NAME, registerVolumeOverlay } from './volumeOverlay'
 import { BASELINE_NAME, HEIKIN_ASHI_NAME, registerSeriesOverlays } from './seriesOverlay'
 import { registerStudyIndicators, studyIndicatorName } from './studyIndicators'
 import { STUDIES, type Study } from './studies'
+import { fibLevels, visibleOnInterval } from './drawingVisibility'
 import { ALERT_LINE_OVERLAY_NAME } from './overlayNames'
 import { QVWAP_INDICATOR_NAME, VWAP_INDICATOR_NAME, registerVwapIndicators } from './vwapIndicator'
 import { VWAP_ANCHORS } from './vwap'
 import { MAX_CACHE_GAP_BARS, loadCachedBars, saveCachedBars } from './candleCache'
 import {
+  batchDrawings,
   createDrawing,
   deleteDrawing,
   updateDrawing,
@@ -234,6 +236,20 @@ export interface KLineChartControllerCallbacks {
   onAlertDelete?(id: string): void
 }
 
+/** Drawing gestures the app answers with its own UI (settings window, context menu, multi-selection toolbar). */
+export type DrawingEvent =
+  | { readonly kind: 'doubleClick', readonly id: string }
+  | { readonly kind: 'contextMenu', readonly id: string, readonly clientX: number, readonly clientY: number }
+  | { readonly kind: 'selection', readonly ids: readonly string[] }
+
+/** Tool-rail toggles that apply to every drawing. */
+export interface DrawingModes {
+  /** Keep the tool armed after a drawing is placed. */
+  readonly stayInDrawingMode: boolean
+  readonly lockAll: boolean
+  readonly hideAll: boolean
+}
+
 /** A price alert shown as a line on this chart. */
 export interface AlertLine {
   readonly id: string
@@ -324,6 +340,14 @@ export class KLineChartController {
   #pendingReplay?: PendingReplay
   #replayPicking = false
   #shiftHeld = false
+  #drawingModes: DrawingModes = { stayInDrawingMode: false, lockAll: false, hideAll: false }
+  /** Drawings selected together (Ctrl/Shift+click); the library itself only knows one selected overlay. */
+  readonly #multiSelection = new Set<string>()
+  #modifierPress = false
+  #groupSeed?: string
+  readonly #drawingListeners = new Set<(event: DrawingEvent) => void>()
+  /** Start points of the other drawings while a multi-selection is dragged. */
+  #groupMove?: Map<string, ChartPoint[]>
   #lastOverlayMoveEvent?: OverlayEvent<unknown>
   readonly #viewListeners = new Set<() => void>()
   #timeZone = 'UTC'
@@ -344,6 +368,49 @@ export class KLineChartController {
   #dominanceReference?: Record<string, number>
   #dominanceIndicatorPoll?: ReturnType<typeof globalThis.setInterval>
   #dominanceEpoch = 0
+
+  readonly #trackSelectionPress = (event: PointerEvent): void => {
+    this.#modifierPress = event.ctrlKey || event.metaKey || event.shiftKey
+    // A plain press on empty chart ends a multi-selection (a press on a member keeps it, to drag the group).
+    if (!this.#modifierPress && event.button === 0 && !this.drawingUnderPointer() && this.#multiSelection.size > 0) {
+      this.#setMultiSelection([])
+    }
+  }
+
+  #emitDrawing(event: DrawingEvent): void {
+    for (const listener of this.#drawingListeners) listener(event)
+  }
+
+  public subscribeDrawingEvents(listener: (event: DrawingEvent) => void): () => void {
+    this.#drawingListeners.add(listener)
+    return () => { this.#drawingListeners.delete(listener) }
+  }
+
+  /** Every selected drawing: the multi-selection, or the single selected one. */
+  public getSelection(): string[] {
+    if (this.#multiSelection.size > 0) return [...this.#multiSelection]
+    return this.#selectedDrawingId ? [this.#selectedDrawingId] : []
+  }
+
+  public clearSelection(): void {
+    this.#setMultiSelection([])
+  }
+
+  #setMultiSelection(ids: readonly string[]): void {
+    const before = [...this.#multiSelection].join(',')
+    this.#multiSelection.clear()
+    if (ids.length > 1) for (const id of ids) this.#multiSelection.add(id)
+    if ([...this.#multiSelection].join(',') === before) return
+    this.#syncDrawings()
+    this.#emitDrawing({ kind: 'selection', ids: [...this.#multiSelection] })
+  }
+
+  public setDrawingModes(modes: DrawingModes): void {
+    if (this.#disposed) return
+    const changed = modes.lockAll !== this.#drawingModes.lockAll || modes.hideAll !== this.#drawingModes.hideAll
+    this.#drawingModes = modes
+    if (changed) this.#syncDrawings()
+  }
 
   readonly #handleKeyDown = (event: KeyboardEvent): void => {
     if (event.key === 'Shift') {
@@ -708,7 +775,10 @@ export class KLineChartController {
     // Without this a finger dragging on the price axis would be taken by the browser as a page gesture.
     const axisElement = chart.getDom('candle_pane', 'yAxis')
     if (axisElement) axisElement.style.touchAction = 'none'
-    if (import.meta.env.DEV) (globalThis as { __tradeHorizonChart?: Chart }).__tradeHorizonChart = chart
+    if (import.meta.env.DEV) {
+      (globalThis as { __tradeHorizonChart?: Chart }).__tradeHorizonChart = chart
+      ;(globalThis as { __tradeHorizonController?: unknown }).__tradeHorizonController = this
+    }
 
     chart.setSymbol({
       ticker: market.symbol,
@@ -751,6 +821,7 @@ export class KLineChartController {
     host.addEventListener('mousedown', this.#blockChartWhileDrawing, true)
     host.addEventListener('touchstart', this.#blockChartWhileDrawing, true)
     host.addEventListener('contextmenu', this.#handleToolContextMenu, true)
+    host.addEventListener('pointerdown', this.#trackSelectionPress, true)
     host.addEventListener('pointerleave', this.#handleHostLeave)
     globalThis.addEventListener('pointermove', this.#handleToolPointerMove, true)
     globalThis.addEventListener('pointerup', this.#handleToolPointerUp, true)
@@ -1581,6 +1652,11 @@ export class KLineChartController {
 
     this.#endTool()
     this.#drawingStore.execute(createDrawing(drawing))
+    if (this.#drawingModes.stayInDrawingMode) {
+      // TradingView's "Stay in drawing mode": arm the same tool again for the next drawing.
+      this.startTool(tool.type)
+      return
+    }
     this.#callbacks.onToolSettled()
     this.#selectOverlay(drawing.id)
     this.#showHandles(drawing.id)
@@ -1756,6 +1832,9 @@ export class KLineChartController {
     const store = (this.#chart as unknown as { _chartStore?: { getHoverOverlayInfo?(): { overlay?: { id?: string } | null } } })._chartStore
     const hovered = store?.getHoverOverlayInfo?.().overlay?.id
     if (hovered === this.#selectedDrawingId) return
+    // Pressing another member of a multi-selection keeps the group (to drag it); Ctrl/Shift+press adds to it.
+    if (hovered && this.#multiSelection.has(hovered)) return
+    if (hovered && (event.ctrlKey || event.metaKey || event.shiftKey)) this.#groupSeed = this.#selectedDrawingId
     this.clearDrawingSelection()
   }
 
@@ -1874,6 +1953,15 @@ export class KLineChartController {
   }
 
   public deleteSelected(): void {
+    if (this.#multiSelection.size > 1) {
+      const ids = [...this.#multiSelection]
+      this.#multiSelection.clear()
+      this.#selectedDrawingId = undefined
+      this.#drawingStore.execute(batchDrawings(ids.map((id) => deleteDrawing(id))))
+      this.#callbacks.onSelectionChange(undefined)
+      this.#emitDrawing({ kind: 'selection', ids: [] })
+      return
+    }
     if (!this.#selectedDrawingId) return
     const id = this.#selectedDrawingId
     this.#selectedDrawingId = undefined
@@ -1984,6 +2072,7 @@ export class KLineChartController {
     this.#host.removeEventListener('mousedown', this.#blockChartWhileDrawing, true)
     this.#host.removeEventListener('touchstart', this.#blockChartWhileDrawing, true)
     this.#host.removeEventListener('contextmenu', this.#handleToolContextMenu, true)
+    this.#host.removeEventListener('pointerdown', this.#trackSelectionPress, true)
     this.#host.removeEventListener('pointerleave', this.#handleHostLeave)
     this.#chart.unsubscribeAction('onCrosshairChange', this.#handleCrosshair)
     this.#hoverListeners.clear()
@@ -2265,8 +2354,8 @@ export class KLineChartController {
       paneId: 'candle_pane',
       mode: this.#magnet ? 'weak_magnet' : 'normal',
       modeSensitivity: MAGNET_TOLERANCE_PX,
-      lock: drawing?.locked ?? false,
-      visible: !(drawing?.hidden ?? false),
+      lock: (drawing?.locked ?? false) || this.#drawingModes.lockAll,
+      visible: !(drawing?.hidden ?? false) && !this.#drawingModes.hideAll && visibleOnInterval(drawing?.style, this.#interval),
       zLevel: drawing ? this.#stackLevels.get(id) ?? DRAFT_Z_LEVEL : DRAFT_Z_LEVEL,
       fixedZLevel: true,
       needDefaultPointFigure: true,
@@ -2274,13 +2363,15 @@ export class KLineChartController {
       needDefaultYAxisFigure: type !== 'verticalLine',
       ...(drawing ? { points: drawingPoints(drawing) } : {}),
       styles: {
-        line: { color, size: lineWidth, style: lineStyle, dashedValue: [6, 4] },
+        // A drawing in a multi-selection is drawn a little thicker, so the group can be seen.
+        line: { color, size: lineWidth + (this.#multiSelection.has(id) ? 1.5 : 0), style: lineStyle, dashedValue: [6, 4] },
+        fibLevels: type === 'fibRetracement' ? fibLevels(style).join(',') : '',
         rect: {
           // "No color" for a rectangle's line: fill only (a zero-width border would still be drawn 1px wide).
           style: style.noBorder === true ? 'fill' : 'stroke_fill',
           color: colorWithOpacity(text('fillColor', '#3aa9ff'), fillOpacity),
           borderColor: color,
-          borderSize: style.noBorder === true ? 0 : lineWidth,
+          borderSize: style.noBorder === true ? 0 : lineWidth + (this.#multiSelection.has(id) ? 1.5 : 0),
           borderStyle: lineStyle,
           borderDashedValue: [4, 4],
           borderRadius: 0,
@@ -2327,10 +2418,33 @@ export class KLineChartController {
       // The library deletes an overlay on right-click unless this is prevented.
       onRightClick: (event) => {
         event.preventDefault?.()
+        if (!this.#multiSelection.has(event.overlay.id)) this.#setMultiSelection([])
         this.#selectOverlay(event.overlay.id)
+        const rect = this.#paneRect()
+        if (rect && event.x !== undefined && event.y !== undefined) {
+          this.#emitDrawing({ kind: 'contextMenu', id: event.overlay.id, clientX: rect.left + event.x, clientY: rect.top + event.y })
+        }
+      },
+      onDoubleClick: (event) => {
+        this.#emitDrawing({ kind: 'doubleClick', id: event.overlay.id })
+        return true
       },
       onRemoved: (event) => this.#removeOverlayFromStore(event),
-      onSelected: (event) => this.#selectOverlay(event.overlay.id),
+      onSelected: (event) => {
+        const id = event.overlay.id
+        const previous = this.#selectedDrawingId ?? this.#groupSeed
+        this.#groupSeed = undefined
+        if (this.#modifierPress) {
+          // Ctrl/Shift+click adds to the selection (or takes the drawing out of it).
+          const ids = new Set(this.#multiSelection.size > 0 ? this.#multiSelection : previous ? [previous] : [])
+          if (ids.has(id) && ids.size > 1) ids.delete(id)
+          else ids.add(id)
+          this.#setMultiSelection([...ids])
+        } else if (!this.#multiSelection.has(id)) {
+          this.#setMultiSelection([])
+        }
+        this.#selectOverlay(id)
+      },
       onDeselected: (event) => this.#deselectOverlay(event.overlay.id),
     }
   }
@@ -2363,6 +2477,19 @@ export class KLineChartController {
       startValue: start.value,
       points,
     }
+    this.#groupMove = undefined
+    if (this.#multiSelection.has(event.overlay.id) && this.#multiSelection.size > 1) {
+      const group = new Map<string, ChartPoint[]>()
+      for (const id of this.#multiSelection) {
+        if (id === event.overlay.id) continue
+        const other = this.#chart.getOverlays({ id })[0]
+        const drawing = this.#drawingStore.getSnapshot().drawings.find((item) => item.id === id)
+        if (!other || !drawing || drawing.locked || this.#drawingModes.lockAll) continue
+        const start = other.points.filter((point) => point.timestamp !== undefined && point.value !== undefined).map((point) => ({ timestamp: point.timestamp!, value: point.value! }))
+        if (start.length === other.points.length) group.set(id, start)
+      }
+      if (group.size > 0) this.#groupMove = group
+    }
   }
 
   #continueOverlayMove(event: OverlayEvent<unknown>): void {
@@ -2380,6 +2507,11 @@ export class KLineChartController {
     const overlay = event.overlay as { points: Array<Partial<Point>> }
     const deltaValue = this.#shiftHeld ? 0 : current.value - move.startValue
     overlay.points = translatePoints(move.points, deltaBars * this.#intervalMs(), deltaValue)
+    if (this.#groupMove) {
+      for (const [id, start] of this.#groupMove) {
+        this.#chart.overrideOverlay({ id, points: translatePoints(start, deltaBars * this.#intervalMs(), deltaValue) })
+      }
+    }
   }
 
   #commitOverlay(event: OverlayEvent<unknown>, type: DrawingType): void {
@@ -2391,10 +2523,22 @@ export class KLineChartController {
       .drawings.find((drawing) => drawing.id === event.overlay.id)
     if (!existing) return
     const drawing = drawingFromOverlay(event.overlay, this.#market.marketId, existing, type)
+    const group = this.#groupMove
+    this.#groupMove = undefined
     // A click without movement must not create an undo step.
     if (!drawing || anchorsEqual(existing.anchors, drawing.anchors)) return
 
-    this.#drawingStore.execute(updateDrawing(existing.id, { anchors: drawing.anchors }))
+    const commands = [updateDrawing(existing.id, { anchors: drawing.anchors })]
+    if (group) {
+      // The whole multi-selection moved: one undo step for all of it.
+      for (const id of group.keys()) {
+        const other = this.#chart.getOverlays({ id })[0]
+        const stored = this.#drawingStore.getSnapshot().drawings.find((item) => item.id === id)
+        const moved = other && stored ? drawingFromOverlay(other, this.#market.marketId, stored, stored.type) : null
+        if (moved && stored && !anchorsEqual(stored.anchors, moved.anchors)) commands.push(updateDrawing(id, { anchors: moved.anchors }))
+      }
+    }
+    this.#drawingStore.execute(batchDrawings(commands))
   }
 
   #removeOverlayFromStore(event: OverlayEvent<unknown>): void {
@@ -2416,6 +2560,8 @@ export class KLineChartController {
   }
 
   #deselectOverlay(id: string): void {
+    // The library deselects the old drawing before selecting the Ctrl/Shift-clicked one; keep it for the group.
+    if (this.#modifierPress && this.#selectedDrawingId === id) this.#groupSeed = id
     if (this.#selectedDrawingId === id) this.#selectOverlay(undefined)
   }
 

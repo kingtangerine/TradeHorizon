@@ -11,7 +11,7 @@ import {
 } from '../chart/indicators'
 import { VWAP_ANCHOR_LABELS } from '../chart/vwap'
 import { STUDIES, studyLabel, type Study } from '../chart/studies'
-import type { ChartAppearanceStyle, KLineChartController, ScaleMode } from '../chart/KLineChartController'
+import type { ChartAppearanceStyle, DrawingModes, KLineChartController, ScaleMode } from '../chart/KLineChartController'
 import type { CryptoMarket } from '../chart/markets'
 import type { ChartRuntimeState, ChartType } from '../chart/types'
 import type { DrawingStore } from '../drawings'
@@ -42,6 +42,7 @@ interface ChartPaneProps {
   highLowLabels: boolean
   scaleMode: ScaleMode
   appearance: ChartAppearanceStyle
+  drawingModes: DrawingModes
   alerts: readonly PriceAlert[]
   alertLinesVisible: boolean
   onMoveAlert(id: string, price: number, lastPrice: number | undefined): void
@@ -92,6 +93,7 @@ export function ChartPane({
   highLowLabels,
   scaleMode,
   appearance,
+  drawingModes,
   alerts,
   alertLinesVisible,
   onMoveAlert,
@@ -280,6 +282,7 @@ export function ChartPane({
         highLowLabels={highLowLabels}
         scaleMode={scaleMode}
         appearance={appearance}
+        drawingModes={drawingModes}
       />
 
       {contextMenu && (

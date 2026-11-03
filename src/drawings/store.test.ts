@@ -114,3 +114,17 @@ describe("DrawingStore", () => {
     expect(store.getSnapshot().version).toBe(3);
   });
 });
+
+describe('batch commands', () => {
+  it('applies several changes as one undo step, or none of them', async () => {
+    const { DrawingStore, batchDrawings, deleteDrawing } = await import('./store')
+    const base = { schemaVersion: 1 as const, marketId: 'binance:BTCUSDT', type: 'horizontalLine' as const, anchors: [{ timeMs: 1, price: '1' }], style: {}, revision: 1 }
+    const store = new DrawingStore({ initialDrawings: [{ ...base, id: 'a' }, { ...base, id: 'b' }, { ...base, id: 'c' }] })
+    expect(store.execute(batchDrawings([deleteDrawing('a'), deleteDrawing('b')]))).toBe(true)
+    expect(store.getSnapshot().drawings.map((d) => d.id)).toEqual(['c'])
+    store.undo()
+    expect(store.getSnapshot().drawings).toHaveLength(3)
+    expect(store.execute(batchDrawings([deleteDrawing('a'), deleteDrawing('missing')]))).toBe(false)
+    expect(store.getSnapshot().drawings).toHaveLength(3)
+  })
+})
