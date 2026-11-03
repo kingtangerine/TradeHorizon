@@ -27,6 +27,9 @@ import { INTERVAL_INPUT_CHARS, isChartTypingKey, parseIntervalInput } from './ho
 import { offsetLabel, resolveTimeZone } from './timeZones'
 import { composeSnapshot, copyImage, downloadBlob, snapshotFileName, snapshotValues } from './snapshot'
 import { formatCrosshairTime } from '../chart/timeAxis'
+import { CHART_TYPES, CHART_TYPE_LABELS, type ChartType } from '../chart/chartTypes'
+import { ChartTypeIcon } from './ChartTypeIcon'
+import { BottomBar, ScaleToggles } from './BottomBar'
 import { ColorPicker } from './ColorPicker'
 import { getTelegramStatus, sendTelegramTest, startTelegramLink, unlinkTelegram, type TelegramStatus } from './telegram'
 import { disablePush, enablePush, fetchAlertEvents, getPushStatus, type PushStatus } from './backgroundAlerts'
@@ -107,8 +110,6 @@ import {
   LongPositionIcon,
   PlusIcon,
   PriceRangeIcon,
-  CandlesIcon,
-  LineChartIcon,
   PauseIcon,
   PlayIcon,
   ReplayIcon,
@@ -313,6 +314,7 @@ function WorkspaceApp({ user, onLogout, onUserRefresh }: WorkspaceAppProps) {
   const paneTotal = panes.length
   const market = paneMarkets[activePaneIdx]
   const interval = panes[activePaneIdx].interval
+  const chartType: ChartType = workspace.chartType ?? 'candles'
   /** Timeframe buttons in the toolbar: the standard ones, then the user's own. */
   const toolbarIntervals = useMemo<readonly MarketInterval[]>(() => [...DISPLAY_INTERVALS, ...workspace.customIntervals.filter((value) => !(DISPLAY_INTERVALS as readonly MarketInterval[]).includes(value))], [workspace.customIntervals])
   const [layoutNotice, setLayoutNotice] = useState('')
@@ -330,6 +332,8 @@ function WorkspaceApp({ user, onLogout, onUserRefresh }: WorkspaceAppProps) {
   const layoutMenuRef = useRef<HTMLDivElement>(null)
   const timeframeMenuRef = useRef<HTMLDivElement>(null)
   const snapshotMenuRef = useRef<HTMLDivElement>(null)
+  const chartTypeMenuRef = useRef<HTMLDivElement>(null)
+  const [chartTypeMenuOpen, setChartTypeMenuOpen] = useState(false)
   const [snapshotMenuOpen, setSnapshotMenuOpen] = useState(false)
   const indicatorMenuRef = useRef<HTMLDivElement>(null)
   const splitMenuRef = useRef<HTMLDivElement>(null)
@@ -964,6 +968,7 @@ function WorkspaceApp({ user, onLogout, onUserRefresh }: WorkspaceAppProps) {
       if (!layoutMenuRef.current?.contains(target)) setLayoutMenuOpen(false)
       if (!timeframeMenuRef.current?.contains(target)) setTimeframeMenuOpen(false)
       if (!snapshotMenuRef.current?.contains(target)) setSnapshotMenuOpen(false)
+      if (!chartTypeMenuRef.current?.contains(target)) setChartTypeMenuOpen(false)
       if (!indicatorMenuRef.current?.contains(target)) setIndicatorMenuOpen(false)
       if (!splitMenuRef.current?.contains(target)) setSplitMenuOpen(false)
     }
@@ -1318,30 +1323,39 @@ function WorkspaceApp({ user, onLogout, onUserRefresh }: WorkspaceAppProps) {
 
         <span className="toolbar-divider" />
 
-        <div className="chart-type-toggle" role="group" aria-label="Chart type">
+        <div className="toolbar-popover-control" ref={chartTypeMenuRef}>
           <button
             type="button"
-            className={workspace.chartType === 'line' ? '' : 'active'}
-            aria-pressed={workspace.chartType !== 'line'}
-            aria-label="Candlestick chart"
-            title="Candles"
-            onClick={() => setWorkspace((current) => {
-              const { chartType: _chartType, ...rest } = current
-              return rest
-            })}
+            className="indicators-button chart-type-button"
+            aria-label={`Chart type: ${CHART_TYPE_LABELS[chartType]}`}
+            title={CHART_TYPE_LABELS[chartType]}
+            aria-expanded={chartTypeMenuOpen}
+            onClick={() => setChartTypeMenuOpen((open) => !open)}
           >
-            <CandlesIcon />
+            <ChartTypeIcon type={chartType} />
           </button>
-          <button
-            type="button"
-            className={workspace.chartType === 'line' ? 'active' : ''}
-            aria-pressed={workspace.chartType === 'line'}
-            aria-label="Line chart"
-            title="Line"
-            onClick={() => setWorkspace((current) => ({ ...current, chartType: 'line' }))}
-          >
-            <LineChartIcon />
-          </button>
+          {chartTypeMenuOpen && (
+            <div className="top-menu layout-menu chart-type-menu" role="menu">
+              {CHART_TYPES.map((type) => (
+                <button
+                  type="button"
+                  role="menuitemradio"
+                  aria-checked={type === chartType}
+                  className={type === chartType ? 'active' : ''}
+                  key={type}
+                  onClick={() => {
+                    setChartTypeMenuOpen(false)
+                    setWorkspace((current) => {
+                      const { chartType: _previous, ...rest } = current
+                      return type === 'candles' ? rest : { ...rest, chartType: type }
+                    })
+                  }}
+                >
+                  <span className="chart-type-option"><ChartTypeIcon type={type} />{CHART_TYPE_LABELS[type]}</span>
+                </button>
+              ))}
+            </div>
+          )}
         </div>
 
         <div className="toolbar-popover-control" ref={splitMenuRef}>
@@ -1716,11 +1730,12 @@ function WorkspaceApp({ user, onLogout, onUserRefresh }: WorkspaceAppProps) {
                 volumeVisible={workspace.volumeVisible}
                 indicators={indicators}
                 magnet={!!workspace.magnet}
-                chartType={workspace.chartType ?? 'candles'}
+                chartType={chartType}
                 theme={theme}
                 countdown={preferences.candleCountdown}
                 timeZone={chartTimeZone}
                 highLowLabels={preferences.highLowLabels}
+                scaleMode={workspace.scaleMode ?? 'normal'}
                 alerts={alerts}
                 alertLinesVisible={preferences.alertLines}
                 onMoveAlert={moveAlertTo}
@@ -2388,7 +2403,19 @@ function WorkspaceApp({ user, onLogout, onUserRefresh }: WorkspaceAppProps) {
       )}
 
       <footer className="statusbar">
-        <span>{market.venue.toUpperCase()} {marketKindLabel(market).toUpperCase()}</span>
+        <BottomBar
+          controller={controller}
+          interval={interval}
+          timeZone={chartTimeZone}
+          scaleMode={workspace.scaleMode ?? 'normal'}
+          onScaleMode={(mode) => setWorkspace((current) => {
+            const { scaleMode: _previous, ...rest } = current
+            return mode === 'normal' ? rest : { ...rest, scaleMode: mode }
+          })}
+          onInterval={changeInterval}
+        />
+        <span className="status-separator" />
+        <span className="status-venue">{market.venue.toUpperCase()} {marketKindLabel(market).toUpperCase()}</span>
         <TimeZoneMenu value={preferences.timeZone} onChange={(timeZone) => setPreferences((current) => ({ ...current, timeZone }))} />
         <span className="status-separator" />
         <span>{marketDrawings.length} saved drawing{marketDrawings.length === 1 ? '' : 's'} for {market.symbol}</span>
@@ -2401,12 +2428,18 @@ function WorkspaceApp({ user, onLogout, onUserRefresh }: WorkspaceAppProps) {
         >
           <i aria-hidden="true" /> {syncStatusText(syncStatus)}
         </button>
-        <span className="status-note">Market data · Public feed</span>
         {runtime.error && quote && (
           <button type="button" className="status-retry" onClick={() => controller?.retry()}>
             <RefreshIcon /> Refresh feed
           </button>
         )}
+        <ScaleToggles
+          scaleMode={workspace.scaleMode ?? 'normal'}
+          onScaleMode={(mode) => setWorkspace((current) => {
+            const { scaleMode: _previous, ...rest } = current
+            return mode === 'normal' ? rest : { ...rest, scaleMode: mode }
+          })}
+        />
       </footer>
     </div>
   )

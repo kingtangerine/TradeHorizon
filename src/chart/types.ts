@@ -20,7 +20,7 @@ export interface ChartQuote {
 
 export type DominanceStatus = 'idle' | 'loading' | 'ready' | 'error'
 
-export type ChartType = 'candles' | 'line'
+export type { ChartType } from './chartTypes'
 
 export interface ReplayState {
   /** "picking" while the user chooses the bar to start from. */

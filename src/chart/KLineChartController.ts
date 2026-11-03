@@ -13,6 +13,7 @@ import {
 import { candleCloseMs } from './countdown'
 import { buildTimeTicks, formatCrosshairTime } from './timeAxis'
 import { VOLUME_OVERLAY_NAME, registerVolumeOverlay } from './volumeOverlay'
+import { BASELINE_NAME, HEIKIN_ASHI_NAME, registerSeriesOverlays } from './seriesOverlay'
 import { ALERT_LINE_OVERLAY_NAME } from './overlayNames'
 import { QVWAP_INDICATOR_NAME, VWAP_INDICATOR_NAME, registerVwapIndicators } from './vwapIndicator'
 import { VWAP_ANCHORS } from './vwap'
@@ -119,6 +120,9 @@ function chartBackground(element: HTMLElement): string {
   return '#131722'
 }
 
+/** Price scale of the candle pane: regular, logarithmic, or percent from the first visible candle. */
+export type ScaleMode = 'normal' | 'log' | 'percent'
+
 /** Bar width when the chart opens or its view is reset (Alt+R). */
 const DEFAULT_BAR_SPACE = 10
 const HIDDEN_INDICATOR_TOOLTIP = { name: '', calcParamsText: '', features: [], legends: [] }
@@ -127,6 +131,7 @@ registerTradeHorizonOverlays()
 registerDominanceIndicators()
 registerVwapIndicators()
 registerVolumeOverlay()
+registerSeriesOverlays()
 
 /** The candle under the crosshair, for the legend (TradingView shows the hovered candle's values). */
 export interface HoverState {
@@ -310,6 +315,10 @@ export class KLineChartController {
   readonly #viewListeners = new Set<() => void>()
   #timeZone = 'UTC'
   #hover: HoverState | null = null
+  #seriesIndicator: { id: string, name: string } | undefined
+  #scaleMode: ScaleMode = 'normal'
+  /** Date-range button waiting for its timeframe's candles. */
+  #pendingRange?: { fromMs: number, interval: MarketInterval }
   readonly #hoverListeners = new Set<() => void>()
   #alertLines: readonly AlertLine[] = []
   #stackLevels = new Map<string, number>()
@@ -791,7 +800,9 @@ export class KLineChartController {
     }
 
     this.resetPriceView()
-    this.#pendingViewport = this.#captureViewport()
+    this.#pendingViewport = this.#pendingRange?.interval === interval
+      ? { followingLive: true, barSpace: this.#chart.getBarSpace().bar }
+      : this.#captureViewport()
     this.#historyLoader.cancel()
     this.#stream?.stop()
     this.#stream = undefined
@@ -824,12 +835,24 @@ export class KLineChartController {
 
   public setChartType(type: ChartType): void {
     if (this.#disposed) return
-    this.#chart.setStyles({
-      candle: {
-        type: type === 'line' ? 'area' : 'candle_solid',
-        area: { lineColor: '#2962ff', lineSize: 2, value: 'close', smooth: false, backgroundColor: 'transparent' },
-      },
-    })
+    const drawnByUs = type === 'heikinAshi' || type === 'baseline'
+    const candleType = type === 'bars' ? 'ohlc' : type === 'hollow' ? 'candle_up_stroke' : type === 'candles' ? 'candle_solid' : 'area'
+    const area = type === 'area'
+      ? { lineColor: '#2962ff', lineSize: 2, backgroundColor: [{ offset: 0, color: 'rgba(41, 98, 255, 0.02)' }, { offset: 1, color: 'rgba(41, 98, 255, 0.32)' }] }
+      : drawnByUs
+        ? { lineColor: 'transparent', lineSize: 0, backgroundColor: 'transparent' }
+        : { lineColor: '#2962ff', lineSize: 2, backgroundColor: 'transparent' }
+    this.#chart.setStyles({ candle: { type: candleType, area: { ...area, value: 'close', smooth: false, point: { show: false } } } } as never)
+    // Heikin Ashi and baseline are our own series over the (hidden) candles.
+    const wanted = type === 'heikinAshi' ? HEIKIN_ASHI_NAME : type === 'baseline' ? BASELINE_NAME : undefined
+    if (this.#seriesIndicator && this.#seriesIndicator.name !== wanted) {
+      this.#chart.removeIndicator({ id: this.#seriesIndicator.id })
+      this.#seriesIndicator = undefined
+    }
+    if (wanted && !this.#seriesIndicator) {
+      const id = this.#chart.createIndicator({ name: wanted, paneId: 'candle_pane', createTooltipDataSource: () => HIDDEN_INDICATOR_TOOLTIP }, true)
+      if (id) this.#seriesIndicator = { id, name: wanted }
+    }
   }
 
   /** Price-pane bounds and the price under a viewport Y, for UI layered over the chart (alert "+" button). */
@@ -980,6 +1003,66 @@ export class KLineChartController {
   public setHighLowLabels(show: boolean): void {
     if (this.#disposed) return
     this.#chart.setStyles({ candle: { priceMark: { high: { show }, low: { show } } } })
+  }
+
+  public setScaleMode(mode: ScaleMode): void {
+    if (this.#disposed || mode === this.#scaleMode) return
+    this.#scaleMode = mode
+    const name = mode === 'log' ? 'logarithm' : mode === 'percent' ? 'percentage' : 'normal'
+    // A new axis name makes klinecharts rebuild the axis widget, so its touch setting is applied again.
+    this.#chart.overrideYAxis({ paneId: 'candle_pane', name, createRange: this.#createPriceRange } as never)
+    const axisElement = this.#chart.getDom('candle_pane', 'yAxis')
+    if (axisElement) axisElement.style.touchAction = 'none'
+    this.#emitView()
+  }
+
+  public getScaleMode(): ScaleMode {
+    return this.#scaleMode
+  }
+
+  /**
+   * Date-range buttons (1D, 5D, 1M …): show from `fromMs` to now on `interval`. When the timeframe is about to change,
+   * the fit waits for the new candles.
+   */
+  public showRange(fromMs: number, interval: MarketInterval): void {
+    if (this.#disposed) return
+    this.#pendingRange = { fromMs, interval }
+    if (interval === this.#interval && this.#chart.getDataList().length > 0) this.#applyPendingRange()
+  }
+
+  #applyPendingRange(): void {
+    const pending = this.#pendingRange
+    if (!pending || pending.interval !== this.#interval) return
+    this.#pendingRange = undefined
+    const data = this.#chart.getDataList()
+    if (data.length === 0) return
+    let first = data.findIndex((bar) => bar.timestamp >= pending.fromMs)
+    if (first < 0) first = data.length - 1
+    const count = Math.max(1, data.length - first)
+    const width = (this.#chart.getSize('candle_pane', 'main')?.width ?? this.#host.clientWidth) - this.#chart.getOffsetRightDistance()
+    this.resetPriceView()
+    this.#chart.setBarSpace(Math.min(40, Math.max(1, width / count)))
+    this.#withIgnoredNavigation(() => this.#chart.scrollToRealTime())
+    this.#patchRuntime({ followingLive: true })
+  }
+
+  /**
+   * Go to date: centre the chart on a moment, loading older candles first when they are not on the chart yet.
+   * Returns false when that moment is further back than the history this timeframe loads at once.
+   */
+  public goToTime(timeMs: number): boolean {
+    if (this.#disposed || this.#replay) return false
+    const data = this.#chart.getDataList()
+    if (data.length > 0 && data[0].timestamp <= timeMs) {
+      this.#withIgnoredNavigation(() => this.#scrollToCentre(Math.min(timeMs, data[data.length - 1].timestamp)))
+      this.#patchRuntime({ followingLive: timeMs >= data[data.length - 1].timestamp })
+      return true
+    }
+    const barsBack = (Date.now() - timeMs) / this.#intervalMs()
+    if (barsBack > (MAX_VIEWPORT_BACKFILL_PAGES + 1) * HISTORY_PAGE_SIZE - VIEWPORT_BACKFILL_MARGIN_BARS) return false
+    this.#pendingViewport = { followingLive: false, centerTimeMs: timeMs, barSpace: this.#chart.getBarSpace().bar }
+    this.retry()
+    return true
   }
 
   /** TradingView's "Reset chart view" (Alt+R): automatic price scale, default zoom, latest candles. */
@@ -1429,12 +1512,30 @@ export class KLineChartController {
   readonly #createPriceRange: AxisCreateRangeCallback = ({ defaultRange }) => {
     const k = this.#priceScale
     const shift = this.#priceOffset
-    if (k === 1 && shift === 0) return defaultRange
     const grow = (from: number, to: number): [number, number] => {
+      if (k === 1 && shift === 0) return [from, to]
       const middle = (from + to) / 2 + shift * (to - from)
       const half = ((to - from) / 2) * k
       return [middle - half, middle + half]
     }
+    if (this.#scaleMode !== 'normal') {
+      // Log and percent scales (bottom bar): zoom in price, then express the range the way that axis expects.
+      const [rawFrom, to] = grow(defaultRange.from, defaultRange.to)
+      let from = rawFrom
+      if (this.#scaleMode === 'log') {
+        from = Math.max(from, to * 1e-4, Number.MIN_VALUE)
+        const realFrom = Math.log10(from)
+        const realTo = Math.log10(Math.max(to, from * 1.0001))
+        return { from, to, range: to - from, realFrom, realTo, realRange: realTo - realFrom, displayFrom: from, displayTo: to, displayRange: to - from }
+      }
+      const data = this.#chart.getDataList()
+      const base = data[Math.max(0, Math.floor(this.#chart.getVisibleRange().from))]?.close
+      if (!base) return defaultRange
+      const realFrom = ((from - base) / base) * 100
+      const realTo = ((to - base) / base) * 100
+      return { from, to, range: to - from, realFrom, realTo, realRange: realTo - realFrom, displayFrom: realFrom, displayTo: realTo, displayRange: realTo - realFrom }
+    }
+    if (k === 1 && shift === 0) return defaultRange
     const [from, to] = grow(defaultRange.from, defaultRange.to)
     const [realFrom, realTo] = grow(defaultRange.realFrom, defaultRange.realTo)
     const [displayFrom, displayTo] = grow(defaultRange.displayFrom, defaultRange.displayTo)
@@ -1705,7 +1806,7 @@ export class KLineChartController {
     const centerTimeMs = Math.round(
       drawing.anchors.reduce((sum, anchor) => sum + anchor.timeMs, 0) / drawing.anchors.length,
     )
-    this.#withIgnoredNavigation(() => this.#chart.scrollToTimestamp(centerTimeMs, 180))
+    this.#withIgnoredNavigation(() => this.#scrollToCentre(centerTimeMs, 180))
   }
 
   /** Re-colors the chart canvas (grid, axes, crosshair, legends) for the app theme. */
@@ -2024,14 +2125,22 @@ export class KLineChartController {
         if (pending.followingLive || pending.centerTimeMs === undefined) {
           this.#withIgnoredNavigation(() => this.#chart.scrollToRealTime())
         } else {
-          this.#withIgnoredNavigation(() => this.#chart.scrollToTimestamp(pending.centerTimeMs!))
+          this.#withIgnoredNavigation(() => this.#scrollToCentre(pending.centerTimeMs!))
         }
       } else {
         this.#withIgnoredNavigation(() => this.#chart.scrollToRealTime())
       }
+      this.#applyPendingRange()
 
       this.#syncDrawings()
     })
+  }
+
+  /** klinecharts' scrollToTimestamp puts the candle at the right edge; every caller here wants it in the middle. */
+  #scrollToCentre(timestamp: number, animationDuration?: number): void {
+    this.#chart.scrollToTimestamp(timestamp)
+    const width = this.#chart.getSize('candle_pane', 'main')?.width ?? this.#host.clientWidth
+    this.#chart.scrollByDistance(-width / 2, animationDuration)
   }
 
   #withIgnoredNavigation(action: () => void): void {

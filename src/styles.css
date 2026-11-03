@@ -3595,3 +3595,31 @@ button:disabled {
 .snapshot-button { padding: 0 7px; }
 .snapshot-menu { width: 230px; }
 .snapshot-menu > button span { font-size: .72rem; }
+
+/* Chart type menu */
+.chart-type-button { padding: 0 7px; }
+.chart-type-menu { left: 0; right: auto; width: 200px; }
+.chart-type-option { display: inline-flex; align-items: center; gap: 10px; color: inherit; }
+.chart-type-menu > button.active { color: var(--tv-blue, #2962ff); }
+.chart-type-menu > button.active .chart-type-option { color: var(--tv-blue, #2962ff); }
+.chart-type-option svg { width: 18px; height: 18px; }
+
+/* Bottom bar: date ranges, go to date, scale toggles, fullscreen (TradingView) */
+.bottom-ranges { display: inline-flex; align-items: center; gap: 1px; }
+.bottom-ranges button, .scale-toggles button, .goto-date > button {
+  height: 22px; padding: 0 7px; border: 0; border-radius: 4px; color: var(--muted); background: transparent;
+  font: inherit; font-size: .72rem; font-weight: 600; letter-spacing: 0; cursor: pointer;
+}
+.bottom-ranges button:hover, .scale-toggles button:hover, .goto-date > button:hover { color: var(--text); background: var(--tv-hover); }
+.scale-toggles { display: inline-flex; gap: 1px; margin-left: 4px; }
+.scale-toggles button.active { color: var(--tv-blue, #2962ff); }
+.scale-toggles button svg, .goto-date > button svg { width: 15px; height: 15px; vertical-align: -3px; }
+.goto-date { position: relative; display: inline-flex; }
+.goto-date-form { position: absolute; z-index: 60; bottom: calc(100% + 8px); left: 0; display: grid; gap: 8px; width: 250px; padding: 12px; border: 1px solid var(--border-strong); border-radius: 8px; background: var(--tv-raised, var(--panel-raised)); box-shadow: 0 10px 32px rgb(0 0 0 / 45%); letter-spacing: 0; }
+.goto-date-form strong { color: var(--text); font-size: .8rem; }
+.goto-date-form input { height: 32px; padding: 0 8px; border: 1px solid var(--border-strong); border-radius: 6px; color: var(--text); background: var(--bg); font: inherit; font-size: .8rem; color-scheme: dark; }
+:root[data-theme="light"] .goto-date-form input { color-scheme: light; }
+.goto-date-form div { display: flex; justify-content: flex-end; gap: 6px; }
+.goto-date-form div button { height: 28px; padding: 0 12px; border: 0; border-radius: 5px; color: var(--text); background: var(--tv-hover); font: inherit; font-size: .76rem; cursor: pointer; }
+.goto-date-form div button[type="submit"] { color: #fff; background: var(--tv-blue, #2962ff); }
+.goto-date-form small { color: #f23645; }

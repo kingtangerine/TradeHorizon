@@ -1,6 +1,7 @@
 import { normalizeIndicators, type IndicatorSettings } from '../chart/indicators'
 import { isMarketInterval, type MarketInterval } from '../market'
 import { panesOf, parseSplit, type PaneSpec, type SplitCount, type TabSplit } from './panes'
+import { isChartType, type ChartType } from '../chart/chartTypes'
 
 export interface ChartTab {
   readonly id: string
@@ -21,8 +22,10 @@ export interface UserWorkspace {
   readonly customIntervals: readonly MarketInterval[]
   readonly indicators?: IndicatorSettings
   readonly magnet?: boolean
-  /** Candles are the default; only the line choice is stored. */
-  readonly chartType?: 'line'
+  /** Regular price scale is the default and is not stored. */
+  readonly scaleMode?: 'log' | 'percent'
+  /** Candles are the default and are not stored. */
+  readonly chartType?: Exclude<ChartType, 'candles'>
 }
 
 export interface SavedLayout {
@@ -240,7 +243,8 @@ export function loadWorkspace(userId: string): UserWorkspace {
       customIntervals: validCustomIntervals(value.customIntervals),
       ...(value.indicators ? { indicators: normalizeIndicators(value.indicators) } : {}),
       ...(value.magnet === true ? { magnet: true } : {}),
-      ...(value.chartType === 'line' ? { chartType: 'line' as const } : {}),
+      ...(value.scaleMode === 'log' || value.scaleMode === 'percent' ? { scaleMode: value.scaleMode } : {}),
+      ...(isChartType(value.chartType) && (value.chartType as string) !== 'candles' ? { chartType: value.chartType as Exclude<ChartType, 'candles'> } : {}),
     }
   } catch {
     return defaultWorkspace()
