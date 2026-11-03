@@ -82,7 +82,8 @@ export async function fetchLastPrices(groups, fetchImpl = (url, init) => fetch(u
       .then((rows) => { for (const row of rows) prices.set(row.symbol, Number(row.price)) }))
   }
   for (const symbol of groups['binance-futures'] ?? []) {
-    jobs.push(getJson(`https://fapi.binance.com/fapi/v1/ticker/price?symbol=${encodeURIComponent(symbol)}`, fetchImpl)
+    // Perpetuals are stored as "XXXUSDT.P"; Binance knows them without the suffix.
+    jobs.push(getJson(`https://fapi.binance.com/fapi/v1/ticker/price?symbol=${encodeURIComponent(symbol.replace(/\.P$/, ''))}`, fetchImpl)
       .then((row) => { prices.set(symbol, Number(row.price)) }))
   }
   for (const symbol of groups.bybit ?? []) {

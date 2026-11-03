@@ -18,6 +18,7 @@ import type { DrawingStore } from '../drawings'
 import type { MarketInterval } from '../market'
 import { CloseIcon, EyeIcon, EyeOffIcon, RefreshIcon, SettingsIcon } from './Icons'
 import { ChartContextMenu } from './ChartContextMenu'
+import { FuturesStatsRow } from './FuturesStatsRow'
 import { LegendIndicatorValues, LegendOhlc, LegendStudyValues, LegendVolume } from './LegendValues'
 import type { PriceAlert } from './alerts'
 import { capTier, coinSymbol, formatUsdCompact, loadMarketCaps, type MarketCapInfo } from './marketCap'
@@ -178,6 +179,7 @@ export function ChartPane({
 
       <div className="chart-legend" aria-label="Current market and indicators">
         <LegendOhlc controller={controller} quote={quote} precision={market.pricePrecision} />
+        {market.kind === 'futures' && <FuturesStatsRow symbol={market.symbol} baseAsset={market.baseAsset} precision={market.pricePrecision} />}
         {capShown && (
           <div
             className="chart-cap-row"

@@ -15,6 +15,7 @@ import { buildTimeTicks, formatCrosshairTime } from './timeAxis'
 import { VOLUME_OVERLAY_NAME, registerVolumeOverlay } from './volumeOverlay'
 import { BASELINE_NAME, HEIKIN_ASHI_NAME, registerSeriesOverlays } from './seriesOverlay'
 import { registerStudyIndicators, studyIndicatorName } from './studyIndicators'
+import { exchangeSymbol } from '../market/binance/futures'
 import { STUDIES, type Study } from './studies'
 import { fibLevels, visibleOnInterval } from './drawingVisibility'
 import { ALERT_LINE_OVERLAY_NAME } from './overlayNames'
@@ -507,7 +508,7 @@ export class KLineChartController {
 
       try {
         const result = await this.#historyLoader.load({
-          symbol: this.#market.symbol,
+          symbol: exchangeSymbol(this.#market.symbol),
           interval,
           limit: HISTORY_PAGE_SIZE,
           ...(type === 'forward' && timestamp !== null
@@ -540,7 +541,7 @@ export class KLineChartController {
             page += 1
           ) {
             const older = await this.#fetchKlines({
-              symbol: this.#market.symbol,
+              symbol: exchangeSymbol(this.#market.symbol),
               interval,
               limit: HISTORY_PAGE_SIZE,
               endTimeMs: Math.max(0, bars[0].timestamp - 1),
@@ -633,7 +634,7 @@ export class KLineChartController {
       }
 
       const streamOptions = {
-        symbol: this.#market.symbol,
+        symbol: exchangeSymbol(this.#market.symbol),
         interval,
         onCandle: (candle: Candle) => {
           if (this.#disposed || epoch !== this.#dataEpoch || interval !== this.#interval) return
@@ -2152,7 +2153,7 @@ export class KLineChartController {
   ): Promise<void> {
     try {
       const candles = await this.#fetchKlines({
-        symbol: this.#market.symbol,
+        symbol: exchangeSymbol(this.#market.symbol),
         interval,
         limit: HISTORY_PAGE_SIZE,
       })

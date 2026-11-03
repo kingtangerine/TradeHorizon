@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { ALERTS_KEY, alertReached, createAlertService, createPushService, fetchLastPrices, newlyTriggered, parseActiveAlerts } from './alerts.mjs'
-import { mergeListings, parseBinanceListings, parseBybitListings, precisionFromStep } from './markets.mjs'
+import { createMarketService, mergeListings, parseBinanceFuturesListings, parseBinanceListings, parseBybitListings, precisionFromStep } from './markets.mjs'
 
 const alert = (overrides = {}) => ({ id: 'a1', symbol: 'BTCUSDT', targetPrice: 100, direction: 'above', enabled: true, createdAtMs: 1, ...overrides })
 
@@ -227,5 +227,35 @@ describe('alerts triggered by a device with the app open', () => {
     instance.relayTriggered('u1', untriggered, serverCopy) // a device that merged the server's trigger uploads it
     expect(notifications).toHaveLength(1)
     instance.stop()
+  })
+})
+
+describe('perpetual futures', () => {
+  it('lists USDT perpetuals as XXXUSDT.P and routes them to Binance Futures', () => {
+    const listings = parseBinanceFuturesListings({ symbols: [
+      { symbol: 'ETHUSDT', baseAsset: 'ETH', quoteAsset: 'USDT', status: 'TRADING', contractType: 'PERPETUAL', filters: [{ filterType: 'PRICE_FILTER', tickSize: '0.01' }] },
+      { symbol: 'ETHUSDT_261225', baseAsset: 'ETH', quoteAsset: 'USDT', status: 'TRADING', contractType: 'CURRENT_QUARTER' },
+    ] })
+    expect(listings.map((item) => item.symbol)).toEqual(['ETHUSDT.P'])
+    const dir = mkdtempSync(join(tmpdir(), 'th-markets-'))
+    try {
+      const service = createMarketService({ dataDir: dir, fetchImpl: async () => { throw new Error('offline') }, log: {} })
+      expect(service.exchangeOf('SOLUSDT.P')).toBe('binance-futures')
+      expect(service.exchangeOf('BTCDOMUSDT')).toBe('binance-futures')
+      expect(service.exchangeOf('bad.P')).toBeUndefined()
+    } finally {
+      rmSync(dir, { recursive: true, force: true })
+    }
+  })
+
+  it('asks Binance Futures for the plain symbol and keeps the .P name', async () => {
+    const urls = []
+    const prices = await fetchLastPrices({ 'binance-futures': ['SOLUSDT.P'] }, async (url) => {
+      urls.push(String(url))
+      return { ok: true, json: async () => ({ symbol: 'SOLUSDT', price: '150.5' }) }
+    })
+    expect(urls[0]).toContain('symbol=SOLUSDT')
+    expect(urls[0]).not.toContain('.P')
+    expect(prices.get('SOLUSDT.P')).toBe(150.5)
   })
 })

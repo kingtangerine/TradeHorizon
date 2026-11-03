@@ -3680,3 +3680,8 @@ button:disabled {
 .drawing-context-menu button.danger { color: #f23645; }
 .context-menu-title { padding: 6px 10px 4px; color: var(--muted); font-size: .72rem; font-weight: 600; }
 .toolbar-count { padding: 0 6px; font-size: .78rem; white-space: nowrap; }
+
+/* Perpetual futures legend line */
+.chart-futures-row { display: flex; flex-wrap: wrap; gap: 12px; color: var(--muted); font-size: .76rem; pointer-events: auto; }
+.chart-futures-row b { color: var(--text); font-weight: 600; font-variant-numeric: tabular-nums; }
+.chart-futures-row small { font-variant-numeric: tabular-nums; }

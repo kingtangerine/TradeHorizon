@@ -2,6 +2,8 @@ import {
   type IndexKey,
   fetchBinanceSpotListings,
   fetchBybitSpotListings,
+  fetchBinanceFuturesListings,
+  exchangeSymbol,
   marketIdFor,
   type BinanceSpotListing,
   type MarketDataFetch,
@@ -148,12 +150,32 @@ const COIN_NAMES: Readonly<Record<string, string>> = {
 const registry = new Map<string, CryptoMarket>(
   [...CRYPTO_MARKETS, BTCDOM_MARKET, ...DOMINANCE_MARKETS].map((item) => [item.symbol, item]),
 )
-const CATALOG_CACHE_KEY = 'trade-horizon:markets:v3'
+// v4: the catalog includes Binance USDT-M perpetuals ("BTCUSDT.P").
+const CATALOG_CACHE_KEY = 'trade-horizon:markets:v4'
 const CATALOG_TTL_MS = 12 * 60 * 60 * 1000
 let cacheRestored = false
 
 function marketFromListing(listing: BinanceSpotListing): CryptoMarket {
   const exchange = listing.exchange ?? 'binance'
+  if (exchange === 'binance-futures') {
+    const plain = exchangeSymbol(listing.symbol)
+    // Same name and badge as the coin's spot pair (Bitcoin, ₿) when there is one.
+    const spot = registry.get(`${listing.baseAsset}USDT`)
+    return {
+      symbol: listing.symbol,
+      baseAsset: listing.baseAsset,
+      name: `${spot?.name ?? COIN_NAMES[listing.baseAsset] ?? listing.baseAsset} perpetual`,
+      mark: spot?.mark ?? listing.baseAsset.charAt(0),
+      pricePrecision: listing.pricePrecision,
+      volumePrecision: listing.volumePrecision,
+      quoteAsset: 'USDT',
+      marketId: `binance:futures:${plain}`,
+      exchange,
+      kind: 'futures',
+      venue: 'Binance Futures',
+      pair: `${listing.baseAsset} / USDT.P`,
+    }
+  }
   return {
     symbol: listing.symbol,
     baseAsset: listing.baseAsset,
@@ -185,7 +207,7 @@ function readCatalogCache(): { fetchedAtMs: number; listings: BinanceSpotListing
     if (!value || typeof value.fetchedAtMs !== 'number' || !Array.isArray(value.listings)) return null
     const listings = value.listings.filter((item): item is BinanceSpotListing => (
       typeof item === 'object' && item !== null &&
-      /^[A-Z0-9]{2,30}$/.test((item as BinanceSpotListing).symbol) &&
+      /^[A-Z0-9]{2,30}(\.P)?$/.test((item as BinanceSpotListing).symbol) &&
       typeof (item as BinanceSpotListing).baseAsset === 'string' &&
       Number.isInteger((item as BinanceSpotListing).pricePrecision) &&
       Number.isInteger((item as BinanceSpotListing).volumePrecision)
@@ -228,7 +250,7 @@ async function fetchServerCatalog(fetcher: MarketDataFetch | undefined, signal?:
 function isListing(item: unknown): item is BinanceSpotListing {
   const value = item as BinanceSpotListing | null
   return typeof value === 'object' && value !== null &&
-    /^[A-Z0-9]{2,30}$/.test(value.symbol) && typeof value.baseAsset === 'string' &&
+    /^[A-Z0-9]{2,30}(\.P)?$/.test(value.symbol) && typeof value.baseAsset === 'string' &&
     Number.isInteger(value.pricePrecision) && Number.isInteger(value.volumePrecision)
 }
 
@@ -245,12 +267,13 @@ export async function refreshMarketCatalog(
   // reachable, fall back to asking the exchanges directly. Bybit is optional: without it the catalog is Binance only.
   let listings = await fetchServerCatalog(fetcher, signal)
   if (!listings) {
-    const [binance, bybit] = await Promise.all([
+    const [binance, bybit, futures] = await Promise.all([
       fetchBinanceSpotListings(fetcher, signal),
       fetchBybitSpotListings(fetcher, signal).catch(() => [] as BinanceSpotListing[]),
+      fetchBinanceFuturesListings(fetcher, signal).catch(() => [] as BinanceSpotListing[]),
     ])
     const binanceSymbols = new Set(binance.map((item) => item.symbol))
-    listings = [...binance, ...bybit.filter((item) => !binanceSymbols.has(item.symbol))]
+    listings = [...binance, ...bybit.filter((item) => !binanceSymbols.has(item.symbol)), ...futures]
   }
   registerListings(listings)
   try {

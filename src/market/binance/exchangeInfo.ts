@@ -5,7 +5,7 @@ export const BINANCE_EXCHANGE_INFO_ENDPOINT = "https://data-api.binance.vision/a
 
 export interface BinanceSpotListing {
   /** Where the pair trades; missing means Binance (older cached catalogs). */
-  exchange?: "binance" | "bybit";
+  exchange?: "binance" | "bybit" | "binance-futures";
   /** Quote currency; missing means USDT. */
   quoteAsset?: "USDT" | "BTC";
   symbol: string;

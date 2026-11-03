@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import type { CryptoMarket } from '../chart/markets'
 import { CloseIcon, SearchIcon } from './Icons'
 
-const CATEGORIES = ['All', 'Crypto', 'Indices'] as const
+const CATEGORIES = ['All', 'Spot', 'Futures', 'Indices'] as const
 
 interface SymbolSearchProps {
   markets: readonly CryptoMarket[]
@@ -49,7 +49,7 @@ export function SymbolSearch({ markets, current, onSelect, onClose, initialQuery
   const [highlight, setHighlight] = useState(0)
   const inputRef = useRef<HTMLInputElement>(null)
   const results = useMemo(() => matchMarkets(query, markets).filter((item) => (
-    category === 'All' || (category === 'Crypto' ? item.kind !== 'dominance' : item.kind === 'dominance')
+    category === 'All' || (category === 'Spot' ? item.kind === 'spot' : category === 'Futures' ? item.kind === 'futures' : item.kind === 'dominance')
   )), [query, markets, category])
   const activeIndex = Math.min(highlight, Math.max(0, results.length - 1))
 

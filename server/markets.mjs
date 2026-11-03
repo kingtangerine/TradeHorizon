@@ -5,6 +5,7 @@ import { join } from 'node:path'
 
 const BINANCE_EXCHANGE_INFO = 'https://data-api.binance.vision/api/v3/exchangeInfo?showPermissionSets=false'
 const BYBIT_INSTRUMENTS = 'https://api.bybit.com/v5/market/instruments-info?category=spot&limit=1000'
+const BINANCE_FUTURES_INFO = 'https://fapi.binance.com/fapi/v1/exchangeInfo'
 const COINGECKO = {
   global: 'https://api.coingecko.com/api/v3/global',
   markets: 'https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&order=market_cap_desc&per_page=100&page=1',
@@ -91,6 +92,26 @@ export function parseBybitListings(payload) {
   return listings.sort((a, b) => a.baseAsset.localeCompare(b.baseAsset))
 }
 
+/** Trading USDT-M perpetuals as "XXXUSDT.P" (TradingView's naming), apart from BTCDOMUSDT which is listed on its own. */
+export function parseBinanceFuturesListings(payload) {
+  if (!Array.isArray(payload?.symbols)) throw new TypeError('Binance futures exchangeInfo has no symbols')
+  const listings = []
+  for (const entry of payload.symbols) {
+    if (
+      entry?.status !== 'TRADING' || entry.contractType !== 'PERPETUAL' || entry.quoteAsset !== 'USDT' ||
+      typeof entry.symbol !== 'string' || typeof entry.baseAsset !== 'string' || !SYMBOL.test(entry.symbol) || entry.symbol === 'BTCDOMUSDT'
+    ) continue
+    listings.push({
+      exchange: 'binance-futures',
+      symbol: `${entry.symbol}.P`,
+      baseAsset: entry.baseAsset,
+      pricePrecision: precisionFromStep(filterValue(entry.filters, 'PRICE_FILTER', 'tickSize'), 2),
+      volumePrecision: precisionFromStep(filterValue(entry.filters, 'LOT_SIZE', 'stepSize'), 3),
+    })
+  }
+  return listings.sort((a, b) => a.baseAsset.localeCompare(b.baseAsset))
+}
+
 /** Binance first; Bybit only adds pairs Binance does not list. */
 export function mergeListings(binance, bybit) {
   const seen = new Set(binance.map((item) => item.symbol))
@@ -127,7 +148,11 @@ export function createMarketService({ dataDir, fetchImpl = (url, init) => fetch(
         log.warn?.(`[markets] Bybit list unavailable: ${error.message}`)
         return []
       })
-      const next = { fetchedAtMs: Date.now(), listings: mergeListings(binance, bybit) }
+      const futures = await getJson(BINANCE_FUTURES_INFO).then(parseBinanceFuturesListings).catch((error) => {
+        log.warn?.(`[markets] Binance futures list unavailable: ${error.message}`)
+        return []
+      })
+      const next = { fetchedAtMs: Date.now(), listings: [...mergeListings(binance, bybit), ...futures] }
       setCatalog(next)
       try {
         writeFileSync(`${catalogFile}.tmp`, JSON.stringify(next))
@@ -193,6 +218,8 @@ export function createMarketService({ dataDir, fetchImpl = (url, init) => fetch(
     /** Where a symbol trades, or undefined when it is not a listed pair (for example an index like BTC.D). */
     exchangeOf(symbol) {
       if (FUTURES_SYMBOLS.has(symbol)) return 'binance-futures'
+      // Perpetuals are named "XXXUSDT.P"; they trade on Binance Futures even before the catalog has loaded.
+      if (typeof symbol === 'string' && symbol.endsWith('.P') && SYMBOL.test(symbol.slice(0, -2))) return 'binance-futures'
       return bySymbol.get(symbol)
     },
     coingecko,

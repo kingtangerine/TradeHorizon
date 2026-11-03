@@ -1,5 +1,6 @@
 import { dominanceCandles, fetchDominancePage, loadDominanceWeights } from '../chart/dominance'
 import type { CryptoMarket } from '../chart/markets'
+import { exchangeSymbol } from '../market/binance/futures'
 import type { WatchQuote } from './watchlists'
 
 // Latest price and 24h change for the watchlist. One request per exchange (or per symbol where
@@ -40,7 +41,7 @@ async function binanceSpot(symbols: readonly string[], signal?: AbortSignal): Pr
 async function binanceFutures(symbols: readonly string[], signal?: AbortSignal): Promise<Quotes> {
   const quotes: Quotes = {}
   await Promise.all(symbols.map(async (symbol) => {
-    const row = await getJson(`${FUTURES_TICKER}?symbol=${encodeURIComponent(symbol)}`, signal) as Record<string, unknown>
+    const row = await getJson(`${FUTURES_TICKER}?symbol=${encodeURIComponent(exchangeSymbol(symbol))}`, signal) as Record<string, unknown>
     const last = num(row.lastPrice)
     const change = num(row.priceChange)
     const changePercent = num(row.priceChangePercent)
