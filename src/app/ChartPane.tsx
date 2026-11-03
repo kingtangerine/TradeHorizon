@@ -44,6 +44,9 @@ interface ChartPaneProps {
   scaleMode: ScaleMode
   appearance: ChartAppearanceStyle
   drawingModes: DrawingModes
+  syncGroup?: string
+  syncCrosshair: boolean
+  syncTime: boolean
   alerts: readonly PriceAlert[]
   alertLinesVisible: boolean
   onMoveAlert(id: string, price: number, lastPrice: number | undefined): void
@@ -95,6 +98,9 @@ export function ChartPane({
   scaleMode,
   appearance,
   drawingModes,
+  syncGroup,
+  syncCrosshair,
+  syncTime,
   alerts,
   alertLinesVisible,
   onMoveAlert,
@@ -285,6 +291,9 @@ export function ChartPane({
         scaleMode={scaleMode}
         appearance={appearance}
         drawingModes={drawingModes}
+        syncGroup={syncGroup}
+        syncCrosshair={syncCrosshair}
+        syncTime={syncTime}
       />
 
       {contextMenu && (

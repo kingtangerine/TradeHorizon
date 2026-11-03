@@ -25,6 +25,10 @@ interface CryptoChartSurfaceProps {
   scaleMode?: ScaleMode
   appearance?: ChartAppearanceStyle
   drawingModes?: DrawingModes
+  /** Split view: the tab's id when its charts share crosshair or time. */
+  syncGroup?: string
+  syncCrosshair?: boolean
+  syncTime?: boolean
   onRuntimeState(state: ChartRuntimeState): void
   onControllerChange(controller: KLineChartController | null): void
   onToolSettled(): void
@@ -53,6 +57,9 @@ export function CryptoChartSurface({
   scaleMode = 'normal',
   appearance,
   drawingModes,
+  syncGroup,
+  syncCrosshair = false,
+  syncTime = false,
   onRuntimeState,
   onControllerChange,
   onToolSettled,
@@ -65,8 +72,8 @@ export function CryptoChartSurface({
   theme = 'dark',
 }: CryptoChartSurfaceProps) {
   const themeRef = useRef(theme)
-  const displayRef = useRef({ timeZone, highLowLabels, scaleMode, appearance, drawingModes })
-  displayRef.current = { timeZone, highLowLabels, scaleMode, appearance, drawingModes }
+  const displayRef = useRef({ timeZone, highLowLabels, scaleMode, appearance, drawingModes, syncGroup, syncCrosshair, syncTime })
+  displayRef.current = { timeZone, highLowLabels, scaleMode, appearance, drawingModes, syncGroup, syncCrosshair, syncTime }
   themeRef.current = theme
   const [priceViewManual, setPriceViewManual] = useState(false)
   const [alertHover, setAlertHover] = useState<{ top: number, left: number, price: number } | null>(null)
@@ -108,6 +115,7 @@ export function CryptoChartSurface({
       controller.setScaleMode(displayRef.current.scaleMode)
       if (displayRef.current.appearance) controller.setAppearance(displayRef.current.appearance)
       if (displayRef.current.drawingModes) controller.setDrawingModes(displayRef.current.drawingModes)
+      controller.setSync(displayRef.current.syncGroup, { crosshair: displayRef.current.syncCrosshair, time: displayRef.current.syncTime })
       onControllerChange(controller)
 
       return () => {
@@ -169,6 +177,10 @@ export function CryptoChartSurface({
   useEffect(() => {
     if (drawingModes) controllerRef.current?.setDrawingModes(drawingModes)
   }, [drawingModes])
+
+  useEffect(() => {
+    controllerRef.current?.setSync(syncGroup, { crosshair: syncCrosshair, time: syncTime })
+  }, [syncGroup, syncCrosshair, syncTime])
 
   useEffect(() => {
     controllerRef.current?.setAlertLines(alertLines ?? [])

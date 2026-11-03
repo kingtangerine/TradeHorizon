@@ -43,7 +43,7 @@ import { disablePush, enablePush, fetchAlertEvents, getPushStatus, type PushStat
 import { ChartPane } from './ChartPane'
 import { ObjectList } from './ObjectList'
 import { versionDetails, versionLabel } from '../version'
-import { activePaneIndex, panesOf, withActivePane, withPaneChange, withPaneCount, type PaneSpec, type SplitCount } from './panes'
+import { SYNC_KEYS, activePaneIndex, panesOf, withActivePane, withPaneCount, withSplitSync, withSyncedPaneChange, type PaneSpec, type SplitCount } from './panes'
 import { Watchlist } from './Watchlist'
 import { addSymbol, loadWatchlists, saveWatchlists } from './watchlists'
 import { RectangleTemplates } from './RectangleTemplates'
@@ -492,7 +492,7 @@ function WorkspaceApp({ user, onLogout, onUserRefresh }: WorkspaceAppProps) {
     setWorkspace((current) => ({
       ...current,
       tabs: current.tabs.map((tab) => (
-        tab.id === current.activeTabId ? withPaneChange(tab, activePaneIndex(tab), changes) : tab
+        tab.id === current.activeTabId ? withSyncedPaneChange(tab, activePaneIndex(tab), changes) : tab
       )),
     }))
   }, [])
@@ -1444,6 +1444,24 @@ function WorkspaceApp({ user, onLogout, onUserRefresh }: WorkspaceAppProps) {
               </div>
               {paneTotal > 1 && <small>Click a chart to make it active. The toolbar, drawing tools and panels act on the active chart.</small>}
               {paneTotal > 1 && (
+                <div className="split-sync" role="group" aria-label="Sync charts">
+                  <b>Sync in this tab</b>
+                  {SYNC_KEYS.map((key) => (
+                    <label key={key}>
+                      <input
+                        type="checkbox"
+                        checked={activeTab.split?.sync?.[key] === true}
+                        onChange={(event) => setWorkspace((current) => ({
+                          ...current,
+                          tabs: current.tabs.map((tab) => (tab.id === current.activeTabId ? withSplitSync(tab, key, event.target.checked) : tab)),
+                        }))}
+                      />
+                      <span>{key === 'symbol' ? 'Symbol' : key === 'interval' ? 'Timeframe' : key === 'crosshair' ? 'Crosshair' : 'Time (scroll and zoom)'}</span>
+                    </label>
+                  ))}
+                </div>
+              )}
+              {paneTotal > 1 && (
                 <form
                   className="split-save"
                   onSubmit={(event) => { event.preventDefault(); saveSplitAsLayout(splitSaveName) }}
@@ -1862,6 +1880,9 @@ function WorkspaceApp({ user, onLogout, onUserRefresh }: WorkspaceAppProps) {
                 scaleMode={workspace.scaleMode ?? 'normal'}
                 appearance={preferences.appearance}
                 drawingModes={drawingModes}
+                syncGroup={paneTotal > 1 ? activeTab.id : undefined}
+                syncCrosshair={activeTab.split?.sync?.crosshair === true}
+                syncTime={activeTab.split?.sync?.time === true}
                 alerts={alerts}
                 alertLinesVisible={preferences.alertLines}
                 onMoveAlert={moveAlertTo}

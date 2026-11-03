@@ -18,6 +18,7 @@ import { registerStudyIndicators, studyIndicatorName } from './studyIndicators'
 import { exchangeSymbol } from '../market/binance/futures'
 import { STUDIES, type Study } from './studies'
 import { fibLevels, visibleOnInterval } from './drawingVisibility'
+import { broadcastCrosshair, broadcastTime, followerBarSpace, joinSyncGroup, type SyncMember, type SyncedCrosshair, type SyncedTime } from './chartSync'
 import { ALERT_LINE_OVERLAY_NAME } from './overlayNames'
 import { QVWAP_INDICATOR_NAME, VWAP_INDICATOR_NAME, registerVwapIndicators } from './vwapIndicator'
 import { VWAP_ANCHORS } from './vwap'
@@ -342,6 +343,16 @@ export class KLineChartController {
   #replayPicking = false
   #shiftHeld = false
   #drawingModes: DrawingModes = { stayInDrawingMode: false, lockAll: false, hideAll: false }
+  // Split-view sync: the group is the tab; crosshair and time are passed to its other charts.
+  #syncGroup?: string
+  #syncOptions = { crosshair: false, time: false }
+  #leaveSync?: () => void
+  #applyingSync = false
+  #timeSyncFrame?: number
+  readonly #syncMember: SyncMember = {
+    syncedCrosshair: (state) => this.#applySyncedCrosshair(state),
+    syncedTime: (state) => this.#applySyncedTime(state),
+  }
   /** Drawings selected together (Ctrl/Shift+click); the library itself only knows one selected overlay. */
   readonly #multiSelection = new Set<string>()
   #modifierPress = false
@@ -451,6 +462,72 @@ export class KLineChartController {
     if (!this.#ignoreNavigationEvents && this.#runtimeState.followingLive) {
       this.#patchRuntime({ followingLive: false })
     }
+    if (!this.#ignoreNavigationEvents) this.#queueTimeSync()
+  }
+
+  readonly #handleZoomSync = (): void => {
+    if (!this.#ignoreNavigationEvents) this.#queueTimeSync()
+  }
+
+  /** Joins (or leaves) the split-view group of this chart's tab. */
+  public setSync(group: string | undefined, options: { crosshair: boolean, time: boolean }): void {
+    if (this.#disposed) return
+    this.#syncOptions = options
+    if (group !== this.#syncGroup) {
+      this.#leaveSync?.()
+      this.#leaveSync = group ? joinSyncGroup(group, this.#syncMember) : undefined
+      this.#syncGroup = group
+    }
+    if (!options.crosshair) this.#chart.executeAction('onCrosshairChange', null as never)
+  }
+
+  /** At most one time message per frame while the user drags or zooms. */
+  #queueTimeSync(): void {
+    if (!this.#syncGroup || !this.#syncOptions.time || this.#applyingSync || this.#timeSyncFrame !== undefined) return
+    this.#timeSyncFrame = requestAnimationFrame(() => {
+      this.#timeSyncFrame = undefined
+      if (this.#disposed || !this.#syncGroup) return
+      const range = this.#chart.getVisibleRange()
+      const data = this.#chart.getDataList()
+      const centre = data[Math.max(0, Math.min(data.length - 1, Math.round((range.from + range.to) / 2)))]
+      if (!centre) return
+      broadcastTime(this.#syncGroup, this.#syncMember, { centreTimeMs: centre.timestamp, pixelsPerMs: this.#chart.getBarSpace().bar / this.#intervalMs() })
+    })
+  }
+
+  #applySyncedTime(state: SyncedTime): void {
+    if (this.#disposed || !this.#syncOptions.time || this.#replay || this.#chart.getDataList().length === 0) return
+    this.#applyingSync = true
+    try {
+      this.#withIgnoredNavigation(() => {
+        this.#chart.setBarSpace(followerBarSpace(state, this.#intervalMs()))
+        this.#scrollToCentre(state.centreTimeMs)
+      })
+      this.#patchRuntime({ followingLive: false })
+    } finally {
+      this.#applyingSync = false
+    }
+  }
+
+  #applySyncedCrosshair(state: SyncedCrosshair | null): void {
+    if (this.#disposed || !this.#syncOptions.crosshair) return
+    if (!state) { this.#chart.executeAction('onCrosshairChange', null as never); return }
+    const data = this.#chart.getDataList()
+    if (data.length === 0) return
+    // The candle of this timeframe that contains the moment (the last one opening at or before it).
+    let low = 0
+    let high = data.length - 1
+    while (low < high) {
+      const middle = Math.ceil((low + high) / 2)
+      if (data[middle].timestamp <= state.timestamp) low = middle
+      else high = middle - 1
+    }
+    const x = (this.#chart.convertToPixel({ dataIndex: low }, { paneId: 'candle_pane' }) as Partial<Coordinate>).x
+    if (x === undefined) return
+    const sameSymbol = state.symbol === this.#market.symbol
+    const y = sameSymbol ? (this.#chart.convertToPixel({ value: state.price }, { paneId: 'candle_pane' }) as Partial<Coordinate>).y : undefined
+    // Off-screen y: only the vertical line shows on charts of other symbols.
+    this.#chart.executeAction('onCrosshairChange', { x, y: y ?? -1000, paneId: 'candle_pane' } as never)
   }
 
   readonly #dataLoader: DataLoader = {
@@ -779,6 +856,7 @@ export class KLineChartController {
     if (import.meta.env.DEV) {
       (globalThis as { __tradeHorizonChart?: Chart }).__tradeHorizonChart = chart
       ;(globalThis as { __tradeHorizonController?: unknown }).__tradeHorizonController = this
+      ;((globalThis as { __tradeHorizonCharts?: Set<Chart> }).__tradeHorizonCharts ??= new Set()).add(chart)
     }
 
     chart.setSymbol({
@@ -790,6 +868,7 @@ export class KLineChartController {
     chart.setDataLoader(this.#dataLoader)
     chart.setOffsetRightDistance(72)
     chart.subscribeAction('onScroll', this.#handleManualNavigation)
+    chart.subscribeAction('onZoom', this.#handleZoomSync)
     chart.subscribeAction('onPaneDrag', this.#handleManualNavigation)
     chart.subscribeAction('onScroll', this.#emitView)
     chart.subscribeAction('onZoom', this.#emitView)
@@ -1252,9 +1331,17 @@ export class KLineChartController {
     if (point?.dataIndex === undefined) return
     const index = Math.max(0, Math.min(list.length - 1, point.dataIndex))
     this.#setHover({ index, bar: list[index], previousClose: list[index - 1]?.close, latest: index === list.length - 1 })
+    if (this.#syncGroup && this.#syncOptions.crosshair) {
+      const y = (data as { y?: number }).y
+      const [value] = typeof y === 'number' ? this.#chart.convertFromPixel([{ x, y }], { paneId: 'candle_pane' }) as Array<Partial<Point>> : []
+      broadcastCrosshair(this.#syncGroup, this.#syncMember, { timestamp: list[index].timestamp, price: value?.value ?? list[index].close, symbol: this.#market.symbol })
+    }
   }
 
-  readonly #handleHostLeave = (): void => { this.#setHover(null) }
+  readonly #handleHostLeave = (): void => {
+    this.#setHover(null)
+    if (this.#syncGroup && this.#syncOptions.crosshair) broadcastCrosshair(this.#syncGroup, this.#syncMember, null)
+  }
 
   /** Time-axis labels on round times in the user's zone (see timeAxis.ts), also over the empty space to the right. */
   readonly #createTimeTicks = ({ range, defaultTicks }: { range: { realFrom: number, realTo: number }, defaultTicks: Array<{ coord: number, value: number | string, text: string }> }) => {
@@ -2032,6 +2119,10 @@ export class KLineChartController {
 
   public dispose(): void {
     if (this.#disposed) return
+    this.#leaveSync?.()
+    this.#leaveSync = undefined
+    if (import.meta.env.DEV) (globalThis as { __tradeHorizonCharts?: Set<Chart> }).__tradeHorizonCharts?.delete(this.#chart)
+    if (this.#timeSyncFrame !== undefined) cancelAnimationFrame(this.#timeSyncFrame)
     this.#disposed = true
     this.#historyLoader.cancel()
     this.#stream?.stop()

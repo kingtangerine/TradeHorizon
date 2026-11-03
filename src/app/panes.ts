@@ -18,6 +18,38 @@ export interface TabSplit {
   readonly panes: readonly PaneSpec[]
   /** Which pane the toolbar, drawing tools and panels act on. */
   readonly active: number
+  /** What the charts of this tab share (TradingView's "Sync in layout"). */
+  readonly sync?: SplitSync
+}
+
+export interface SplitSync {
+  readonly symbol?: boolean
+  readonly interval?: boolean
+  readonly crosshair?: boolean
+  readonly time?: boolean
+}
+
+export const SYNC_KEYS = ['symbol', 'interval', 'crosshair', 'time'] as const
+
+/** Changes one pane; a synced symbol or timeframe goes to every pane of the tab. */
+export function withSyncedPaneChange<T extends PaneTab>(tab: T, index: number, changes: Partial<PaneSpec>): T {
+  const sync = tab.split?.sync
+  if (!tab.split || !sync || (!(sync.symbol && changes.symbol) && !(sync.interval && changes.interval))) return withPaneChange(tab, index, changes)
+  const shared: Partial<PaneSpec> = {
+    ...(sync.symbol && changes.symbol ? { symbol: changes.symbol } : {}),
+    ...(sync.interval && changes.interval ? { interval: changes.interval } : {}),
+  }
+  let next = withPaneChange(tab, index, changes)
+  for (let pane = 0; pane < tab.split.count; pane += 1) if (pane !== index) next = withPaneChange(next, pane, shared)
+  return next
+}
+
+export function withSplitSync<T extends PaneTab>(tab: T, key: (typeof SYNC_KEYS)[number], on: boolean): T {
+  if (!tab.split) return tab
+  const sync = { ...tab.split.sync, [key]: on }
+  for (const item of SYNC_KEYS) if (!sync[item]) delete sync[item]
+  const { sync: _previous, ...rest } = tab.split
+  return { ...tab, split: Object.keys(sync).length > 0 ? { ...rest, sync } : rest }
 }
 
 export interface PaneTab {
@@ -103,5 +135,8 @@ export function parseSplit(value: unknown, fallback: PaneSpec): TabSplit | undef
     )
   }
   const active = typeof raw.active === 'number' && Number.isInteger(raw.active) ? Math.min(Math.max(raw.active, 0), count - 1) : 0
-  return { count, panes, active }
+  const storedSync = (raw as { sync?: Record<string, unknown> }).sync
+  const sync: Record<string, boolean> = {}
+  for (const key of SYNC_KEYS) if (storedSync?.[key] === true) sync[key] = true
+  return { count, panes, active, ...(Object.keys(sync).length > 0 ? { sync } : {}) }
 }

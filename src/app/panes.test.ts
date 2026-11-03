@@ -74,3 +74,16 @@ describe('split panes', () => {
     })
   })
 })
+
+describe('split sync', () => {
+  it('sends a synced symbol or timeframe to every pane and keeps the others', async () => {
+    const { withPaneCount, withSplitSync, withSyncedPaneChange, panesOf, parseSplit } = await import('./panes')
+    let tab: import('./panes').PaneTab = withPaneCount<import('./panes').PaneTab>({ symbol: 'BTCUSDT', interval: '15m' }, 3)
+    tab = withSplitSync(tab, 'symbol', true)
+    const changed = withSyncedPaneChange(tab, 1, { symbol: 'ETHUSDT', interval: '4h' })
+    expect(panesOf(changed).map((pane) => pane.symbol)).toEqual(['ETHUSDT', 'ETHUSDT', 'ETHUSDT'])
+    expect(panesOf(changed).map((pane) => pane.interval)).toEqual(['15m', '4h', panesOf(tab)[2].interval])
+    expect(parseSplit(JSON.parse(JSON.stringify(changed.split)), { symbol: 'X', interval: '1h' })?.sync).toEqual({ symbol: true })
+    expect(withSplitSync(tab, 'symbol', false).split?.sync).toBeUndefined()
+  })
+})

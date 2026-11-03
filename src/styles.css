@@ -3685,3 +3685,9 @@ button:disabled {
 .chart-futures-row { display: flex; flex-wrap: wrap; gap: 12px; color: var(--muted); font-size: .76rem; pointer-events: auto; }
 .chart-futures-row b { color: var(--text); font-weight: 600; font-variant-numeric: tabular-nums; }
 .chart-futures-row small { font-variant-numeric: tabular-nums; }
+
+/* Split-view sync toggles */
+.split-sync { display: grid; grid-template-columns: 1fr 1fr; gap: 6px 10px; margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--border); }
+.split-sync b { grid-column: 1 / -1; color: var(--muted); font-size: .7rem; font-weight: 650; letter-spacing: .05em; text-transform: uppercase; }
+.split-sync label { display: flex; align-items: center; gap: 6px; font-size: .8rem; cursor: pointer; }
+.split-sync input { accent-color: var(--tv-blue, #2962ff); }
