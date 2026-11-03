@@ -26,6 +26,14 @@ const ANCHOR_NAMES: Partial<Record<Drawing['type'], readonly string[]>> = {
   trendLine: ['Start', 'End'],
   ray: ['Start', 'Through'],
   rectangle: ['Corner 1', 'Corner 2'],
+  parallelChannel: ['Start', 'End', 'Width'],
+  pitchfork: ['Pivot', 'High', 'Low'],
+  fibExtension: ['Swing start', 'Swing end', 'Projected from'],
+  ellipse: ['Corner 1', 'Corner 2'],
+  dateRange: ['Start', 'End'],
+  datePriceRange: ['Start', 'End'],
+  arrow: ['Tail', 'Head'],
+  extendedLine: ['Point 1', 'Point 2'],
   priceRange: ['Start', 'End'],
   fibRetracement: ['Level 1', 'Level 0'],
   longPosition: ['Entry', 'Target', 'Stop', 'DCA'],
@@ -37,6 +45,9 @@ function timeInput(ms: number, timeZone: string): string {
   const two = (value: number) => String(value).padStart(2, '0')
   return `${t.year}-${two(t.month + 1)}-${two(t.day)}T${two(t.hour)}:${two(t.minute)}`
 }
+
+/** Tools with a fill colour and opacity. */
+const FILLED = new Set<Drawing['type']>(['rectangle', 'fibRetracement', 'ellipse', 'parallelChannel', 'pitchfork', 'dateRange'])
 
 const text = (value: unknown, fallback: string) => (typeof value === 'string' ? value : fallback)
 const num = (value: unknown, fallback: number) => (typeof value === 'number' && Number.isFinite(value) ? value : fallback)
@@ -71,7 +82,8 @@ export function DrawingSettingsDialog({ drawing, timeZone, pricePrecision, initi
           </nav>
           <div className="chart-settings-panel">
             {tab === 'style' && <StyleTab drawing={drawing} position={position} setStyle={setStyle} />}
-            {tab === 'coordinates' && <CoordinatesTab drawing={drawing} timeZone={timeZone} pricePrecision={pricePrecision} onAnchors={(anchors) => onUpdate({ anchors })} />}
+            {tab === 'coordinates' && drawing.type === 'brush' && <p className="chart-settings-note">A brush stroke has too many points to type in; drag it on the chart to move it.</p>}
+            {tab === 'coordinates' && drawing.type !== 'brush' && <CoordinatesTab drawing={drawing} timeZone={timeZone} pricePrecision={pricePrecision} onAnchors={(anchors) => onUpdate({ anchors })} />}
             {tab === 'visibility' && (
               <>
                 <h4>Show on timeframes</h4>
@@ -151,9 +163,9 @@ function StyleTab({ drawing, position, setStyle }: {
               </label>
             </>
           )}
-          {(type === 'rectangle' || type === 'fibRetracement') && (
+          {FILLED.has(type) && (
             <>
-              {type === 'rectangle' && <div className="chart-settings-row"><span>Fill colour</span><ColorPicker label="Fill colour" value={text(style.fillColor, '#3aa9ff')} onChange={(fillColor) => setStyle({ fillColor })} /></div>}
+              {type !== 'fibRetracement' && <div className="chart-settings-row"><span>Fill colour</span><ColorPicker label="Fill colour" value={text(style.fillColor, '#3aa9ff')} onChange={(fillColor) => setStyle({ fillColor })} /></div>}
               <label className="chart-settings-row">
                 <span>Fill opacity</span>
                 <span className="chart-settings-inline">
@@ -162,6 +174,12 @@ function StyleTab({ drawing, position, setStyle }: {
                 </span>
               </label>
             </>
+          )}
+          {type === 'priceLabel' && (
+            <label className="chart-settings-row">
+              <span>Label</span>
+              <input className="study-input wide" value={text(style.text, 'Text') === 'Text' ? '' : text(style.text, '')} placeholder="The price (default)" maxLength={80} onChange={(event) => setStyle({ text: event.target.value || 'Text' })} />
+            </label>
           )}
           {type === 'text' && (
             <>

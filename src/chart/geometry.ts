@@ -156,7 +156,7 @@ export function clampDcaPrice(entry: number, stop: number, dca?: number): number
 }
 
 /** Drawings that cover an area: a click anywhere inside them lands on them. */
-const AREA_DRAWINGS = new Set(['rectangle', 'fibRetracement', 'longPosition', 'shortPosition', 'priceRange'])
+const AREA_DRAWINGS = new Set(['rectangle', 'fibRetracement', 'longPosition', 'shortPosition', 'priceRange', 'ellipse', 'parallelChannel', 'pitchfork', 'fibExtension', 'dateRange', 'datePriceRange'])
 
 export interface StackableDrawing {
   readonly id: string
@@ -185,4 +185,76 @@ export function stackLevels(drawings: readonly StackableDrawing[]): Map<string, 
   let next = areas.length + 1
   for (const drawing of drawings) if (!levels.has(drawing.id)) levels.set(drawing.id, next++)
   return levels
+}
+
+// --- Wave 3 drawing tools ------------------------------------------------------------------------------------------
+
+/** Trend-based Fibonacci extension levels (TradingView's defaults). */
+export const FIB_EXTENSION_LEVELS = [0, 0.382, 0.618, 1, 1.272, 1.618, 2, 2.618] as const
+
+/** Price of an extension level: the move from point 1 to 2, projected from point 3. */
+export function fibExtensionPrice(first: number, second: number, third: number, level: number): number {
+  return third + (second - first) * level
+}
+
+interface Pixel { readonly x: number, readonly y: number }
+
+/** The point where the line from `from` through `to` reaches x = `toX` (a ray drawn to the chart's right edge). */
+export function extendLine(from: Pixel, to: Pixel, toX: number): Pixel {
+  if (to.x === from.x) return { x: to.x, y: to.y }
+  const slope = (to.y - from.y) / (to.x - from.x)
+  return { x: toX, y: from.y + slope * (toX - from.x) }
+}
+
+/** Parallel channel: the second line goes through the third point, at the same slope as the first. */
+export function parallelOffset(first: Pixel, second: Pixel, third: Pixel): number {
+  if (second.x === first.x) return third.y - first.y
+  const onLine = first.y + ((second.y - first.y) * (third.x - first.x)) / (second.x - first.x)
+  return third.y - onLine
+}
+
+/** Andrews' pitchfork: the median runs from point 1 through the middle of points 2 and 3. */
+export function pitchforkMedian(first: Pixel, second: Pixel, third: Pixel): { readonly from: Pixel, readonly through: Pixel } {
+  return { from: first, through: { x: (second.x + third.x) / 2, y: (second.y + third.y) / 2 } }
+}
+
+/** Polygon approximating the ellipse inside the box of two corners. */
+export function ellipsePolygon(a: Pixel, b: Pixel, segments = 48): Pixel[] {
+  const cx = (a.x + b.x) / 2
+  const cy = (a.y + b.y) / 2
+  const rx = Math.abs(b.x - a.x) / 2
+  const ry = Math.abs(b.y - a.y) / 2
+  return Array.from({ length: segments }, (_, index) => {
+    const angle = (index / segments) * Math.PI * 2
+    return { x: cx + rx * Math.cos(angle), y: cy + ry * Math.sin(angle) }
+  })
+}
+
+/** "3d 4h", "2h 15m", "45m" */
+export function formatDuration(ms: number): string {
+  const minutes = Math.round(Math.abs(ms) / 60_000)
+  const days = Math.floor(minutes / 1440)
+  const hours = Math.floor((minutes % 1440) / 60)
+  const rest = minutes % 60
+  if (days > 0) return hours > 0 ? `${days}d ${hours}h` : `${days}d`
+  if (hours > 0) return rest > 0 ? `${hours}h ${rest}m` : `${hours}h`
+  return `${rest}m`
+}
+
+/** Bars and time between two moments, for the date range tools. */
+export function rangeSummary(startMs: number, endMs: number, intervalMs: number): string {
+  const bars = intervalMs > 0 ? Math.round(Math.abs(endMs - startMs) / intervalMs) : 0
+  return `${bars} bar${bars === 1 ? '' : 's'}, ${formatDuration(endMs - startMs)}`
+}
+
+/** Keeps a freehand stroke light: drops points closer than `minDistance` px to the last kept one, at most `max`. */
+export function thinStroke<T extends Pixel>(points: readonly T[], minDistance: number, max = 400): T[] {
+  const kept: T[] = []
+  for (const point of points) {
+    const last = kept[kept.length - 1]
+    if (!last || Math.hypot(point.x - last.x, point.y - last.y) >= minDistance) kept.push(point)
+  }
+  if (kept.length <= max) return kept
+  const step = kept.length / max
+  return Array.from({ length: max }, (_, index) => kept[Math.min(kept.length - 1, Math.round(index * step))])
 }

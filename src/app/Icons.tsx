@@ -411,3 +411,47 @@ export function SplitIcon({ count, ...props }: IconProps & { count: number }) {
     </IconBase>
   )
 }
+
+export function ExtendedLineIcon(props: IconProps) {
+  return <IconBase {...props}><path d="M2 19 22 5" /><circle cx="8" cy="15" r="1.7" /><circle cx="16" cy="9" r="1.7" /></IconBase>
+}
+
+export function HorizontalRayIcon(props: IconProps) {
+  return <IconBase {...props}><path d="M6 12h16" /><circle cx="5" cy="12" r="1.7" /></IconBase>
+}
+
+export function ParallelChannelIcon(props: IconProps) {
+  return <IconBase {...props}><path d="M3 15 15 5M9 19 21 9" /><path d="M6 17 18 7" strokeDasharray="2 2" /></IconBase>
+}
+
+export function ArrowIcon(props: IconProps) {
+  return <IconBase {...props}><path d="M4 20 19 5M11 5h8v8" /></IconBase>
+}
+
+export function BrushIcon(props: IconProps) {
+  return <IconBase {...props}><path d="M3 17c3-1 4-6 7-6s2 5 5 5 4-6 6-8" /></IconBase>
+}
+
+export function FibExtensionIcon(props: IconProps) {
+  return <IconBase {...props}><path d="M4 18 9 8l5 6" strokeDasharray="2 2" /><path d="M13 5h8M13 10h8M13 15h8M13 20h8" /></IconBase>
+}
+
+export function PitchforkIcon(props: IconProps) {
+  return <IconBase {...props}><path d="M3 13 21 13M8 6 21 6M8 20 21 20M8 6v14" /><circle cx="3" cy="13" r="1.5" /></IconBase>
+}
+
+export function EllipseIcon(props: IconProps) {
+  return <IconBase {...props}><ellipse cx="12" cy="12" rx="9" ry="6" /></IconBase>
+}
+
+export function DateRangeIcon(props: IconProps) {
+  return <IconBase {...props}><path d="M5 4v16M19 4v16M7 12h10M14 9l3 3-3 3" /></IconBase>
+}
+
+export function DatePriceRangeIcon(props: IconProps) {
+  return <IconBase {...props}><rect x="4" y="5" width="16" height="14" rx="1" /><path d="M12 7v10M6 12h12" /></IconBase>
+}
+
+export function PriceLabelIcon(props: IconProps) {
+  return <IconBase {...props}><path d="M4 7h11l5 5-5 5H4Z" /><path d="M2 20l3-3" /></IconBase>
+}

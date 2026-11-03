@@ -17,6 +17,7 @@ import { BASELINE_NAME, HEIKIN_ASHI_NAME, registerSeriesOverlays } from './serie
 import { registerStudyIndicators, studyIndicatorName } from './studyIndicators'
 import { exchangeSymbol } from '../market/binance/futures'
 import { COMPARE_INDICATOR_NAME, registerCompareOverlay, type CompareSeries } from './compareOverlay'
+import { registerWave3Overlays } from './overlaysWave3'
 import { COMPARE_COLORS, compareChange, scaledCompare } from './compare'
 import { getMarket, type CryptoMarket as CompareMarket } from './markets'
 import { STUDIES, type Study } from './studies'
@@ -147,6 +148,7 @@ const DEFAULT_BAR_SPACE = 10
 const HIDDEN_INDICATOR_TOOLTIP = { name: '', calcParamsText: '', features: [], legends: [] }
 
 registerTradeHorizonOverlays()
+registerWave3Overlays()
 registerDominanceIndicators()
 registerVwapIndicators()
 registerVolumeOverlay()
@@ -180,6 +182,10 @@ interface ToolSession {
   pointerId?: number
   dragged: boolean
   createdThisPress: boolean
+  /** Three-point tools: the points fixed so far. Freehand: the stroke so far. */
+  fixed?: ChartPoint[]
+  /** Freehand: the stroke in pixels, to keep only points a few pixels apart. */
+  strokePx?: Array<{ x: number, y: number }>
 }
 
 interface OverlayMove {
@@ -1790,6 +1796,12 @@ export class KLineChartController {
     const start = tool.start ?? current
     const placement = DRAWING_TOOLS[tool.type].placement
     if (placement === 'onePoint') return [current]
+    if (placement === 'threePoint') {
+      const points = [...(tool.fixed ?? [start])]
+      while (points.length < 3) points.push(current)
+      return points
+    }
+    if (placement === 'freehand') return tool.fixed && tool.fixed.length > 1 ? tool.fixed : [start, current]
     if (placement === 'position') {
       return positionPoints(
         tool.type === 'shortPosition' ? 'short' : 'long',
@@ -1800,7 +1812,7 @@ export class KLineChartController {
     }
 
     let end = current
-    if (shiftKey && (tool.type === 'trendLine' || tool.type === 'ray')) {
+    if (shiftKey && (tool.type === 'trendLine' || tool.type === 'ray' || tool.type === 'extendedLine' || tool.type === 'arrow')) {
       const [from, to] = this.#chart.convertToPixel(
         [start, current],
         { paneId: 'candle_pane' },
@@ -1845,9 +1857,11 @@ export class KLineChartController {
       const first = drawing.anchors[0]
       const sameTime = drawing.anchors.every((anchor) => anchor.timeMs === first.timeMs)
       const samePrice = drawing.anchors.every((anchor) => anchor.price === first.price)
-      const needsHeight = tool.type !== 'trendLine' && tool.type !== 'ray'
+      const lineLike = tool.type === 'trendLine' || tool.type === 'ray' || tool.type === 'extendedLine' || tool.type === 'arrow'
+      const needsHeight = !lineLike && tool.type !== 'dateRange'
+      const needsWidth = tool.type === 'rectangle' || tool.type === 'ellipse' || tool.type === 'dateRange' || tool.type === 'datePriceRange'
       // Nothing to commit yet: keep the tool armed so the next click sets the second point.
-      if ((sameTime && samePrice) || (needsHeight && samePrice) || (tool.type === 'rectangle' && sameTime)) return
+      if ((sameTime && samePrice) || (needsHeight && samePrice) || (needsWidth && sameTime)) return
     }
 
     this.#endTool()
@@ -2059,7 +2073,12 @@ export class KLineChartController {
     tool.pressOrigin = { x: event.clientX, y: event.clientY }
     tool.dragged = false
     tool.createdThisPress = !tool.draftId
-    if (!tool.draftId) tool.start = point
+    if (!tool.draftId) {
+      tool.start = point
+      const placement = DRAWING_TOOLS[tool.type].placement
+      if (placement === 'threePoint') tool.fixed = [point]
+      if (placement === 'freehand') { tool.fixed = [point]; tool.strokePx = [{ x: event.clientX, y: event.clientY }] }
+    }
     this.#updateDraft(tool, point, event.shiftKey)
   }
 
@@ -2077,7 +2096,16 @@ export class KLineChartController {
     if (!pressed && event.buttons !== 0) return
 
     const point = this.#pointAt(event.clientX, event.clientY)
-    if (point) this.#updateDraft(tool, point, event.shiftKey)
+    if (!point) return
+    if (DRAWING_TOOLS[tool.type].placement === 'freehand') {
+      if (!pressed) return
+      // Keep a point only when the pointer moved a few pixels, so a stroke stays light.
+      const last = tool.strokePx?.at(-1)
+      if (last && Math.hypot(event.clientX - last.x, event.clientY - last.y) < 4) return
+      tool.strokePx?.push({ x: event.clientX, y: event.clientY })
+      if ((tool.fixed?.length ?? 0) < 400) tool.fixed?.push(point)
+    }
+    this.#updateDraft(tool, point, event.shiftKey)
   }
 
   readonly #handleToolPointerUp = (event: PointerEvent): void => {
@@ -2089,8 +2117,20 @@ export class KLineChartController {
       this.cancelActiveTool()
       return
     }
+    const placement = DRAWING_TOOLS[tool.type].placement
     // First click of a click-click placement: the shape follows the pointer until the second click.
-    if (DRAWING_TOOLS[tool.type].placement === 'twoPoint' && tool.createdThisPress && !tool.dragged) return
+    if (placement === 'twoPoint' && tool.createdThisPress && !tool.dragged) return
+    if (placement === 'threePoint') {
+      // Click, click, click; or drag the first line and click the third point.
+      const fixed = tool.fixed ?? []
+      if (!(tool.createdThisPress && !tool.dragged) && tool.current) fixed.push(tool.current)
+      tool.fixed = fixed
+      if (fixed.length < 3) return
+    }
+    if (placement === 'freehand' && (tool.fixed?.length ?? 0) < 2) {
+      this.cancelActiveTool()
+      return
+    }
     this.#finishDraft(tool)
   }
 
@@ -2565,9 +2605,9 @@ export class KLineChartController {
       visible: !(drawing?.hidden ?? false) && !this.#drawingModes.hideAll && visibleOnInterval(drawing?.style, this.#interval),
       zLevel: drawing ? this.#stackLevels.get(id) ?? DRAFT_Z_LEVEL : DRAFT_Z_LEVEL,
       fixedZLevel: true,
-      needDefaultPointFigure: true,
-      needDefaultXAxisFigure: type !== 'horizontalLine',
-      needDefaultYAxisFigure: type !== 'verticalLine',
+      needDefaultPointFigure: type !== 'brush',
+      needDefaultXAxisFigure: type !== 'horizontalLine' && type !== 'horizontalRay' && type !== 'brush',
+      needDefaultYAxisFigure: type !== 'verticalLine' && type !== 'dateRange' && type !== 'brush',
       ...(drawing ? { points: drawingPoints(drawing) } : {}),
       styles: {
         // A drawing in a multi-selection is drawn a little thicker, so the group can be seen.

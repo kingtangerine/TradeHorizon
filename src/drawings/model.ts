@@ -17,6 +17,17 @@ export const DRAWING_TYPES = [
   "shortPosition",
   "priceRange",
   "text",
+  "extendedLine",
+  "horizontalRay",
+  "parallelChannel",
+  "arrow",
+  "brush",
+  "fibExtension",
+  "pitchfork",
+  "ellipse",
+  "dateRange",
+  "datePriceRange",
+  "priceLabel",
 ] as const;
 
 export type DrawingType = (typeof DRAWING_TYPES)[number];
@@ -214,7 +225,10 @@ export function expandRectangleAnchors(anchors: readonly AnchorV1[]): AnchorV1[]
 }
 
 function isValidAnchorCount(type: DrawingType, count: number): boolean {
-  if (type === "horizontalLine" || type === "verticalLine" || type === "text") return count === 1;
+  if (type === "horizontalLine" || type === "verticalLine" || type === "text" || type === "horizontalRay" || type === "priceLabel") return count === 1;
+  if (type === "parallelChannel" || type === "fibExtension" || type === "pitchfork") return count === 3;
+  // A freehand stroke keeps up to 400 points (thinned while drawing).
+  if (type === "brush") return count >= 2 && count <= 400;
   if (type === "priceRange") return count === 2;
   if (type === "longPosition" || type === "shortPosition") return count === 3 || count === 4;
   if (type === "rectangle") return count === 8 || count === 6 || count === 2;

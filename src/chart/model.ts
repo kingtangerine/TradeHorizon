@@ -68,7 +68,9 @@ export function drawingFromOverlay(
 ): Drawing | null {
   let anchors: readonly Anchor[] | null
 
-  if (type === 'rectangle') {
+  if (type === 'brush') {
+    anchors = overlay.points.length >= 2 ? overlayAnchors(overlay, Math.min(overlay.points.length, 400)) : null
+  } else if (type === 'rectangle') {
     // Any two or more corners define the box; the eight handles are always rebuilt from it.
     const parsed = overlay.points.length >= 2 ? overlayAnchors(overlay, Math.min(overlay.points.length, 8)) : null
     anchors = parsed ? expandRectangleAnchors(parsed) : null

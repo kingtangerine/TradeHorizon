@@ -34,6 +34,7 @@ import { ChartTypeIcon } from './ChartTypeIcon'
 import { BottomBar, ScaleToggles } from './BottomBar'
 import { ChartSettingsDialog } from './ChartSettingsDialog'
 import { StudySettingsDialog } from './StudySettingsDialog'
+import { ToolGroup } from './ToolGroup'
 import { DrawingSettingsDialog, type DrawingSettingsTab } from './DrawingSettingsDialog'
 import { DrawingContextMenu } from './DrawingContextMenu'
 import type { DrawingModes } from '../chart/KLineChartController'
@@ -79,7 +80,7 @@ import {
 } from '../chart/indicators'
 import { VWAP_ANCHORS, VWAP_ANCHOR_LABELS, type VwapAnchor } from '../chart/vwap'
 import { REPLAY_SPEEDS } from '../chart/replay'
-import { DRAWING_TOOLS, TOOL_ORDER } from '../chart/tools'
+import { DRAWING_TOOLS, TOOL_GROUPS, TOOL_ORDER } from '../chart/tools'
 import { decimalString } from '../chart/model'
 import { clampDcaPrice } from '../chart/geometry'
 import { SymbolSearch } from './SymbolSearch'
@@ -140,6 +141,17 @@ import {
   MidlineIcon,
   CameraIcon,
   PencilLockIcon,
+  ExtendedLineIcon,
+  HorizontalRayIcon,
+  ParallelChannelIcon,
+  ArrowIcon,
+  BrushIcon,
+  FibExtensionIcon,
+  PitchforkIcon,
+  EllipseIcon,
+  DateRangeIcon,
+  DatePriceRangeIcon,
+  PriceLabelIcon,
 } from './Icons'
 
 const INITIAL_INTERVAL: MarketInterval = '15m'
@@ -155,6 +167,17 @@ const TOOL_ICONS: Readonly<Record<DrawingType, typeof CursorIcon>> = {
   longPosition: LongPositionIcon,
   shortPosition: ShortPositionIcon,
   text: TextIcon,
+  extendedLine: ExtendedLineIcon,
+  horizontalRay: HorizontalRayIcon,
+  parallelChannel: ParallelChannelIcon,
+  arrow: ArrowIcon,
+  brush: BrushIcon,
+  fibExtension: FibExtensionIcon,
+  pitchfork: PitchforkIcon,
+  ellipse: EllipseIcon,
+  dateRange: DateRangeIcon,
+  datePriceRange: DatePriceRangeIcon,
+  priceLabel: PriceLabelIcon,
 }
 
 function isPositionTool(type: DrawingType): boolean {
@@ -436,8 +459,13 @@ function WorkspaceApp({ user, onLogout, onUserRefresh }: WorkspaceAppProps) {
     setActiveTool('cursor')
   }, [controller])
 
+  /** Tool rail: the last tool used in each group is the one its button shows. */
+  const [groupTools, setGroupTools] = useState<Record<string, DrawingType>>({})
   const chooseTool = useCallback((type: DrawingType) => {
-    if (controller?.startTool(type)) setActiveTool(type)
+    if (!controller?.startTool(type)) return
+    setActiveTool(type)
+    const group = TOOL_GROUPS.find((item) => item.tools.includes(type))
+    if (group) setGroupTools((current) => (current[group.id] === type ? current : { ...current, [group.id]: type }))
   }, [controller])
 
   const updateIndicators = useCallback((update: (current: IndicatorSettings) => IndicatorSettings) => {
@@ -1786,24 +1814,19 @@ function WorkspaceApp({ user, onLogout, onUserRefresh }: WorkspaceAppProps) {
           >
             <CursorIcon />
           </button>
-          {TOOL_ORDER.map((type) => {
-            const tool = DRAWING_TOOLS[type]
-            const Icon = TOOL_ICONS[type]
-            return (
-              <button
-                type="button"
-                key={type}
-                className={activeTool === type ? 'tool-button active' : 'tool-button'}
-                aria-label={`Draw ${tool.label.toLowerCase()}`}
-                aria-pressed={activeTool === type}
-                title={`${tool.label} (Alt+${tool.shortcut})`}
-                onClick={() => (activeTool === type ? chooseCursor() : chooseTool(type))}
-                disabled={!controller || runtime.connection === 'error'}
-              >
-                <Icon />
-              </button>
-            )
-          })}
+          {TOOL_GROUPS.map((group) => (
+            <ToolGroup
+              key={group.id}
+              label={group.label}
+              tools={group.tools}
+              shown={group.tools.includes(activeTool as DrawingType) ? activeTool as DrawingType : groupTools[group.id] ?? group.tools[0]}
+              activeTool={activeTool}
+              icons={TOOL_ICONS}
+              disabled={!controller || runtime.connection === 'error'}
+              onChoose={chooseTool}
+              onCursor={chooseCursor}
+            />
+          ))}
 
           <span className="tool-divider" />
 

@@ -7,6 +7,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [0.26.0] - 2026-11-03
+
+Closer to TradingView, part 3.
+
+### Added
+- **Perpetual futures**: Binance USDT-M perpetuals are listed as `XXXUSDT.P` (as in TradingView), under **Futures** in symbol search.
+  - They work for charts, watchlists, compare and alerts (the server checks them too).
+  - The legend shows the funding rate with a countdown to the next funding, the mark price and open interest.
+- **11 new drawing tools**: extended line, horizontal ray, parallel channel, arrow, brush, trend-based Fibonacci extension, pitchfork, ellipse, date range, date and price range, and price label.
+  - The tool rail groups tools in fly-outs, as TradingView does: lines, Fibonacci and pitchfork, shapes, measuring, and text. Each group shows the last tool used from it, and the small arrow in its corner lists the rest.
+  - Every tool has an Alt shortcut, shown in its fly-out.
+- **Split-view sync**: in the split menu, choose what the charts of a tab share: symbol, timeframe, crosshair, or time. Time sync means scrolling or zooming one chart moves the others to the same moment and span, even on other timeframes.
+- **Compare**: the **+** next to the symbol overlays up to 3 other symbols.
+  - Each line starts at the first candle on screen, and the chart switches to the % scale, so every line reads as its own % change.
+  - The legend shows each symbol's price and change, with a button to remove it.
+- **Alert conditions**:
+  - Crossing up or down, greater than, less than, entering a channel, exiting a channel, and moving up or down N% within 5 minutes to 24 hours.
+  - **Alerts on trend lines**: right-click a trend line or ray, then *Add alert on this line*. The alert follows the line as it slopes.
+  - **Every time** alerts fire on each new crossing, at most once a minute. Alerts can **expire** after a day, a week or a month, and can carry a **custom message** that appears in browser and Telegram notifications.
+  - Channel alerts show both lines on the chart.
+
+### Changed
+- Notifications say what happened ("Crossing up 65000: price 65012.5", or your own message) instead of "Price reached …".
+- The server and the app now use one set of alert rules (`server/alertRules.mjs`), so they always agree on when an alert fires.
 ## [0.25.0] - 2026-11-03
 
 Closer to TradingView, part 2.
