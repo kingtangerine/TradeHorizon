@@ -12,6 +12,8 @@ export interface AlertEvent {
   readonly direction: 'above' | 'below'
   readonly triggeredAtMs: number
   readonly triggeredPrice?: number
+  /** An "every time" alert: it stays active; this event is one of its triggers. */
+  readonly everyTime?: boolean
 }
 
 export function pushSupported(): boolean {

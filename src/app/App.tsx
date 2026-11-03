@@ -21,7 +21,8 @@ import {
   type DrawingType,
 } from '../drawings'
 import { MARKET_INTERVALS, MARKET_INTERVAL_SPECS, type MarketInterval } from '../market'
-import { alertReached, isTriggered, loadAlerts, moveAlert, saveAlerts, type AlertDirection, type PriceAlert } from './alerts'
+import { isTriggered, loadAlerts, moveAlert, saveAlerts, type AlertOptions, type PriceAlert } from './alerts'
+import { evaluateAlert, targetAt, type AlertState } from '../../server/alertRules.mjs'
 import { AlertsPanel } from './AlertsPanel'
 import { TimeZoneMenu } from './TimeZoneMenu'
 import { INTERVAL_INPUT_CHARS, isChartTypingKey, parseIntervalInput } from './hotkeys'
@@ -293,6 +294,8 @@ function WorkspaceApp({ user, onLogout, onUserRefresh }: WorkspaceAppProps) {
   const [symbolSearch, setSymbolSearch] = useState<'change' | 'new' | 'watchlist' | 'compare' | null>(null)
   const [markets, setMarkets] = useState(() => allMarkets())
   const [alertsOpen, setAlertsOpen] = useState(false)
+  /** Per-alert memory between price updates (was the condition met, is it armed), as on the server. */
+  const alertStatesRef = useRef(new Map<string, AlertState>())
   // Typing on the chart (TradingView): letters open symbol search with them, digits open the timeframe box.
   const [searchSeed, setSearchSeed] = useState<string>()
   const [intervalInput, setIntervalInput] = useState<string | null>(null)
@@ -390,18 +393,24 @@ function WorkspaceApp({ user, onLogout, onUserRefresh }: WorkspaceAppProps) {
     }
   }, [])
 
-  const createAlert = useCallback((direction: AlertDirection, targetPrice: number, symbol: string) => {
-    setAlerts((current) => [{ id: crypto.randomUUID(), symbol, targetPrice, direction, enabled: true, createdAtMs: Date.now() }, ...current])
+  const createAlert = useCallback((options: AlertOptions, symbol: string) => {
+    setAlerts((current) => [{ id: crypto.randomUUID(), symbol, ...options, enabled: true, createdAtMs: Date.now() }, ...current])
     if ('Notification' in globalThis && Notification.permission === 'default') void Notification.requestPermission()
   }, [])
 
   /** Dragging an alert line moves the alert (and re-arms it on the side of the price it now sits). */
   const moveAlertTo = useCallback((id: string, targetPrice: number, lastPrice: number | undefined) => {
+    if (id.endsWith(':upper')) {
+      const base = id.slice(0, -':upper'.length)
+      setAlerts((current) => current.map((alert) => (alert.id === base ? { ...alert, upperPrice: targetPrice } : alert)))
+      return
+    }
     setAlerts((current) => current.map((alert) => (alert.id === id ? moveAlert(alert, targetPrice, lastPrice) : alert)))
   }, [])
 
   const deleteAlert = useCallback((id: string) => {
-    setAlerts((current) => current.filter((alert) => alert.id !== id))
+    const base = id.endsWith(':upper') ? id.slice(0, -':upper'.length) : id
+    setAlerts((current) => current.filter((alert) => alert.id !== base))
   }, [])
 
   const toggleAlert = useCallback((id: string) => {
@@ -1038,20 +1047,24 @@ function WorkspaceApp({ user, onLogout, onUserRefresh }: WorkspaceAppProps) {
       return
     }
     if (price === undefined) return
-    const previous = previousPriceRef.current
     previousPriceRef.current = price
-    if (previous === undefined) return
 
-    const triggered = alerts.filter((alert) => (
-      alert.enabled && !alert.triggeredAtMs && alert.symbol === market.symbol &&
-      !alertReached(alert, previous) && alertReached(alert, price)
-    ))
+    // Same rules as the server (alertRules.mjs). "Moving N%" needs a price history, so only the server checks it.
+    const now = Date.now()
+    const triggered = alerts.filter((alert) => {
+      if (!alert.enabled || alert.triggeredAtMs || alert.symbol !== market.symbol || alert.condition === 'movePercent') return false
+      const step = evaluateAlert(alert, price, now, alertStatesRef.current.get(alert.id))
+      alertStatesRef.current.set(alert.id, step.state)
+      return step.fire
+    })
     if (triggered.length === 0) return
 
-    const now = Date.now()
-    setAlerts((current) => current.map((alert) => (
-      triggered.some((item) => item.id === alert.id) ? { ...alert, triggeredAtMs: now, triggeredPrice: price, enabled: false } : alert
-    )))
+    setAlerts((current) => current.map((alert) => {
+      if (!triggered.some((item) => item.id === alert.id)) return alert
+      return alert.frequency === 'everyTime'
+        ? { ...alert, lastTriggeredAtMs: now, lastTriggeredPrice: price, triggerCount: (alert.triggerCount ?? 0) + 1 }
+        : { ...alert, triggeredAtMs: now, triggeredPrice: price, enabled: false }
+    }))
 
     announceAlerts(triggered.map((alert) => ({ symbol: alert.symbol, targetPrice: alert.targetPrice, price })))
   }, [alerts, market.symbol, runtime.quote?.close, runtime.replay])
@@ -1068,13 +1081,17 @@ function WorkspaceApp({ user, onLogout, onUserRefresh }: WorkspaceAppProps) {
       const events = await fetchAlertEvents(since)
       if (!live || events.length === 0) return
       since = Math.max(since, ...events.map((event) => event.triggeredAtMs))
-      const fresh = events.filter((event) => alertsRef.current.some((alert) => alert.id === event.id && !alert.triggeredAtMs))
+      const isNew = (alert: PriceAlert, event: { triggeredAtMs: number, everyTime?: boolean }) => (
+        event.everyTime ? (alert.lastTriggeredAtMs ?? 0) < event.triggeredAtMs : !alert.triggeredAtMs
+      )
+      const fresh = events.filter((event) => alertsRef.current.some((alert) => alert.id === event.id && isNew(alert, event)))
       if (fresh.length === 0) return
       setAlerts((current) => current.map((alert) => {
         const event = fresh.find((item) => item.id === alert.id)
-        return event && !alert.triggeredAtMs
-          ? { ...alert, enabled: false, triggeredAtMs: event.triggeredAtMs, triggeredPrice: event.triggeredPrice }
-          : alert
+        if (!event || !isNew(alert, event)) return alert
+        return event.everyTime
+          ? { ...alert, lastTriggeredAtMs: event.triggeredAtMs, lastTriggeredPrice: event.triggeredPrice }
+          : { ...alert, enabled: false, triggeredAtMs: event.triggeredAtMs, triggeredPrice: event.triggeredPrice }
       }))
       // Alerts that fired while this tab was hidden were already announced by the push notification.
       const announce = fresh.filter((event) => hiddenAtMs === undefined || event.triggeredAtMs >= hiddenAtMs)
@@ -2456,7 +2473,7 @@ function WorkspaceApp({ user, onLogout, onUserRefresh }: WorkspaceAppProps) {
           lastPrice={quote?.close}
           linesVisible={preferences.alertLines}
           onToggleLines={() => setPreferences((current) => ({ ...current, alertLines: !current.alertLines }))}
-          onCreate={(direction, targetPrice) => createAlert(direction, targetPrice, market.symbol)}
+          onCreate={(options) => createAlert(options, market.symbol)}
           onToggle={toggleAlert}
           onDelete={deleteAlert}
           onClearTriggered={() => setAlerts((current) => current.filter((alert) => !isTriggered(alert)))}
@@ -2614,6 +2631,7 @@ function WorkspaceApp({ user, onLogout, onUserRefresh }: WorkspaceAppProps) {
         const ids = group ? [...multiSelection] : [drawing.id]
         const targets = drawingSnapshot.drawings.filter((item) => ids.includes(item.id))
         const locked = targets.every((item) => item.locked)
+        const single = ids.length === 1
         return (
           <DrawingContextMenu
             left={drawingMenu.left}
@@ -2622,6 +2640,15 @@ function WorkspaceApp({ user, onLogout, onUserRefresh }: WorkspaceAppProps) {
             count={ids.length}
             onSettings={() => (isPositionTool(drawing.type) ? setPositionSettingsOpen(true) : setDrawingSettings({ id: drawing.id, tab: 'style' }))}
             onVisibility={() => setDrawingSettings({ id: drawing.id, tab: 'visibility' })}
+            onAddAlert={single && (drawing.type === 'trendLine' || drawing.type === 'ray') ? () => {
+              const [first, second] = drawing.anchors
+              const line = { t1: first.timeMs, p1: Number(first.price), t2: second.timeMs, p2: Number(second.price) }
+              const now = Date.now()
+              const target = targetAt({ id: '', symbol: market.symbol, targetPrice: line.p1, direction: 'above', line }, now)
+              const last = runtime.quote?.close
+              createAlert({ targetPrice: Number(target.toFixed(market.pricePrecision)), direction: last !== undefined && last > target ? 'below' : 'above', condition: 'crossing', line }, market.symbol)
+              showToast(`Alert on the trend line: fires when the price crosses it (now ${target.toFixed(market.pricePrecision)}).`)
+            } : undefined}
             onClone={() => { for (const id of ids) controller?.cloneDrawing(id) }}
             onLock={() => drawingStore.execute(batchDrawings(targets.map((item) => updateDrawing(item.id, { locked: !locked }))))}
             onHide={() => drawingStore.execute(batchDrawings(targets.map((item) => updateDrawing(item.id, { hidden: true }))))}

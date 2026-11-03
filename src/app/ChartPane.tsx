@@ -143,8 +143,14 @@ export function ChartPane({
   // This chart's alerts as lines: active and paused ones (a triggered alert has done its job).
   const alertLines = useMemo<readonly AlertLine[]>(() => (
     alertLinesVisible
-      ? alerts.filter((alert) => alert.symbol === market.symbol && alert.triggeredAtMs === undefined)
-        .map((alert) => ({ id: alert.id, price: alert.targetPrice, paused: !alert.enabled }))
+      // Level alerts get a line (channels two); trend-line and "% move" alerts have no fixed level to draw.
+      ? alerts.filter((alert) => alert.symbol === market.symbol && alert.triggeredAtMs === undefined && !alert.line && alert.condition !== 'movePercent')
+        .flatMap((alert) => [
+          { id: alert.id, price: alert.targetPrice, paused: !alert.enabled },
+          ...(alert.upperPrice !== undefined && (alert.condition === 'enterChannel' || alert.condition === 'exitChannel')
+            ? [{ id: `${alert.id}:upper`, price: alert.upperPrice, paused: !alert.enabled }]
+            : []),
+        ])
       : []
   ), [alerts, alertLinesVisible, market.symbol])
 

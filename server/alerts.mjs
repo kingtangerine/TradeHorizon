@@ -9,6 +9,7 @@ import { existsSync, readFileSync, renameSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import webpush from 'web-push'
 import { createSendQueue } from './sendQueue.mjs'
+import { alertMessage, conditionMet, conditionOf, evaluateAlert, isExpired, isValidAlert } from './alertRules.mjs'
 
 export const ALERTS_KEY = 'alerts:v1'
 const POLL_MS = 10_000
@@ -20,8 +21,22 @@ const MAX_SUBSCRIPTIONS_PER_USER = 10
 /** Browsers' push services. Subscriptions pointing anywhere else are rejected so the server cannot be aimed at other hosts. */
 const PUSH_HOSTS = /(^|\.)(fcm\.googleapis\.com|push\.services\.mozilla\.com|push\.apple\.com|notify\.windows\.com)$/
 
+/** Kept for older callers: a plain level alert's "reached" test. Conditions live in alertRules.mjs. */
 export function alertReached(alert, price) {
-  return alert.direction === 'above' ? price >= alert.targetPrice : price <= alert.targetPrice
+  return conditionMet(alert, price, Date.now())
+}
+
+/** How far back prices are kept for "moving N% in a window" alerts (the longest window plus a margin). */
+const SAMPLE_KEEP_MS = 24 * 3_600_000 + 10 * 60_000
+const SAMPLE_EVERY_MS = 10_000
+
+/** The price `windowMs` ago from a symbol's samples, or undefined while there is not that much history yet. */
+export function priceAgo(samples, windowMs, nowMs) {
+  if (!samples || samples.length === 0) return undefined
+  const start = nowMs - windowMs
+  if (samples[0][0] > start + 60_000) return undefined
+  for (const [time, price] of samples) if (time >= start) return price
+  return samples[samples.length - 1][1]
 }
 
 /** Alerts that can still fire. Anything malformed is ignored rather than trusted. */
@@ -29,12 +44,8 @@ export function parseActiveAlerts(value) {
   let list
   try { list = JSON.parse(value) } catch { return [] }
   if (!Array.isArray(list)) return []
-  return list.filter((alert) => (
-    alert && typeof alert.id === 'string' && typeof alert.symbol === 'string' &&
-    typeof alert.targetPrice === 'number' && Number.isFinite(alert.targetPrice) &&
-    (alert.direction === 'above' || alert.direction === 'below') &&
-    alert.enabled === true && !alert.triggeredAtMs
-  ))
+  const nowMs = Date.now()
+  return list.filter((alert) => isValidAlert(alert) && alert.enabled === true && !alert.triggeredAtMs && !isExpired(alert, nowMs))
 }
 
 /** How long after triggering a device-reported alert is still worth a notification (old uploads are not re-sent). */
@@ -46,19 +57,21 @@ const RELAY_WINDOW_MS = 30 * 60_000
  */
 export function newlyTriggered(previousValue, nextValue, nowMs, maxAgeMs = RELAY_WINDOW_MS) {
   const parse = (value) => { try { const list = JSON.parse(value ?? '[]'); return Array.isArray(list) ? list : [] } catch { return [] } }
-  const before = new Map(parse(previousValue).filter((alert) => alert && typeof alert.id === 'string').map((alert) => [alert.id, alert.triggeredAtMs]))
+  // "Every time" alerts stay active and record each trigger in lastTriggeredAtMs instead.
+  const at = (alert) => (typeof alert?.triggeredAtMs === 'number' ? alert.triggeredAtMs : alert?.lastTriggeredAtMs)
+  const before = new Map(parse(previousValue).filter((alert) => alert && typeof alert.id === 'string').map((alert) => [alert.id, at(alert)]))
   return parse(nextValue).filter((alert) => (
     alert && typeof alert.id === 'string' && typeof alert.symbol === 'string' &&
-    typeof alert.targetPrice === 'number' && typeof alert.triggeredAtMs === 'number' &&
-    before.get(alert.id) !== alert.triggeredAtMs &&
-    Math.abs(nowMs - alert.triggeredAtMs) <= maxAgeMs
-  ))
+    typeof alert.targetPrice === 'number' && typeof at(alert) === 'number' &&
+    before.get(alert.id) !== at(alert) &&
+    Math.abs(nowMs - at(alert)) <= maxAgeMs
+  )).map((alert) => ({ ...alert, triggeredAtMs: at(alert) }))
 }
 
 export function alertPayload(alert, price) {
   return {
-    title: `${alert.symbol} price alert`,
-    body: `Price reached ${price} (target ${alert.targetPrice}).`,
+    title: `${alert.symbol} alert`,
+    body: alertMessage(alert, price),
     symbol: alert.symbol,
     alertId: alert.id,
     price,
@@ -104,8 +117,12 @@ export async function fetchLastPrices(groups, fetchImpl = (url, init) => fetch(u
 export function createAlertService({ store, exchangeOf, fetchPrices = fetchLastPrices, notify = async () => {}, feed, now = () => Date.now(), log = console }) {
   /** userId -> alerts that can still fire */
   const active = new Map()
-  /** symbol -> last price seen; a crossing needs a previous price to compare with */
+  /** symbol -> last price seen */
   const lastPrice = new Map()
+  /** alertId -> { met, armed } from the previous check (see evaluateAlert) */
+  const alertState = new Map()
+  /** symbol -> [[time, price], ...] over the last day, for "moving N%" alerts */
+  const samples = new Map()
   /** symbol -> when the live feed last delivered a price for it */
   const liveAt = new Map()
   /** symbol -> [{ userId, alert }]: what to check when a price for that symbol arrives */
@@ -135,7 +152,9 @@ export function createAlertService({ store, exchangeOf, fetchPrices = fetchLastP
     }
     bySymbol = nextBySymbol
     groups = nextGroups
-    for (const symbol of [...lastPrice.keys()]) if (!bySymbol.has(symbol)) { lastPrice.delete(symbol); liveAt.delete(symbol) }
+    for (const symbol of [...lastPrice.keys()]) if (!bySymbol.has(symbol)) { lastPrice.delete(symbol); liveAt.delete(symbol); samples.delete(symbol) }
+    const ids = new Set([...active.values()].flat().map((alert) => alert.id))
+    for (const id of [...alertState.keys()]) if (!ids.has(id)) alertState.delete(id)
     const key = JSON.stringify(Object.entries(groups).map(([exchange, symbols]) => [exchange, [...symbols].sort()]).sort())
     if (key !== watchedKey) {
       watchedKey = key
@@ -159,13 +178,21 @@ export function createAlertService({ store, exchangeOf, fetchPrices = fetchLastP
     reindex()
   }
 
-  /** A new price for a symbol: fires every alert it crossed since the previous price. */
+  /** A new price for a symbol: checks each of its alerts (alertRules.mjs decides crossings, levels, channels, moves). */
   function checkPrice(symbol, price) {
-    const previous = lastPrice.get(symbol)
     lastPrice.set(symbol, price)
-    if (previous === undefined || previous === price) return
+    const nowMs = now()
+    const history = samples.get(symbol) ?? []
+    if (history.length === 0 || nowMs - history[history.length - 1][0] >= SAMPLE_EVERY_MS) {
+      history.push([nowMs, price])
+      while (history.length > 0 && nowMs - history[0][0] > SAMPLE_KEEP_MS) history.shift()
+      samples.set(symbol, history)
+    }
     for (const { userId, alert } of bySymbol.get(symbol) ?? []) {
-      if (!alertReached(alert, previous) && alertReached(alert, price)) fire(userId, alert, price)
+      const reference = conditionOf(alert) === 'movePercent' ? priceAgo(history, alert.windowMs, nowMs) : undefined
+      const step = evaluateAlert(alert, price, nowMs, alertState.get(alert.id), reference)
+      alertState.set(alert.id, step.state)
+      if (step.fire) fire(userId, alert, price)
     }
   }
 
@@ -187,9 +214,13 @@ export function createAlertService({ store, exchangeOf, fetchPrices = fetchLastP
     if (value) {
       try {
         const list = JSON.parse(value)
-        const updated = list.map((item) => (
-          item?.id === alert.id ? { ...item, enabled: false, triggeredAtMs, triggeredPrice: price } : item
-        ))
+        const updated = list.map((item) => {
+          if (item?.id !== alert.id) return item
+          // "Every time" alerts stay on; the trigger is recorded for the cooldown and the history.
+          return item.frequency === 'everyTime'
+            ? { ...item, lastTriggeredAtMs: triggeredAtMs, lastTriggeredPrice: price, triggerCount: (Number(item.triggerCount) || 0) + 1 }
+            : { ...item, enabled: false, triggeredAtMs, triggeredPrice: price }
+        })
         store.setAlertsValue(userId, JSON.stringify(updated))
       } catch { /* leave the stored data alone if it cannot be read */ }
     }
@@ -241,9 +272,14 @@ export function createAlertService({ store, exchangeOf, fetchPrices = fetchLastP
     const value = store.getAlertsValue(userId)
     if (!value) return []
     try {
+      const at = (alert) => (typeof alert?.triggeredAtMs === 'number' ? alert.triggeredAtMs : alert?.lastTriggeredAtMs)
       return JSON.parse(value)
-        .filter((alert) => typeof alert?.triggeredAtMs === 'number' && alert.triggeredAtMs > sinceMs)
-        .map(({ id, symbol, targetPrice, direction, triggeredAtMs, triggeredPrice }) => ({ id, symbol, targetPrice, direction, triggeredAtMs, triggeredPrice }))
+        .filter((alert) => typeof at(alert) === 'number' && at(alert) > sinceMs)
+        .map((alert) => ({
+          id: alert.id, symbol: alert.symbol, targetPrice: alert.targetPrice, direction: alert.direction,
+          triggeredAtMs: at(alert), triggeredPrice: alert.triggeredPrice ?? alert.lastTriggeredPrice,
+          ...(alert.frequency === 'everyTime' ? { everyTime: true } : {}),
+        }))
     } catch {
       return []
     }

@@ -213,7 +213,7 @@ describe('alerts triggered by a device with the app open', () => {
     const { instance, notifications } = service({ store, prices: [] })
     instance.relayTriggered('u1', untriggered, triggered())
     instance.relayTriggered('u1', untriggered, triggered()) // the same upload again (retry)
-    expect(notifications).toEqual([{ userId: 'u1', title: 'BTCUSDT price alert', body: 'Price reached 101 (target 100).', symbol: 'BTCUSDT', alertId: 'a1', price: 101 }])
+    expect(notifications).toEqual([{ userId: 'u1', title: 'BTCUSDT alert', body: 'Crossing up 100: price 101.', symbol: 'BTCUSDT', alertId: 'a1', price: 101 }])
     instance.stop()
   })
 

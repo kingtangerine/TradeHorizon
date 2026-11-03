@@ -3699,3 +3699,12 @@ button:disabled {
 .compare-button svg { width: 16px; height: 16px; }
 .compare-row > span:first-child { display: inline-flex; align-items: center; gap: 6px; }
 .compare-row > span:first-child i { width: 10px; height: 3px; border-radius: 2px; }
+
+/* Alert conditions */
+.alert-more-toggle { justify-self: start; padding: 0; border: 0; color: var(--tv-blue, #2962ff); background: transparent; font: inherit; font-size: .74rem; cursor: pointer; }
+.alert-more { display: grid; grid-template-columns: 1fr 1fr; gap: 6px 8px; }
+.alert-more label { display: grid; gap: 3px; font-size: .72rem; color: var(--muted); }
+.alert-more label.wide { grid-column: 1 / -1; }
+.alert-more select, .alert-more input { height: 30px; padding: 0 8px; border: 1px solid var(--border-strong); border-radius: 6px; color: var(--text); background: var(--bg); font: inherit; font-size: .78rem; }
+.alert-message { display: block; color: var(--muted); font-size: .72rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.alert-create-row { flex-wrap: wrap; }

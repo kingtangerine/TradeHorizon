@@ -1,5 +1,9 @@
-export type AlertDirection = 'above' | 'below'
+import { conditionMet, isValidAlert, type AlertCondition, type AlertLineAnchors } from '../../server/alertRules.mjs'
 
+export type AlertDirection = 'above' | 'below'
+export type { AlertCondition } from '../../server/alertRules.mjs'
+
+/** Conditions, trend lines, repeat, expiry and message are optional: older alerts are "crossing" a level, once. */
 export interface PriceAlert {
   readonly id: string
   readonly symbol: string
@@ -10,7 +14,25 @@ export interface PriceAlert {
   readonly triggeredAtMs?: number
   /** Price at the moment the alert triggered (seen by the server, or by the app while open). */
   readonly triggeredPrice?: number
+  readonly condition?: AlertCondition
+  /** Other side of a channel (enter/exit channel). */
+  readonly upperPrice?: number
+  /** "Moving N%": the size of the move and the window it must happen in. */
+  readonly percent?: number
+  readonly windowMs?: number
+  /** Trend-line alert: the target follows this line (market coordinates, extended past its points). */
+  readonly line?: AlertLineAnchors
+  readonly frequency?: 'once' | 'everyTime'
+  readonly expiresAtMs?: number
+  readonly message?: string
+  /** "Every time" alerts stay active; their last trigger is recorded here. */
+  readonly lastTriggeredAtMs?: number
+  readonly lastTriggeredPrice?: number
+  readonly triggerCount?: number
 }
+
+/** What the alert form chooses beyond symbol and price. */
+export type AlertOptions = Pick<PriceAlert, 'targetPrice' | 'direction' | 'condition' | 'upperPrice' | 'percent' | 'windowMs' | 'line' | 'frequency' | 'expiresAtMs' | 'message'>
 
 function key(userId: string): string {
   return `trade-horizon:user:${userId}:alerts:v1`
@@ -19,12 +41,7 @@ function key(userId: string): string {
 export function loadAlerts(userId: string): PriceAlert[] {
   try {
     const value = JSON.parse(localStorage.getItem(key(userId)) ?? '[]') as unknown
-    return Array.isArray(value) ? value.filter((item): item is PriceAlert => (
-      typeof item === 'object' && item !== null &&
-      typeof (item as PriceAlert).id === 'string' &&
-      typeof (item as PriceAlert).symbol === 'string' &&
-      typeof (item as PriceAlert).targetPrice === 'number'
-    )) : []
+    return Array.isArray(value) ? value.filter((item): item is PriceAlert => isValidAlert(item)) : []
   } catch {
     return []
   }
@@ -35,7 +52,7 @@ export function saveAlerts(userId: string, alerts: readonly PriceAlert[]): void 
 }
 
 export function alertReached(alert: PriceAlert, price: number): boolean {
-  return alert.direction === 'above' ? price >= alert.targetPrice : price <= alert.targetPrice
+  return conditionMet(alert, price, Date.now())
 }
 
 export type AlertFilter = 'active' | 'triggered' | 'all'
@@ -73,6 +90,8 @@ export function groupAlerts(alerts: readonly PriceAlert[], filter: AlertFilter, 
 /** Moving an alert line re-arms it on the side of the price it is now on. */
 export function moveAlert(alert: PriceAlert, targetPrice: number, lastPrice: number | undefined): PriceAlert {
   const { triggeredAtMs: _triggered, triggeredPrice: _price, ...rest } = alert
-  const direction: AlertDirection = lastPrice !== undefined ? (targetPrice < lastPrice ? 'below' : 'above') : alert.direction
+  // Only a crossing picks its side from where the price is; the other conditions keep their meaning.
+  const crossing = (alert.condition ?? 'crossing') === 'crossing'
+  const direction: AlertDirection = crossing && lastPrice !== undefined ? (targetPrice < lastPrice ? 'below' : 'above') : alert.direction
   return { ...rest, targetPrice, direction, enabled: true }
 }

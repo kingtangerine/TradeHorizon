@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
-import { groupAlerts, isTriggered, type AlertDirection, type AlertFilter, type PriceAlert } from './alerts'
+import { groupAlerts, isTriggered, type AlertCondition, type AlertDirection, type AlertFilter, type AlertOptions, type PriceAlert } from './alerts'
+import { MAX_MESSAGE_LENGTH, MOVE_WINDOWS_MS, describeAlert, isExpired } from '../../server/alertRules.mjs'
 import { BellIcon, ChevronIcon, CloseIcon, EyeIcon, EyeOffIcon, PauseIcon, PlayIcon, SearchIcon, TrashIcon } from './Icons'
 import type { CryptoMarket } from '../chart/markets'
 
@@ -12,7 +13,7 @@ interface AlertsPanelProps {
   lastPrice?: number
   linesVisible: boolean
   onToggleLines(): void
-  onCreate(direction: AlertDirection, targetPrice: number): void
+  onCreate(options: AlertOptions): void
   onToggle(id: string): void
   onDelete(id: string): void
   onClearTriggered(): void
@@ -28,6 +29,20 @@ const FILTERS: ReadonlyArray<{ value: AlertFilter, label: string }> = [
   { value: 'triggered', label: 'Triggered' },
   { value: 'all', label: 'All' },
 ]
+
+type FormKind = 'crossingUp' | 'crossingDown' | 'greater' | 'less' | 'enterChannel' | 'exitChannel' | 'moveUp' | 'moveDown'
+
+/** The form's condition list, as TradingView words it. */
+const FORM_KINDS: Readonly<Record<FormKind, { label: string, condition: AlertCondition, direction?: AlertDirection }>> = {
+  crossingUp: { label: 'Crossing up', condition: 'crossing', direction: 'above' },
+  crossingDown: { label: 'Crossing down', condition: 'crossing', direction: 'below' },
+  greater: { label: 'Greater than', condition: 'greater', direction: 'above' },
+  less: { label: 'Less than', condition: 'less', direction: 'below' },
+  enterChannel: { label: 'Entering channel', condition: 'enterChannel', direction: 'above' },
+  exitChannel: { label: 'Exiting channel', condition: 'exitChannel', direction: 'above' },
+  moveUp: { label: 'Moving up %', condition: 'movePercent', direction: 'above' },
+  moveDown: { label: 'Moving down %', condition: 'movePercent', direction: 'below' },
+}
 
 const shortSymbol = (symbol: string) => symbol.replace(/(USDT|USDC|FDUSD|BUSD)$/, '')
 
@@ -46,6 +61,15 @@ export function AlertsPanel({
   const [query, setQuery] = useState('')
   const [collapsed, setCollapsed] = useState<ReadonlySet<string>>(new Set())
   const [direction, setDirection] = useState<AlertDirection>('above')
+  // TradingView-style conditions: "kind" folds the condition and, for crossings and moves, the direction.
+  const [kind, setKind] = useState<FormKind>('crossingUp')
+  const [upper, setUpper] = useState('')
+  const [percent, setPercent] = useState('3')
+  const [windowMs, setWindowMs] = useState(3_600_000)
+  const [frequency, setFrequency] = useState<'once' | 'everyTime'>('once')
+  const [expiry, setExpiry] = useState(0)
+  const [message, setMessage] = useState('')
+  const [moreOpen, setMoreOpen] = useState(false)
   const [price, setPrice] = useState(initialPrice ?? '')
   const priceRef = useRef<HTMLInputElement>(null)
   useEffect(() => {
@@ -96,18 +120,42 @@ export function AlertsPanel({
         className="alert-create-form"
         onSubmit={(event) => {
           event.preventDefault()
-          const target = Number(price)
-          if (!Number.isFinite(target) || target <= 0) return
-          onCreate(direction, target)
+          const spec = FORM_KINDS[kind]
+          const target = spec.condition === 'movePercent' ? (lastPrice ?? 0) : Number(price)
+          if (spec.condition !== 'movePercent' && (!Number.isFinite(target) || target <= 0)) return
+          const top = Number(upper)
+          if ((spec.condition === 'enterChannel' || spec.condition === 'exitChannel') && !(Number.isFinite(top) && top > 0)) return
+          const size = Number(percent)
+          if (spec.condition === 'movePercent' && !(size > 0 && size <= 100)) return
+          onCreate({
+            targetPrice: target,
+            // A crossing's side is where the target sits from the price, unless the form says otherwise.
+            direction: spec.direction ?? direction,
+            ...(spec.condition !== 'crossing' ? { condition: spec.condition } : {}),
+            ...(spec.condition === 'enterChannel' || spec.condition === 'exitChannel' ? { upperPrice: top } : {}),
+            ...(spec.condition === 'movePercent' ? { percent: size, windowMs } : {}),
+            ...(frequency === 'everyTime' ? { frequency } : {}),
+            ...(expiry > 0 ? { expiresAtMs: Date.now() + expiry } : {}),
+            ...(message.trim() ? { message: message.trim().slice(0, MAX_MESSAGE_LENGTH) } : {}),
+          })
           setPrice('')
+          setUpper('')
+          setMessage('')
         }}
       >
         <strong>New alert · {shortSymbol(market.symbol)}</strong>
         <div className="alert-create-row">
-          <select value={direction} onChange={(event) => setDirection(event.target.value as AlertDirection)} aria-label="Trigger">
-            <option value="above">Crosses above</option>
-            <option value="below">Crosses below</option>
+          <select value={kind} onChange={(event) => { const next = event.target.value as FormKind; setKind(next); setDirection(FORM_KINDS[next].direction ?? 'above') }} aria-label="Condition">
+            {(Object.keys(FORM_KINDS) as FormKind[]).map((item) => <option value={item} key={item}>{FORM_KINDS[item].label}</option>)}
           </select>
+          {FORM_KINDS[kind].condition === 'movePercent' ? (
+            <>
+              <input type="number" min="0.1" max="100" step="0.1" aria-label="Move size in percent" value={percent} onChange={(event) => setPercent(event.target.value)} />
+              <select value={windowMs} onChange={(event) => setWindowMs(Number(event.target.value))} aria-label="Within">
+                {MOVE_WINDOWS_MS.map((ms) => <option value={ms} key={ms}>in {ms >= 3_600_000 ? `${ms / 3_600_000}h` : `${ms / 60_000}m`}</option>)}
+              </select>
+            </>
+          ) : (
           <input
             ref={priceRef}
             type="number"
@@ -119,8 +167,39 @@ export function AlertsPanel({
             value={price}
             onChange={(event) => setPrice(event.target.value)}
           />
+          )}
+          {(FORM_KINDS[kind].condition === 'enterChannel' || FORM_KINDS[kind].condition === 'exitChannel') && (
+            <input type="number" min="0" step="any" required aria-label="Other side of the channel" placeholder="Upper / lower" value={upper} onChange={(event) => setUpper(event.target.value)} />
+          )}
           <button type="submit" title="Create alert"><BellIcon /> Add</button>
         </div>
+        <button type="button" className="alert-more-toggle" aria-expanded={moreOpen} onClick={() => setMoreOpen((open) => !open)}>
+          {moreOpen ? 'Fewer options' : 'Repeat, expiry and message…'}
+        </button>
+        {moreOpen && (
+          <div className="alert-more">
+            <label>
+              <span>Trigger</span>
+              <select value={frequency} onChange={(event) => setFrequency(event.target.value as 'once' | 'everyTime')}>
+                <option value="once">Only once</option>
+                <option value="everyTime">Every time (at most once a minute)</option>
+              </select>
+            </label>
+            <label>
+              <span>Expires</span>
+              <select value={expiry} onChange={(event) => setExpiry(Number(event.target.value))}>
+                <option value={0}>Never</option>
+                <option value={86_400_000}>In 1 day</option>
+                <option value={7 * 86_400_000}>In 1 week</option>
+                <option value={30 * 86_400_000}>In 1 month</option>
+              </select>
+            </label>
+            <label className="wide">
+              <span>Message</span>
+              <input value={message} maxLength={MAX_MESSAGE_LENGTH} placeholder="Shown in the notification (optional)" onChange={(event) => setMessage(event.target.value)} />
+            </label>
+          </div>
+        )}
         <small className="alert-note">
           Tip: right-click the chart or use the + next to the price scale to place an alert, then drag its line to move it.
           {market.kind === 'dominance' && ' Index alerts only fire while TradeHorizon is open.'}
@@ -185,13 +264,20 @@ export function AlertsPanel({
                       {alert.direction === 'above' ? '▲' : '▼'}
                     </span>
                     <div>
-                      <strong>{alert.targetPrice.toLocaleString('en-US', { maximumFractionDigits: alert.symbol === market.symbol ? precision : 8 })}</strong>
+                      <strong title={describeAlert(alert)}>
+                        {(alert.condition ?? 'crossing') === 'crossing' && !alert.line
+                          ? alert.targetPrice.toLocaleString('en-US', { maximumFractionDigits: alert.symbol === market.symbol ? precision : 8 })
+                          : describeAlert(alert)}
+                      </strong>
                       <span>
                         {triggered
                           ? `Triggered ${formatTime(alert.triggeredAtMs!)}${alert.triggeredPrice !== undefined ? ` at ${alert.triggeredPrice.toLocaleString('en-US', { maximumFractionDigits: 8 })}` : ''}`
-                          : alert.enabled ? 'Active' : 'Paused'}
-                        {away && <b> · {away}</b>}
+                          : isExpired(alert, Date.now()) ? 'Expired' : alert.enabled ? 'Active' : 'Paused'}
+                        {alert.frequency === 'everyTime' && <b> · every time{alert.triggerCount ? ` (${alert.triggerCount}×)` : ''}</b>}
+                        {alert.expiresAtMs !== undefined && !triggered && !isExpired(alert, Date.now()) && <b> · until {formatTime(alert.expiresAtMs)}</b>}
+                        {away && !alert.line && !alert.condition && <b> · {away}</b>}
                       </span>
+                      {alert.message && <em className="alert-message">“{alert.message}”</em>}
                     </div>
                     <button
                       type="button"
