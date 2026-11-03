@@ -37,6 +37,7 @@ import { DrawingSettingsDialog, type DrawingSettingsTab } from './DrawingSetting
 import { DrawingContextMenu } from './DrawingContextMenu'
 import type { DrawingModes } from '../chart/KLineChartController'
 import { MAX_STUDIES, STUDIES, STUDY_TYPES, newStudy, type Study, type StudyType } from '../chart/studies'
+import { MAX_COMPARE } from '../chart/compare'
 import { ColorPicker } from './ColorPicker'
 import { getTelegramStatus, sendTelegramTest, startTelegramLink, unlinkTelegram, type TelegramStatus } from './telegram'
 import { disablePush, enablePush, fetchAlertEvents, getPushStatus, type PushStatus } from './backgroundAlerts'
@@ -289,7 +290,7 @@ function WorkspaceApp({ user, onLogout, onUserRefresh }: WorkspaceAppProps) {
   const [watchlistOpen, setWatchlistOpen] = useState(false)
   const [positionSettingsOpen, setPositionSettingsOpen] = useState(false)
   const [superchartOpen, setSuperchartOpen] = useState(false)
-  const [symbolSearch, setSymbolSearch] = useState<'change' | 'new' | 'watchlist' | null>(null)
+  const [symbolSearch, setSymbolSearch] = useState<'change' | 'new' | 'watchlist' | 'compare' | null>(null)
   const [markets, setMarkets] = useState(() => allMarkets())
   const [alertsOpen, setAlertsOpen] = useState(false)
   // Typing on the chart (TradingView): letters open symbol search with them, digits open the timeframe box.
@@ -470,6 +471,14 @@ function WorkspaceApp({ user, onLogout, onUserRefresh }: WorkspaceAppProps) {
   }, [updateIndicators])
 
   const [studySettingsId, setStudySettingsId] = useState<string>()
+  /** Compare: the first compared symbol switches the chart to the percent scale, as in TradingView. */
+  const addCompare = useCallback((symbol: string) => {
+    updateIndicators((current) => (current.compare.includes(symbol) || current.compare.length >= MAX_COMPARE ? current : { ...current, compare: [...current.compare, symbol] }))
+    setWorkspace((current) => (current.scaleMode ? current : { ...current, scaleMode: 'percent' }))
+  }, [updateIndicators])
+  const removeCompare = useCallback((symbol: string) => {
+    updateIndicators((current) => ({ ...current, compare: current.compare.filter((item) => item !== symbol) }))
+  }, [updateIndicators])
   const [studyQuery, setStudyQuery] = useState('')
   const addStudy = useCallback((type: StudyType) => {
     const id = `study-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`
@@ -1303,6 +1312,16 @@ function WorkspaceApp({ user, onLogout, onUserRefresh }: WorkspaceAppProps) {
           <span className="asset-badge">{market.mark}</span>
           <strong>{market.symbol}</strong>
         </button>
+        <button
+          type="button"
+          className="compare-button"
+          title={indicators.compare.length >= MAX_COMPARE ? `Up to ${MAX_COMPARE} symbols can be compared` : 'Compare or add symbol'}
+          aria-label="Compare symbol"
+          disabled={indicators.compare.length >= MAX_COMPARE || market.kind === 'dominance'}
+          onClick={() => setSymbolSearch('compare')}
+        >
+          <PlusIcon />
+        </button>
 
         <span className="toolbar-divider" />
 
@@ -1899,6 +1918,7 @@ function WorkspaceApp({ user, onLogout, onUserRefresh }: WorkspaceAppProps) {
                 onStudyChange={changeStudy}
                 onStudyRemove={removeStudy}
                 onStudySettings={setStudySettingsId}
+                onCompareRemove={removeCompare}
                 onOpenSettings={openChartSettings}
               />
             ))}
@@ -2500,6 +2520,7 @@ function WorkspaceApp({ user, onLogout, onUserRefresh }: WorkspaceAppProps) {
           onSelect={(next) => {
             if (symbolSearch === 'new') createChartTab(next.symbol)
             else if (symbolSearch === 'watchlist') setWatchlistState((current) => addSymbol(current, next.symbol))
+            else if (symbolSearch === 'compare') addCompare(next.symbol)
             else changeMarket(next)
             setSymbolSearch(null)
             setSearchSeed(undefined)

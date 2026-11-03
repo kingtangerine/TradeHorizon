@@ -19,6 +19,8 @@ import type { MarketInterval } from '../market'
 import { CloseIcon, EyeIcon, EyeOffIcon, RefreshIcon, SettingsIcon } from './Icons'
 import { ChartContextMenu } from './ChartContextMenu'
 import { FuturesStatsRow } from './FuturesStatsRow'
+import { formatPrice } from './format'
+import { getMarket } from '../chart/markets'
 import { LegendIndicatorValues, LegendOhlc, LegendStudyValues, LegendVolume } from './LegendValues'
 import type { PriceAlert } from './alerts'
 import { capTier, coinSymbol, formatUsdCompact, loadMarketCaps, type MarketCapInfo } from './marketCap'
@@ -64,6 +66,7 @@ interface ChartPaneProps {
   onStudyChange(study: Study): void
   onStudyRemove(id: string): void
   onStudySettings(id: string): void
+  onCompareRemove(symbol: string): void
   onOpenSettings(): void
 }
 
@@ -117,6 +120,7 @@ export function ChartPane({
   onStudyChange,
   onStudyRemove,
   onStudySettings,
+  onCompareRemove,
   onOpenSettings,
 }: ChartPaneProps) {
   const [runtime, setRuntime] = useState<ChartRuntimeState>(() => INITIAL_RUNTIME(interval))
@@ -250,6 +254,16 @@ export function ChartPane({
             <EyeIcon />
           </button>
         )}
+        {controller && indicators.compare.length > 0 && controller.compareLegend().map((item) => (
+          <div className="chart-indicator-row study-row compare-row" key={item.symbol}>
+            <span><i style={{ background: item.color }} aria-hidden="true" />{item.symbol}</span>
+            <b style={{ color: item.color }}>{formatPrice(item.last, getMarket(item.symbol).pricePrecision)}</b>
+            {item.changePercent !== undefined && <b className={item.changePercent >= 0 ? 'price-up' : 'price-down'}>{item.changePercent >= 0 ? '+' : ''}{item.changePercent.toFixed(2)}%</b>}
+            <span className="study-actions">
+              <button type="button" title="Remove" aria-label={`Stop comparing ${item.symbol}`} onClick={() => onCompareRemove(item.symbol)}><CloseIcon /></button>
+            </span>
+          </div>
+        ))}
         {indicators.studies.map((study) => (
           <div className={study.visible ? 'chart-indicator-row study-row' : 'chart-indicator-row study-row muted'} key={study.id}>
             <span title={STUDIES[study.type].name}>{studyLabel(study)}</span>

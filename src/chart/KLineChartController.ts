@@ -16,6 +16,9 @@ import { VOLUME_OVERLAY_NAME, registerVolumeOverlay } from './volumeOverlay'
 import { BASELINE_NAME, HEIKIN_ASHI_NAME, registerSeriesOverlays } from './seriesOverlay'
 import { registerStudyIndicators, studyIndicatorName } from './studyIndicators'
 import { exchangeSymbol } from '../market/binance/futures'
+import { COMPARE_INDICATOR_NAME, registerCompareOverlay, type CompareSeries } from './compareOverlay'
+import { COMPARE_COLORS, compareChange, scaledCompare } from './compare'
+import { getMarket, type CryptoMarket as CompareMarket } from './markets'
 import { STUDIES, type Study } from './studies'
 import { fibLevels, visibleOnInterval } from './drawingVisibility'
 import { broadcastCrosshair, broadcastTime, followerBarSpace, joinSyncGroup, type SyncMember, type SyncedCrosshair, type SyncedTime } from './chartSync'
@@ -149,6 +152,7 @@ registerVwapIndicators()
 registerVolumeOverlay()
 registerSeriesOverlays()
 registerStudyIndicators()
+registerCompareOverlay()
 
 /** The candle under the crosshair, for the legend (TradingView shows the hovered candle's values). */
 export interface HoverState {
@@ -366,6 +370,12 @@ export class KLineChartController {
   #hover: HoverState | null = null
   #seriesIndicator: { id: string, name: string } | undefined
   #scaleMode: ScaleMode = 'normal'
+  /** Compare symbols: their candles at this chart's timeframe, refreshed while shown. */
+  #compareSymbols: readonly string[] = []
+  #compareSeries: CompareSeries[] = []
+  #compareIndicatorId?: string
+  #compareTimer?: ReturnType<typeof globalThis.setInterval>
+  #compareEpoch = 0
   /** Indicator-library studies on the chart: study id -> klinecharts indicator. */
   readonly #studyIds = new Map<string, { indicatorId: string, type: Study['type'] }>()
   /** Date-range button waiting for its timeframe's candles. */
@@ -981,6 +991,7 @@ export class KLineChartController {
     }
     this.#chart.setPeriod(intervalToPeriod(interval))
     this.#syncDominanceData()
+    if (this.#compareSymbols.length > 0) { this.#compareSeries = []; void this.#loadCompare() }
   }
 
   public retry(): void {
@@ -1390,6 +1401,107 @@ export class KLineChartController {
     this.#applyVwap('qvwap', settings.qvwap.visible, 'quarter')
     this.#applyDominance(settings.dominance)
     this.#applyStudies(settings.studies)
+    this.#applyCompare(settings.compare)
+  }
+
+  #applyCompare(symbols: readonly string[]): void {
+    const wanted = symbols.filter((symbol) => symbol !== this.#market.symbol)
+    if (wanted.join(',') === this.#compareSymbols.join(',')) return
+    this.#compareSymbols = wanted
+    this.#compareSeries = this.#compareSeries.filter((item) => wanted.includes(item.symbol))
+    void this.#loadCompare()
+  }
+
+  /** Loads every compare symbol's recent candles, then keeps the newest ones fresh every 20 seconds. */
+  async #loadCompare(): Promise<void> {
+    const epoch = ++this.#compareEpoch
+    if (this.#compareTimer !== undefined) { globalThis.clearInterval(this.#compareTimer); this.#compareTimer = undefined }
+    if (this.#compareSymbols.length === 0) { this.#renderCompare(); return }
+    const interval = this.#interval
+    const load = async (limit: number) => {
+      const results = await Promise.all(this.#compareSymbols.map(async (symbol, index) => {
+        const market = getMarket(symbol)
+        if (market.symbol !== symbol || market.kind === 'dominance') return undefined
+        try {
+          const candles = await this.#fetchKlinesFor(market, { symbol: exchangeSymbol(market.symbol), interval, limit })
+          const bars = candles.map((candle) => ({ timestamp: candle.openTimeMs, close: Number(candle.close) })).filter((bar) => Number.isFinite(bar.close))
+          const previous = this.#compareSeries.find((item) => item.symbol === symbol)?.bars ?? []
+          const merged = limit < HISTORY_PAGE_SIZE && previous.length > 0
+            ? [...previous.filter((bar) => bar.timestamp < (bars[0]?.timestamp ?? Infinity)), ...bars]
+            : bars
+          return { symbol, color: COMPARE_COLORS[index % COMPARE_COLORS.length], bars: merged }
+        } catch {
+          return this.#compareSeries.find((item) => item.symbol === symbol)
+        }
+      }))
+      if (this.#disposed || epoch !== this.#compareEpoch || interval !== this.#interval) return
+      this.#compareSeries = results.filter((item): item is CompareSeries => item !== undefined)
+      this.#renderCompare()
+    }
+    await load(HISTORY_PAGE_SIZE)
+    if (this.#disposed || epoch !== this.#compareEpoch) return
+    this.#compareTimer = globalThis.setInterval(() => void load(3), 20_000)
+  }
+
+  #renderCompare(): void {
+    if (this.#compareSeries.length === 0) {
+      if (this.#compareIndicatorId) this.#chart.removeIndicator({ id: this.#compareIndicatorId })
+      this.#compareIndicatorId = undefined
+      this.#patchRuntime({})
+      return
+    }
+    const config = { name: COMPARE_INDICATOR_NAME, extendData: { series: this.#compareSeries } }
+    if (this.#compareIndicatorId) this.#chart.overrideIndicator({ id: this.#compareIndicatorId, ...config })
+    else {
+      const id = this.#chart.createIndicator({ ...config, paneId: 'candle_pane', createTooltipDataSource: () => HIDDEN_INDICATOR_TOOLTIP }, true)
+      if (id) this.#compareIndicatorId = id
+    }
+    // The price range includes the compare lines, so ask the axis to measure again.
+    this.#chart.overrideYAxis({ paneId: 'candle_pane', createRange: this.#createPriceRange })
+    this.#emitView()
+  }
+
+  /** Legend: each compare symbol's colour, last close and change over the visible candles. */
+  public compareLegend(): Array<{ symbol: string, color: string, last?: number, changePercent?: number }> {
+    if (this.#disposed) return []
+    const data = this.#chart.getDataList()
+    const range = this.#chart.getVisibleRange()
+    const from = Math.max(0, Math.floor(range.from))
+    const to = Math.min(data.length, Math.ceil(range.to))
+    return this.#compareSeries.map((item) => ({
+      symbol: item.symbol,
+      color: item.color,
+      last: item.bars.at(-1)?.close,
+      changePercent: compareChange(data, item.bars, from, to),
+    }))
+  }
+
+  #fetchKlinesFor(market: CompareMarket, options: FetchBinanceKlinesOptions): Promise<Candle[]> {
+    if (market.exchange === 'bybit') return fetchBybitKlines(options)
+    return fetchBinanceKlines(market.exchange === 'binance-futures' ? { ...options, endpoint: BINANCE_FUTURES_REST_ENDPOINT } : options)
+  }
+
+  /** The automatic price range widened to fit the visible part of the compare lines. */
+  #withCompareRange<T extends { from: number, to: number, range: number, realFrom: number, realTo: number, realRange: number, displayFrom: number, displayTo: number, displayRange: number }>(range: T): T {
+    if (this.#compareSeries.length === 0) return range
+    const data = this.#chart.getDataList()
+    const visible = this.#chart.getVisibleRange()
+    const from = Math.max(0, Math.floor(visible.from))
+    const to = Math.min(data.length, Math.ceil(visible.to))
+    let low = range.from
+    let high = range.to
+    for (const item of this.#compareSeries) {
+      for (const value of scaledCompare(data, item.bars, from, to)) {
+        if (value === undefined) continue
+        if (value < low) low = value
+        if (value > high) high = value
+      }
+    }
+    if (low === range.from && high === range.to) return range
+    const pad = (high - low) * 0.04
+    low = Math.min(range.from, low - pad)
+    high = Math.max(range.to, high + pad)
+    return { ...range, from: low, to: high, range: high - low, realFrom: low, realTo: high, realRange: high - low, displayFrom: low, displayTo: high, displayRange: high - low }
   }
 
   /** Library studies: price-pane ones stack on the candles (legend in HTML), the rest get their own pane and legend. */
@@ -1756,7 +1868,8 @@ export class KLineChartController {
   // and a drag toward the top of the page collapses the range. We take over presses on the price axis and scale
   // by the drag distance instead, feeding the result through the library's own createRange hook.
 
-  readonly #createPriceRange: AxisCreateRangeCallback = ({ defaultRange }) => {
+  readonly #createPriceRange: AxisCreateRangeCallback = ({ defaultRange: autoRange }) => {
+    const defaultRange = this.#withCompareRange(autoRange)
     const k = this.#priceScale
     const shift = this.#priceOffset
     const grow = (from: number, to: number): [number, number] => {
@@ -2121,6 +2234,8 @@ export class KLineChartController {
     if (this.#disposed) return
     this.#leaveSync?.()
     this.#leaveSync = undefined
+    if (this.#compareTimer !== undefined) globalThis.clearInterval(this.#compareTimer)
+    this.#compareEpoch += 1
     if (import.meta.env.DEV) (globalThis as { __tradeHorizonCharts?: Set<Chart> }).__tradeHorizonCharts?.delete(this.#chart)
     if (this.#timeSyncFrame !== undefined) cancelAnimationFrame(this.#timeSyncFrame)
     this.#disposed = true

@@ -1,5 +1,6 @@
 import { VWAP_ANCHORS, type VwapAnchor } from './vwap'
 import { normalizeStudies, type Study } from './studies'
+import { normalizeCompare } from './compare'
 
 export type MovingAverageKind = 'sma' | 'ema'
 export type VwapKind = 'vwap' | 'qvwap'
@@ -20,6 +21,8 @@ export interface IndicatorSettings {
   readonly qvwap: { readonly visible: boolean }
   /** Indicator library: RSI, MACD, Bollinger Bands … (studies.ts). */
   readonly studies: readonly Study[]
+  /** Compare: other symbols drawn over the chart (compare.ts). */
+  readonly compare: readonly string[]
 }
 
 export const MAX_MOVING_AVERAGE_PERIODS = 5
@@ -32,6 +35,7 @@ export const DEFAULT_INDICATORS: IndicatorSettings = {
   vwap: { visible: false, anchor: 'day' },
   qvwap: { visible: false },
   studies: [],
+  compare: [],
 }
 
 export const MOVING_AVERAGE_LABELS: Readonly<Record<MovingAverageKind, string>> = {
@@ -99,7 +103,7 @@ function normalizeMovingAverage(value: unknown, fallback: MovingAverageSettings)
 
 export function normalizeIndicators(value: unknown): IndicatorSettings {
   if (typeof value !== 'object' || value === null) return DEFAULT_INDICATORS
-  const candidate = value as { sma?: unknown; ema?: unknown; dominance?: unknown; vwap?: { visible?: unknown; anchor?: unknown }; qvwap?: { visible?: unknown }; studies?: unknown }
+  const candidate = value as { sma?: unknown; ema?: unknown; dominance?: unknown; vwap?: { visible?: unknown; anchor?: unknown }; qvwap?: { visible?: unknown }; studies?: unknown; compare?: unknown }
   const dominance = (typeof candidate.dominance === 'object' && candidate.dominance !== null
     ? candidate.dominance
     : {}) as Partial<Record<DominanceKey, unknown>>
@@ -117,5 +121,6 @@ export function normalizeIndicators(value: unknown): IndicatorSettings {
     },
     qvwap: { visible: candidate.qvwap?.visible === true },
     studies: normalizeStudies(candidate.studies),
+    compare: normalizeCompare(candidate.compare),
   }
 }
