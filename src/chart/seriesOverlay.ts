@@ -29,13 +29,14 @@ export function registerSeriesOverlays(): void {
         const [from, to] = visibleSpan(chart, rows.length)
         const { gapBar } = chart.getBarSpace()
         const body = Math.max(1, Math.round(gapBar))
+        const colors = chart.getStyles().candle.bar
         for (let index = from; index < to; index += 1) {
           const row = rows[index]
           if (row?.open === undefined || row.close === undefined || row.high === undefined || row.low === undefined) continue
           const x = Math.round(xAxis.convertToPixel(index))
           const top = yAxis.convertToPixel(Math.max(row.open, row.close))
           const bottom = yAxis.convertToPixel(Math.min(row.open, row.close))
-          ctx.fillStyle = row.close >= row.open ? UP : DOWN
+          ctx.fillStyle = row.close >= row.open ? colors.upColor : colors.downColor
           ctx.fillRect(x, yAxis.convertToPixel(row.high), 1, Math.max(1, yAxis.convertToPixel(row.low) - yAxis.convertToPixel(row.high)))
           ctx.fillRect(Math.round(x - body / 2), Math.round(top), body, Math.max(1, Math.round(bottom - top)))
         }

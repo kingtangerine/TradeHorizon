@@ -30,6 +30,7 @@ import { formatCrosshairTime } from '../chart/timeAxis'
 import { CHART_TYPES, CHART_TYPE_LABELS, type ChartType } from '../chart/chartTypes'
 import { ChartTypeIcon } from './ChartTypeIcon'
 import { BottomBar, ScaleToggles } from './BottomBar'
+import { ChartSettingsDialog } from './ChartSettingsDialog'
 import { ColorPicker } from './ColorPicker'
 import { getTelegramStatus, sendTelegramTest, startTelegramLink, unlinkTelegram, type TelegramStatus } from './telegram'
 import { disablePush, enablePush, fetchAlertEvents, getPushStatus, type PushStatus } from './backgroundAlerts'
@@ -289,7 +290,8 @@ function WorkspaceApp({ user, onLogout, onUserRefresh }: WorkspaceAppProps) {
   const [profileOpen, setProfileOpen] = useState(false)
   const [profileFocus, setProfileFocus] = useState<'chart' | 'password'>()
   const [adminOpen, setAdminOpen] = useState(false)
-  const openChartSettings = useCallback(() => { setProfileFocus('chart'); setProfileOpen(true) }, [])
+  const [chartSettingsOpen, setChartSettingsOpen] = useState(false)
+  const openChartSettings = useCallback(() => setChartSettingsOpen(true), [])
   const [layoutMenuOpen, setLayoutMenuOpen] = useState(false)
   const [saveAsOpen, setSaveAsOpen] = useState(false)
   const [timeframeMenuOpen, setTimeframeMenuOpen] = useState(false)
@@ -840,7 +842,7 @@ function WorkspaceApp({ user, onLogout, onUserRefresh }: WorkspaceAppProps) {
         setAlertsOpen(true)
         return
       }
-      const otherWindowOpen = symbolSearch !== null || profileOpen || adminOpen || superchartOpen || document.querySelector('[role="dialog"], [role="menu"]') !== null
+      const otherWindowOpen = symbolSearch !== null || profileOpen || adminOpen || superchartOpen || chartSettingsOpen || document.querySelector('[role="dialog"], [role="menu"]') !== null
       if (!otherWindowOpen && isChartTypingKey(event, target)) {
         if (/^[0-9]$/.test(event.key)) { event.preventDefault(); setIntervalError(''); setIntervalInput(event.key); return }
         if (/^[a-zA-Z]$/.test(event.key)) { event.preventDefault(); setSearchSeed(event.key.toUpperCase()); setSymbolSearch('change'); return }
@@ -883,7 +885,7 @@ function WorkspaceApp({ user, onLogout, onUserRefresh }: WorkspaceAppProps) {
 
     globalThis.addEventListener('keydown', handleKeyDown)
     return () => globalThis.removeEventListener('keydown', handleKeyDown)
-  }, [adminOpen, changeInterval, chooseCursor, chooseTool, controller, drawingStore, intervalInput, market.pricePrecision, profileOpen, replayActive, replayPlaying, selectedDrawingId, superchartOpen, symbolSearch, takeSnapshot])
+  }, [adminOpen, chartSettingsOpen, changeInterval, chooseCursor, chooseTool, controller, drawingStore, intervalInput, market.pricePrecision, profileOpen, replayActive, replayPlaying, selectedDrawingId, superchartOpen, symbolSearch, takeSnapshot])
 
   // A click anywhere closes the timeframe box, as in TradingView.
   useEffect(() => {
@@ -1736,6 +1738,7 @@ function WorkspaceApp({ user, onLogout, onUserRefresh }: WorkspaceAppProps) {
                 timeZone={chartTimeZone}
                 highLowLabels={preferences.highLowLabels}
                 scaleMode={workspace.scaleMode ?? 'normal'}
+                appearance={preferences.appearance}
                 alerts={alerts}
                 alertLinesVisible={preferences.alertLines}
                 onMoveAlert={moveAlertTo}
@@ -2399,6 +2402,19 @@ function WorkspaceApp({ user, onLogout, onUserRefresh }: WorkspaceAppProps) {
           onRename={renameLayout}
           onDuplicate={duplicateSavedLayout}
           onDelete={deleteSavedLayout}
+        />
+      )}
+
+      {chartSettingsOpen && (
+        <ChartSettingsDialog
+          preferences={preferences}
+          onPreferences={setPreferences}
+          scaleMode={workspace.scaleMode ?? 'normal'}
+          onScaleMode={(mode) => setWorkspace((current) => {
+            const { scaleMode: _previous, ...rest } = current
+            return mode === 'normal' ? rest : { ...rest, scaleMode: mode }
+          })}
+          onClose={() => setChartSettingsOpen(false)}
         />
       )}
 

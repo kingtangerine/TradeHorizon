@@ -3623,3 +3623,29 @@ button:disabled {
 .goto-date-form div button { height: 28px; padding: 0 12px; border: 0; border-radius: 5px; color: var(--text); background: var(--tv-hover); font: inherit; font-size: .76rem; cursor: pointer; }
 .goto-date-form div button[type="submit"] { color: #fff; background: var(--tv-blue, #2962ff); }
 .goto-date-form small { color: #f23645; }
+
+/* Chart settings window (right-click → Settings) */
+.chart-settings-dialog {
+  display: grid; grid-template-rows: auto minmax(0, 1fr) auto; width: min(620px, 100%); height: min(500px, 100%);
+  border: 1px solid var(--border-strong); border-radius: 10px; background: var(--panel-raised); color: var(--text);
+  box-shadow: 0 24px 60px rgb(0 0 0 / 50%); overflow: hidden;
+}
+.chart-settings-dialog > header { display: flex; align-items: center; justify-content: space-between; padding: 14px 16px; border-bottom: 1px solid var(--border); }
+.chart-settings-dialog > header strong { font-size: 1rem; }
+.chart-settings-body { display: grid; grid-template-columns: 170px minmax(0, 1fr); min-height: 0; }
+.chart-settings-body nav { display: grid; align-content: start; gap: 2px; padding: 10px 8px; border-right: 1px solid var(--border); }
+.chart-settings-body nav button { height: 34px; padding: 0 12px; border: 0; border-radius: 6px; color: var(--text); background: transparent; font: inherit; font-size: .84rem; text-align: left; cursor: pointer; }
+.chart-settings-body nav button:hover { background: var(--tv-hover); }
+.chart-settings-body nav button.active { color: var(--tv-blue, #2962ff); background: rgb(41 98 255 / 12%); }
+.chart-settings-panel { display: grid; align-content: start; gap: 4px; padding: 12px 18px; overflow: auto; }
+.chart-settings-panel h4 { margin: 10px 0 4px; color: var(--muted); font-size: .7rem; font-weight: 650; letter-spacing: .06em; text-transform: uppercase; }
+.chart-settings-panel h4:first-child { margin-top: 2px; }
+.chart-settings-row { display: flex; align-items: center; justify-content: space-between; gap: 16px; min-height: 38px; font-size: .84rem; }
+.chart-settings-row select { height: 32px; min-width: 190px; padding: 0 8px; border: 1px solid var(--border-strong); border-radius: 6px; color: var(--text); background: var(--bg); font: inherit; font-size: .82rem; }
+.chart-settings-row input[type="checkbox"] { width: 17px; height: 17px; accent-color: var(--tv-blue, #2962ff); }
+.chart-settings-inline { display: inline-flex; align-items: center; gap: 8px; }
+.chart-settings-note { margin: 6px 0 0; color: var(--muted); font-size: .76rem; }
+.chart-settings-dialog > footer { display: flex; justify-content: space-between; gap: 8px; padding: 12px 16px; border-top: 1px solid var(--border); }
+.chart-settings-dialog > footer button { height: 34px; padding: 0 14px; border: 1px solid var(--border-strong); border-radius: 6px; color: var(--text); background: transparent; font: inherit; font-size: .82rem; cursor: pointer; }
+.chart-settings-dialog > footer button.primary { border-color: transparent; color: #fff; background: var(--tv-blue, #2962ff); }
+@media (max-width: 560px) { .chart-settings-body { grid-template-columns: 1fr; } .chart-settings-body nav { display: flex; border-right: 0; border-bottom: 1px solid var(--border); } }

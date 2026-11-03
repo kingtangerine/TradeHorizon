@@ -123,6 +123,16 @@ function chartBackground(element: HTMLElement): string {
 /** Price scale of the candle pane: regular, logarithmic, or percent from the first visible candle. */
 export type ScaleMode = 'normal' | 'log' | 'percent'
 
+/** What the chart settings window controls (kept free of app imports; preferences.ts has the stored form). */
+export interface ChartAppearanceStyle {
+  readonly upColor: string
+  readonly downColor: string
+  readonly wicks: boolean
+  readonly background: string | null
+  readonly grid: 'both' | 'vertical' | 'horizontal' | 'none'
+  readonly lastPriceLine: boolean
+}
+
 /** Bar width when the chart opens or its view is reset (Alt+R). */
 const DEFAULT_BAR_SPACE = 10
 const HIDDEN_INDICATOR_TOOLTIP = { name: '', calcParamsText: '', features: [], legends: [] }
@@ -997,6 +1007,25 @@ export class KLineChartController {
     this.#timeZone = timeZone
     this.#chart.setTimezone(timeZone)
     this.#chart.overrideXAxis({ createTicks: this.#createTimeTicks })
+  }
+
+  /** Chart settings window: candle colours, wicks, background, grid and the last-price line. */
+  public setAppearance(appearance: ChartAppearanceStyle): void {
+    if (this.#disposed) return
+    const { upColor, downColor } = appearance
+    const wick = (color: string) => (appearance.wicks ? color : 'transparent')
+    this.#chart.setStyles({
+      candle: {
+        bar: { upColor, downColor, upBorderColor: upColor, downBorderColor: downColor, upWickColor: wick(upColor), downWickColor: wick(downColor) },
+        priceMark: { last: { upColor, downColor, line: { show: appearance.lastPriceLine } } },
+      },
+      grid: {
+        horizontal: { show: appearance.grid === 'both' || appearance.grid === 'horizontal' },
+        vertical: { show: appearance.grid === 'both' || appearance.grid === 'vertical' },
+      },
+    } as never)
+    // The canvases are transparent; a custom background goes on the host (and so into chart pictures too).
+    this.#host.style.background = appearance.background ?? ''
   }
 
   /** Labels at the highest and lowest visible price. */

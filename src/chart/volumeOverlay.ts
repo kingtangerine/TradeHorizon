@@ -4,8 +4,10 @@ import { getSupportedIndicators, registerIndicator } from 'klinecharts'
 import { VOLUME_HEIGHT_RATIO, volumeBarHeights } from './volumeBars'
 
 export const VOLUME_OVERLAY_NAME = 'tradeHorizonVolume'
-const UP_COLOR = 'rgba(8, 153, 129, 0.45)'
-const DOWN_COLOR = 'rgba(242, 54, 69, 0.45)'
+/** The candle colour at 45% opacity, so volume follows the chart settings. */
+function faded(color: unknown, fallback: string): string {
+  return typeof color === 'string' && /^#[0-9a-fA-F]{6}$/.test(color) ? `${color}73` : fallback
+}
 
 export function registerVolumeOverlay(): void {
   if (getSupportedIndicators().includes(VOLUME_OVERLAY_NAME)) return
@@ -23,12 +25,15 @@ export function registerVolumeOverlay(): void {
       const visible = data.slice(from, to)
       const heights = volumeBarHeights(visible.map((bar) => bar.volume), bounding.height * VOLUME_HEIGHT_RATIO)
       const width = Math.max(1, chart.getBarSpace().gapBar)
+      const bar = chart.getStyles().candle.bar
+      const up = faded(bar.upColor, 'rgba(8, 153, 129, 0.45)')
+      const down = faded(bar.downColor, 'rgba(242, 54, 69, 0.45)')
       for (let offset = 0; offset < visible.length; offset += 1) {
         const height = heights[offset]
         if (height <= 0) continue
-        const bar = visible[offset]
+        const candle = visible[offset]
         const x = xAxis.convertToPixel(from + offset)
-        ctx.fillStyle = bar.close >= bar.open ? UP_COLOR : DOWN_COLOR
+        ctx.fillStyle = candle.close >= candle.open ? up : down
         ctx.fillRect(Math.round(x - width / 2), bounding.height - height, Math.max(1, Math.round(width)), height)
       }
       return true
