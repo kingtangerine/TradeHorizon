@@ -10,14 +10,15 @@ import {
   type VwapKind,
 } from '../chart/indicators'
 import { VWAP_ANCHOR_LABELS } from '../chart/vwap'
+import { STUDIES, studyLabel, type Study } from '../chart/studies'
 import type { ChartAppearanceStyle, KLineChartController, ScaleMode } from '../chart/KLineChartController'
 import type { CryptoMarket } from '../chart/markets'
 import type { ChartRuntimeState, ChartType } from '../chart/types'
 import type { DrawingStore } from '../drawings'
 import type { MarketInterval } from '../market'
-import { EyeIcon, EyeOffIcon, RefreshIcon } from './Icons'
+import { CloseIcon, EyeIcon, EyeOffIcon, RefreshIcon, SettingsIcon } from './Icons'
 import { ChartContextMenu } from './ChartContextMenu'
-import { LegendIndicatorValues, LegendOhlc, LegendVolume } from './LegendValues'
+import { LegendIndicatorValues, LegendOhlc, LegendStudyValues, LegendVolume } from './LegendValues'
 import type { PriceAlert } from './alerts'
 import { capTier, coinSymbol, formatUsdCompact, loadMarketCaps, type MarketCapInfo } from './marketCap'
 import type { AlertLine } from '../chart/KLineChartController'
@@ -54,6 +55,10 @@ interface ChartPaneProps {
   onToggleVolume(): void
   onToggleMovingAverage(kind: MovingAverageKind): void
   onToggleVwap(kind: VwapKind): void
+  /** Library studies: eye, settings and remove buttons in the legend. */
+  onStudyChange(study: Study): void
+  onStudyRemove(id: string): void
+  onStudySettings(id: string): void
   onOpenSettings(): void
 }
 
@@ -100,6 +105,9 @@ export function ChartPane({
   onToggleVolume,
   onToggleMovingAverage,
   onToggleVwap,
+  onStudyChange,
+  onStudyRemove,
+  onStudySettings,
   onOpenSettings,
 }: ChartPaneProps) {
   const [runtime, setRuntime] = useState<ChartRuntimeState>(() => INITIAL_RUNTIME(interval))
@@ -232,6 +240,21 @@ export function ChartPane({
             <EyeIcon />
           </button>
         )}
+        {indicators.studies.map((study) => (
+          <div className={study.visible ? 'chart-indicator-row study-row' : 'chart-indicator-row study-row muted'} key={study.id}>
+            <span title={STUDIES[study.type].name}>{studyLabel(study)}</span>
+            {study.visible && STUDIES[study.type].pane === 'price' && (
+              <LegendStudyValues controller={controller} quote={quote} studyId={study.id} colors={study.colors} precision={market.pricePrecision} />
+            )}
+            <span className="study-actions">
+              <button type="button" title={study.visible ? 'Hide' : 'Show'} aria-label={`${study.visible ? 'Hide' : 'Show'} ${studyLabel(study)}`} onClick={() => onStudyChange({ ...study, visible: !study.visible })}>
+                {study.visible ? <EyeIcon /> : <EyeOffIcon />}
+              </button>
+              <button type="button" title="Settings" aria-label={`Settings of ${studyLabel(study)}`} onClick={() => onStudySettings(study.id)}><SettingsIcon /></button>
+              <button type="button" title="Remove" aria-label={`Remove ${studyLabel(study)}`} onClick={() => onStudyRemove(study.id)}><CloseIcon /></button>
+            </span>
+          </div>
+        ))}
       </div>
 
       <CryptoChartSurface

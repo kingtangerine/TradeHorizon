@@ -84,3 +84,23 @@ export function LegendIndicatorValues({ controller, pick, colors, precision }: {
     </>
   )
 }
+
+/** Values of a library study at the hovered candle or the newest one. */
+export function LegendStudyValues({ controller, studyId, colors, precision }: {
+  controller: KLineChartController | null
+  studyId: string
+  colors: readonly string[]
+  precision: number
+  /** Changes on every price update, so live values re-render while nothing is hovered. */
+  quote: ChartQuote | null
+}) {
+  const hover = useHoveredCandle(controller)
+  const values = controller ? controller.studyValuesAt(studyId, hover?.index) : []
+  return (
+    <>
+      {values.map((value, position) => (value === undefined ? null : (
+        <b key={position} style={{ color: colors[position % colors.length] }}>{formatPrice(value, precision)}</b>
+      )))}
+    </>
+  )
+}

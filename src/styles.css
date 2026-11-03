@@ -3649,3 +3649,17 @@ button:disabled {
 .chart-settings-dialog > footer button { height: 34px; padding: 0 14px; border: 1px solid var(--border-strong); border-radius: 6px; color: var(--text); background: transparent; font: inherit; font-size: .82rem; cursor: pointer; }
 .chart-settings-dialog > footer button.primary { border-color: transparent; color: #fff; background: var(--tv-blue, #2962ff); }
 @media (max-width: 560px) { .chart-settings-body { grid-template-columns: 1fr; } .chart-settings-body nav { display: flex; border-right: 0; border-bottom: 1px solid var(--border); } }
+
+/* Indicator library and study legend rows */
+.indicator-search { width: 100%; height: 32px; margin: 2px 0 6px; padding: 0 10px; border: 1px solid var(--border-strong); border-radius: 6px; color: var(--text); background: var(--bg); font: inherit; font-size: .8rem; box-sizing: border-box; }
+.study-library-row svg { width: 16px; height: 16px; color: var(--muted); }
+.study-library-row:disabled { opacity: .45; cursor: default; }
+.study-row { cursor: default; }
+.study-row .study-actions { display: inline-flex; gap: 1px; opacity: 0; transition: opacity .12s; }
+.study-row:hover .study-actions, .study-row:focus-within .study-actions, .study-row.muted .study-actions { opacity: 1; }
+.study-row .study-actions button { display: grid; place-items: center; width: 22px; height: 22px; padding: 0; border: 0; border-radius: 4px; color: var(--muted); background: transparent; cursor: pointer; }
+.study-row .study-actions button:hover { color: var(--text); background: var(--tv-hover); }
+.study-row .study-actions svg { width: 14px; height: 14px; }
+.study-settings-dialog { width: min(440px, 100%); height: auto; max-height: min(640px, 100%); }
+.study-settings-dialog .chart-settings-panel { padding: 8px 18px 14px; }
+.study-input { width: 110px; height: 30px; padding: 0 8px; border: 1px solid var(--border-strong); border-radius: 6px; color: var(--text); background: var(--bg); font: inherit; font-size: .82rem; }

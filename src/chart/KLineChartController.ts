@@ -14,6 +14,8 @@ import { candleCloseMs } from './countdown'
 import { buildTimeTicks, formatCrosshairTime } from './timeAxis'
 import { VOLUME_OVERLAY_NAME, registerVolumeOverlay } from './volumeOverlay'
 import { BASELINE_NAME, HEIKIN_ASHI_NAME, registerSeriesOverlays } from './seriesOverlay'
+import { registerStudyIndicators, studyIndicatorName } from './studyIndicators'
+import { STUDIES, type Study } from './studies'
 import { ALERT_LINE_OVERLAY_NAME } from './overlayNames'
 import { QVWAP_INDICATOR_NAME, VWAP_INDICATOR_NAME, registerVwapIndicators } from './vwapIndicator'
 import { VWAP_ANCHORS } from './vwap'
@@ -142,6 +144,7 @@ registerDominanceIndicators()
 registerVwapIndicators()
 registerVolumeOverlay()
 registerSeriesOverlays()
+registerStudyIndicators()
 
 /** The candle under the crosshair, for the legend (TradingView shows the hovered candle's values). */
 export interface HoverState {
@@ -327,6 +330,8 @@ export class KLineChartController {
   #hover: HoverState | null = null
   #seriesIndicator: { id: string, name: string } | undefined
   #scaleMode: ScaleMode = 'normal'
+  /** Indicator-library studies on the chart: study id -> klinecharts indicator. */
+  readonly #studyIds = new Map<string, { indicatorId: string, type: Study['type'] }>()
   /** Date-range button waiting for its timeframe's candles. */
   #pendingRange?: { fromMs: number, interval: MarketInterval }
   readonly #hoverListeners = new Set<() => void>()
@@ -1225,6 +1230,55 @@ export class KLineChartController {
     this.#applyVwap('vwap', settings.vwap.visible, settings.vwap.anchor)
     this.#applyVwap('qvwap', settings.qvwap.visible, 'quarter')
     this.#applyDominance(settings.dominance)
+    this.#applyStudies(settings.studies)
+  }
+
+  /** Library studies: price-pane ones stack on the candles (legend in HTML), the rest get their own pane and legend. */
+  #applyStudies(studies: readonly Study[]): void {
+    const wanted = new Map(studies.map((study) => [study.id, study]))
+    for (const [id, entry] of this.#studyIds) {
+      const study = wanted.get(id)
+      if (!study || study.type !== entry.type) {
+        this.#chart.removeIndicator({ id: entry.indicatorId })
+        this.#studyIds.delete(id)
+      }
+    }
+    for (const study of studies) {
+      const definition = STUDIES[study.type]
+      const onPrice = definition.pane === 'price'
+      const precision = onPrice || study.type === 'atr' ? (this.#chart.getSymbol()?.pricePrecision ?? 2) : definition.type === 'macd' ? 4 : 2
+      const config = {
+        name: studyIndicatorName(study.type),
+        calcParams: [...study.params],
+        visible: study.visible,
+        precision,
+        extendData: { colors: study.colors },
+        styles: { lines: study.colors.map((color) => ({ color, size: 1.5 })) },
+      }
+      const existing = this.#studyIds.get(study.id)
+      if (existing) {
+        this.#chart.overrideIndicator({ id: existing.indicatorId, ...config })
+        continue
+      }
+      const paneId = onPrice ? 'candle_pane' : `trade-horizon:study:${study.id}`
+      const created = this.#chart.createIndicator(
+        { ...config, paneId, ...(onPrice ? { createTooltipDataSource: () => HIDDEN_INDICATOR_TOOLTIP } : {}) },
+        onPrice,
+      )
+      if (!created) continue
+      this.#studyIds.set(study.id, { indicatorId: created, type: study.type })
+      if (!onPrice) this.#chart.setPaneOptions({ id: paneId, height: 120, minHeight: 64 })
+    }
+  }
+
+  /** A library study's line values at a candle (the newest when `index` is undefined), in its lines' order. */
+  public studyValuesAt(studyId: string, index?: number): Array<number | undefined> {
+    const entry = this.#studyIds.get(studyId)
+    if (!entry || this.#disposed) return []
+    const at = index ?? this.#chart.getDataList().length - 1
+    const indicator = this.#chart.getIndicators({ id: entry.indicatorId })[0] as { result?: Array<Record<string, number | undefined>> } | undefined
+    const row = indicator?.result?.[at]
+    return STUDIES[entry.type].lines.map((line) => row?.[line.key])
   }
 
   /** VWAP lines sit on the price pane. An index has no traded volume, so there is nothing to average. */

@@ -31,6 +31,8 @@ import { CHART_TYPES, CHART_TYPE_LABELS, type ChartType } from '../chart/chartTy
 import { ChartTypeIcon } from './ChartTypeIcon'
 import { BottomBar, ScaleToggles } from './BottomBar'
 import { ChartSettingsDialog } from './ChartSettingsDialog'
+import { StudySettingsDialog } from './StudySettingsDialog'
+import { MAX_STUDIES, STUDIES, STUDY_TYPES, newStudy, type Study, type StudyType } from '../chart/studies'
 import { ColorPicker } from './ColorPicker'
 import { getTelegramStatus, sendTelegramTest, startTelegramLink, unlinkTelegram, type TelegramStatus } from './telegram'
 import { disablePush, enablePush, fetchAlertEvents, getPushStatus, type PushStatus } from './backgroundAlerts'
@@ -453,6 +455,20 @@ function WorkspaceApp({ user, onLogout, onUserRefresh }: WorkspaceAppProps) {
     }))
   }, [updateIndicators])
 
+  const [studySettingsId, setStudySettingsId] = useState<string>()
+  const [studyQuery, setStudyQuery] = useState('')
+  const addStudy = useCallback((type: StudyType) => {
+    const id = `study-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`
+    updateIndicators((current) => (current.studies.length >= MAX_STUDIES ? current : { ...current, studies: [...current.studies, newStudy(type, id)] }))
+  }, [updateIndicators])
+  const changeStudy = useCallback((study: Study) => {
+    updateIndicators((current) => ({ ...current, studies: current.studies.map((item) => (item.id === study.id ? study : item)) }))
+  }, [updateIndicators])
+  const removeStudy = useCallback((id: string) => {
+    updateIndicators((current) => ({ ...current, studies: current.studies.filter((item) => item.id !== id) }))
+    setStudySettingsId((current) => (current === id ? undefined : current))
+  }, [updateIndicators])
+
   const toggleDominance = useCallback((key: DominanceKey) => {
     updateIndicators((current) => ({ ...current, dominance: { ...current.dominance, [key]: !current.dominance[key] } }))
   }, [updateIndicators])
@@ -842,7 +858,7 @@ function WorkspaceApp({ user, onLogout, onUserRefresh }: WorkspaceAppProps) {
         setAlertsOpen(true)
         return
       }
-      const otherWindowOpen = symbolSearch !== null || profileOpen || adminOpen || superchartOpen || chartSettingsOpen || document.querySelector('[role="dialog"], [role="menu"]') !== null
+      const otherWindowOpen = symbolSearch !== null || profileOpen || adminOpen || superchartOpen || chartSettingsOpen || studySettingsId !== undefined || document.querySelector('[role="dialog"], [role="menu"]') !== null
       if (!otherWindowOpen && isChartTypingKey(event, target)) {
         if (/^[0-9]$/.test(event.key)) { event.preventDefault(); setIntervalError(''); setIntervalInput(event.key); return }
         if (/^[a-zA-Z]$/.test(event.key)) { event.preventDefault(); setSearchSeed(event.key.toUpperCase()); setSymbolSearch('change'); return }
@@ -885,7 +901,7 @@ function WorkspaceApp({ user, onLogout, onUserRefresh }: WorkspaceAppProps) {
 
     globalThis.addEventListener('keydown', handleKeyDown)
     return () => globalThis.removeEventListener('keydown', handleKeyDown)
-  }, [adminOpen, chartSettingsOpen, changeInterval, chooseCursor, chooseTool, controller, drawingStore, intervalInput, market.pricePrecision, profileOpen, replayActive, replayPlaying, selectedDrawingId, superchartOpen, symbolSearch, takeSnapshot])
+  }, [adminOpen, chartSettingsOpen, studySettingsId, changeInterval, chooseCursor, chooseTool, controller, drawingStore, intervalInput, market.pricePrecision, profileOpen, replayActive, replayPlaying, selectedDrawingId, superchartOpen, symbolSearch, takeSnapshot])
 
   // A click anywhere closes the timeframe box, as in TradingView.
   useEffect(() => {
@@ -1099,7 +1115,8 @@ function WorkspaceApp({ user, onLogout, onUserRefresh }: WorkspaceAppProps) {
     (movingAverageActive(indicators.ema) ? 1 : 0) +
     (indicators.vwap.visible ? 1 : 0) +
     (indicators.qvwap.visible ? 1 : 0) +
-    Object.values(indicators.dominance).filter(Boolean).length
+    Object.values(indicators.dominance).filter(Boolean).length +
+    indicators.studies.length
   const connectionLabel = connectionCopy(runtime)
   const marketDrawings = drawingSnapshot.drawings.filter((drawing) => drawing.marketId === market.marketId)
   const selectedDrawing = drawingSnapshot.drawings.find((drawing) => drawing.id === selectedDrawingId)
@@ -1428,6 +1445,37 @@ function WorkspaceApp({ user, onLogout, onUserRefresh }: WorkspaceAppProps) {
                 <strong>Indicators</strong>
                 <small>{activeIndicatorCount} active</small>
               </div>
+              <input
+                className="indicator-search"
+                type="search"
+                placeholder="Search indicators (RSI, MACD, Bollinger …)"
+                aria-label="Search indicators"
+                value={studyQuery}
+                onChange={(event) => setStudyQuery(event.target.value)}
+                autoFocus
+              />
+              {STUDY_TYPES.filter((type) => {
+                const needle = studyQuery.trim().toLowerCase()
+                const definition = STUDIES[type]
+                return !needle || `${definition.name} ${definition.short} ${definition.description}`.toLowerCase().includes(needle)
+              }).map((type) => {
+                const definition = STUDIES[type]
+                const count = indicators.studies.filter((study) => study.type === type).length
+                return (
+                  <button
+                    type="button"
+                    className="indicator-row study-library-row"
+                    key={type}
+                    disabled={indicators.studies.length >= MAX_STUDIES || (market.kind === 'dominance' && type === 'volumeProfile')}
+                    title={definition.description}
+                    onClick={() => addStudy(type)}
+                  >
+                    <span><b>{definition.name}</b><small>{definition.pane === 'price' ? 'On the candles' : 'Own pane'}{count > 0 ? ` · ${count} on chart` : ''}</small></span>
+                    <PlusIcon />
+                  </button>
+                )
+              })}
+              <div className="indicator-section-title"><b>Built in</b></div>
               <button
                 type="button"
                 className="indicator-row"
@@ -1752,6 +1800,9 @@ function WorkspaceApp({ user, onLogout, onUserRefresh }: WorkspaceAppProps) {
                 onToggleVolume={() => setWorkspace((current) => ({ ...current, volumeVisible: !current.volumeVisible }))}
                 onToggleMovingAverage={toggleMovingAverage}
                 onToggleVwap={toggleVwap}
+                onStudyChange={changeStudy}
+                onStudyRemove={removeStudy}
+                onStudySettings={setStudySettingsId}
                 onOpenSettings={openChartSettings}
               />
             ))}
@@ -2402,6 +2453,15 @@ function WorkspaceApp({ user, onLogout, onUserRefresh }: WorkspaceAppProps) {
           onRename={renameLayout}
           onDuplicate={duplicateSavedLayout}
           onDelete={deleteSavedLayout}
+        />
+      )}
+
+      {studySettingsId && indicators.studies.some((study) => study.id === studySettingsId) && (
+        <StudySettingsDialog
+          study={indicators.studies.find((study) => study.id === studySettingsId)!}
+          onChange={changeStudy}
+          onRemove={() => removeStudy(studySettingsId)}
+          onClose={() => setStudySettingsId(undefined)}
         />
       )}
 
