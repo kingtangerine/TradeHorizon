@@ -1,6 +1,38 @@
 import { VWAP_ANCHORS, type VwapAnchor } from './vwap'
 import { normalizeStudies, type Study } from './studies'
 import { normalizeCompare } from './compare'
+import { MAX_SOURCE_LENGTH } from './script'
+
+/** A user script on the chart: a copy of its source (so layouts carry it) and the inputs chosen for this chart. */
+export interface ScriptInstance {
+  readonly id: string
+  /** The script in "My scripts" it came from (edits there update this copy). */
+  readonly scriptId: string
+  readonly name: string
+  readonly source: string
+  readonly inputs: readonly number[]
+  readonly visible: boolean
+}
+
+export const MAX_SCRIPT_INSTANCES = 10
+
+export function normalizeScriptInstances(value: unknown): ScriptInstance[] {
+  if (!Array.isArray(value)) return []
+  const seen = new Set<string>()
+  return value.filter((item): item is ScriptInstance => {
+    const candidate = item as ScriptInstance | null
+    if (!candidate || typeof candidate.id !== 'string' || seen.has(candidate.id) || typeof candidate.source !== 'string' || candidate.source.length > MAX_SOURCE_LENGTH) return false
+    seen.add(candidate.id)
+    return true
+  }).slice(0, MAX_SCRIPT_INSTANCES).map((item) => ({
+    id: item.id,
+    scriptId: typeof item.scriptId === 'string' ? item.scriptId : item.id,
+    name: typeof item.name === 'string' ? item.name.slice(0, 60) : 'My script',
+    source: item.source,
+    inputs: Array.isArray(item.inputs) ? item.inputs.filter((value): value is number => typeof value === 'number' && Number.isFinite(value)).slice(0, 32) : [],
+    visible: item.visible !== false,
+  }))
+}
 
 export type MovingAverageKind = 'sma' | 'ema'
 export type VwapKind = 'vwap' | 'qvwap'
@@ -23,6 +55,8 @@ export interface IndicatorSettings {
   readonly studies: readonly Study[]
   /** Compare: other symbols drawn over the chart (compare.ts). */
   readonly compare: readonly string[]
+  /** "My scripts" on the chart. */
+  readonly scripts: readonly ScriptInstance[]
 }
 
 export const MAX_MOVING_AVERAGE_PERIODS = 5
@@ -30,12 +64,13 @@ export const MAX_MOVING_AVERAGE_PERIOD = 500
 
 export const DEFAULT_INDICATORS: IndicatorSettings = {
   sma: { visible: false, periods: [20] },
-  ema: { visible: false, periods: [20] },
+  ema: { visible: false, periods: [12] },
   dominance: { btc: false, usdt: false, alt: false },
   vwap: { visible: false, anchor: 'day' },
   qvwap: { visible: false },
   studies: [],
   compare: [],
+  scripts: [],
 }
 
 export const MOVING_AVERAGE_LABELS: Readonly<Record<MovingAverageKind, string>> = {
@@ -103,7 +138,7 @@ function normalizeMovingAverage(value: unknown, fallback: MovingAverageSettings)
 
 export function normalizeIndicators(value: unknown): IndicatorSettings {
   if (typeof value !== 'object' || value === null) return DEFAULT_INDICATORS
-  const candidate = value as { sma?: unknown; ema?: unknown; dominance?: unknown; vwap?: { visible?: unknown; anchor?: unknown }; qvwap?: { visible?: unknown }; studies?: unknown; compare?: unknown }
+  const candidate = value as { sma?: unknown; ema?: unknown; dominance?: unknown; vwap?: { visible?: unknown; anchor?: unknown }; qvwap?: { visible?: unknown }; studies?: unknown; compare?: unknown; scripts?: unknown }
   const dominance = (typeof candidate.dominance === 'object' && candidate.dominance !== null
     ? candidate.dominance
     : {}) as Partial<Record<DominanceKey, unknown>>
@@ -122,5 +157,6 @@ export function normalizeIndicators(value: unknown): IndicatorSettings {
     qvwap: { visible: candidate.qvwap?.visible === true },
     studies: normalizeStudies(candidate.studies),
     compare: normalizeCompare(candidate.compare),
+    scripts: normalizeScriptInstances(candidate.scripts),
   }
 }

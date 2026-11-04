@@ -1,5 +1,6 @@
 import { getSupportedOverlays, registerOverlay } from 'klinecharts'
-import { FIB_LEVELS, clampDcaPrice, clampPositionLevels, fibLevelPrice, type PositionDirection } from './geometry'
+import { clampDcaPrice, clampPositionLevels, fibLevelPrice, type PositionDirection } from './geometry'
+import { fibLevelText, fibSettings, type FibSettings } from './drawingVisibility'
 import {
   ALERT_LINE_OVERLAY_NAME,
   FIB_RETRACEMENT_OVERLAY_NAME,
@@ -16,7 +17,6 @@ import { calculateDcaPositionMetrics, calculateLongPositionMetrics } from './pos
 export * from './overlayNames'
 
 
-const FIB_COLORS = ['#787b86', '#f23645', '#ff9800', '#4caf50', '#089981', '#00bcd4', '#787b86', '#2962ff']
 
 function numericStyle(styles: unknown, key: string, fallback: number): number {
   if (!styles || typeof styles !== 'object') return fallback
@@ -583,36 +583,38 @@ export function registerTradeHorizonOverlays(): void {
       needDefaultPointFigure: true,
       needDefaultXAxisFigure: true,
       needDefaultYAxisFigure: true,
-      createPointFigures: ({ coordinates, overlay, chart, yAxis }) => {
+      createPointFigures: ({ coordinates, overlay, chart, yAxis, bounding }) => {
         if (coordinates.length < 2 || overlay.points.length < 2) return []
-        const first = overlay.points[0].value
-        const second = overlay.points[1].value
+        let first = overlay.points[0].value
+        let second = overlay.points[1].value
         if (first === undefined || second === undefined || !yAxis) return []
+        // TradingView's Style tab (drawingVisibility.ts: fibSettings), passed as JSON in the overlay styles.
+        let settings: FibSettings
+        try { settings = JSON.parse(stringStyle(overlay.styles, 'fibConfig', '')) as FibSettings } catch { settings = fibSettings(undefined) }
+        if (settings.reverse) [first, second] = [second, first]
 
         const [c1, c2] = coordinates
-        const left = Math.min(c1.x, c2.x)
-        const right = Math.max(Math.max(c1.x, c2.x), left + 120)
+        const startX = Math.min(c1.x, c2.x)
+        const endX = Math.max(Math.max(c1.x, c2.x), startX + 120)
+        const left = settings.extendLeft ? 0 : startX
+        const right = settings.extendRight ? bounding.width : endX
         const precision = chart.getSymbol()?.pricePrecision ?? 2
         const fillOpacity = numericStyle(overlay.styles, 'fillOpacity', 8)
         const lineWidth = numericStyle(overlay.styles, 'lineWidth', 1)
         const lineStyle = stringStyle(overlay.styles, 'lineStyle', 'solid')
-        const stored = stringStyle(overlay.styles, 'fibLevels', '')
-        const levelList = stored ? stored.split(',').map(Number).filter(Number.isFinite) : [...FIB_LEVELS]
-        const levels = levelList.map((level, index) => {
-          const price = fibLevelPrice(first, second, level)
-          return { level, price, y: yAxis.convertToPixel(price), color: FIB_COLORS[index % FIB_COLORS.length] }
-        })
+        const levels = settings.rows
+          .filter((row) => row.on)
+          .sort((a, b) => a.v - b.v)
+          .map((row) => {
+            const price = fibLevelPrice(first, second, row.v)
+            return { level: row.v, price, y: yAxis.convertToPixel(price), color: settings.oneColor ?? row.c }
+          })
 
-        const bands = levels.slice(1).map((current, index) => {
+        const bands = !settings.background ? [] : levels.slice(1).map((current, index) => {
           const previous = levels[index]
           return {
             type: 'rect',
-            attrs: {
-              x: left,
-              y: Math.min(previous.y, current.y),
-              width: right - left,
-              height: Math.abs(current.y - previous.y),
-            },
+            attrs: { x: left, y: Math.min(previous.y, current.y), width: right - left, height: Math.abs(current.y - previous.y) },
             styles: { style: 'fill', color: rgba(current.color, fillOpacity), borderSize: 0 },
             ignoreEvent: true,
           }
@@ -622,13 +624,19 @@ export function registerTradeHorizonOverlays(): void {
           attrs: { coordinates: [{ x: left, y: item.y }, { x: right, y: item.y }] },
           styles: { color: item.color, size: lineWidth, style: lineStyle, dashedValue: [4, 4] },
         }))
-        const labels = levels.map((item) => ({
+        const labelText = (item: { level: number, price: number }) => {
+          const parts: string[] = []
+          if (settings.levels) parts.push(fibLevelText(item.level, settings.percent))
+          if (settings.prices) parts.push(settings.levels ? `(${formatPositionNumber(item.price, precision)})` : formatPositionNumber(item.price, precision))
+          return parts.join(' ')
+        }
+        const labels = !settings.levels && !settings.prices ? [] : levels.map((item) => ({
           type: 'text',
           attrs: {
-            x: left + 4,
+            x: settings.labelSide === 'right' ? right - 4 : left + 4,
             y: item.y - 2,
-            text: `${item.level} (${formatPositionNumber(item.price, precision)})`,
-            align: 'left',
+            text: labelText(item),
+            align: settings.labelSide === 'right' ? 'right' : 'left',
             baseline: 'bottom',
           },
           styles: {
@@ -649,11 +657,11 @@ export function registerTradeHorizonOverlays(): void {
         return [
           ...bands,
           ...lines,
-          {
+          ...(settings.trend ? [{
             type: 'line',
             attrs: { coordinates: [c1, c2] },
             styles: { color: '#787b86', size: 1, style: 'dashed', dashedValue: [3, 3] },
-          },
+          }] : []),
           ...labels,
         ]
       },

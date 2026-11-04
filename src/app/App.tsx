@@ -1,5 +1,4 @@
 import {
-  type CSSProperties,
   type FormEvent,
   useCallback,
   useEffect,
@@ -35,10 +34,13 @@ import { BottomBar, ScaleToggles } from './BottomBar'
 import { ChartSettingsDialog } from './ChartSettingsDialog'
 import { StudySettingsDialog } from './StudySettingsDialog'
 import { ToolGroup } from './ToolGroup'
+import { IndicatorsDialog } from './IndicatorsDialog'
+import { ScriptEditorDialog, ScriptSettingsDialog } from './ScriptEditorDialog'
+import { loadScripts, saveScripts, type UserScript } from './scripts'
 import { DrawingSettingsDialog, type DrawingSettingsTab } from './DrawingSettingsDialog'
 import { DrawingContextMenu } from './DrawingContextMenu'
 import type { DrawingModes } from '../chart/KLineChartController'
-import { MAX_STUDIES, STUDIES, STUDY_TYPES, newStudy, type Study, type StudyType } from '../chart/studies'
+import { MAX_STUDIES, newStudy, type Study, type StudyType } from '../chart/studies'
 import { MAX_COMPARE } from '../chart/compare'
 import { ColorPicker } from './ColorPicker'
 import { getTelegramStatus, sendTelegramTest, startTelegramLink, unlinkTelegram, type TelegramStatus } from './telegram'
@@ -63,22 +65,13 @@ import { AdminPage } from './AdminPage'
 import { syncStatusText, useSyncStatus } from './SyncPanel'
 import {
   DEFAULT_INDICATORS,
-  DOMINANCE_DESCRIPTIONS,
-  DOMINANCE_LABELS,
-  MAX_MOVING_AVERAGE_PERIODS,
-  MAX_MOVING_AVERAGE_PERIOD,
-  MOVING_AVERAGE_COLORS,
-  MOVING_AVERAGE_LABELS,
-  addMovingAveragePeriod,
   movingAverageActive,
-  parsePeriod,
-  removeMovingAveragePeriod,
-  type DominanceKey,
   type IndicatorSettings,
   type MovingAverageKind,
   type VwapKind,
+  MAX_SCRIPT_INSTANCES,
+  type ScriptInstance,
 } from '../chart/indicators'
-import { VWAP_ANCHORS, VWAP_ANCHOR_LABELS, type VwapAnchor } from '../chart/vwap'
 import { REPLAY_SPEEDS } from '../chart/replay'
 import { DRAWING_TOOLS, TOOL_GROUPS, TOOL_ORDER } from '../chart/tools'
 import { decimalString } from '../chart/model'
@@ -333,12 +326,9 @@ function WorkspaceApp({ user, onLogout, onUserRefresh }: WorkspaceAppProps) {
   const [layoutMenuOpen, setLayoutMenuOpen] = useState(false)
   const [saveAsOpen, setSaveAsOpen] = useState(false)
   const [timeframeMenuOpen, setTimeframeMenuOpen] = useState(false)
-  const [indicatorMenuOpen, setIndicatorMenuOpen] = useState(false)
   const [splitMenuOpen, setSplitMenuOpen] = useState(false)
   const [splitSaveName, setSplitSaveName] = useState('')
   const [toast, setToast] = useState('')
-  const [maDraft, setMaDraft] = useState<Record<MovingAverageKind, string>>({ sma: '', ema: '' })
-  const [maError, setMaError] = useState<{ kind: MovingAverageKind; message: string } | null>(null)
   const [layoutDraftName, setLayoutDraftName] = useState(workspace.layoutName)
   const [customIntervalAmount, setCustomIntervalAmount] = useState('12')
   const [customIntervalUnit, setCustomIntervalUnit] = useState<'m' | 'h' | 'd' | 'w' | 'M'>('h')
@@ -472,21 +462,6 @@ function WorkspaceApp({ user, onLogout, onUserRefresh }: WorkspaceAppProps) {
     setWorkspace((current) => ({ ...current, indicators: update(current.indicators ?? DEFAULT_INDICATORS) }))
   }, [])
 
-  const addMovingAverage = useCallback((kind: MovingAverageKind) => {
-    const period = parsePeriod(maDraft[kind])
-    const settings = indicators[kind]
-    if (period === undefined) {
-      setMaError({ kind, message: `Enter a whole number from 1 to ${MAX_MOVING_AVERAGE_PERIOD}.` })
-      return
-    }
-    if (!settings.periods.includes(period) && settings.periods.length >= MAX_MOVING_AVERAGE_PERIODS) {
-      setMaError({ kind, message: `You can plot up to ${MAX_MOVING_AVERAGE_PERIODS} lengths.` })
-      return
-    }
-    setMaError(null)
-    setMaDraft((current) => ({ ...current, [kind]: '' }))
-    updateIndicators((current) => ({ ...current, [kind]: addMovingAveragePeriod(current[kind], period) }))
-  }, [indicators, maDraft, updateIndicators])
 
   const toggleVwap = useCallback((kind: VwapKind) => {
     updateIndicators((current) => (
@@ -496,9 +471,6 @@ function WorkspaceApp({ user, onLogout, onUserRefresh }: WorkspaceAppProps) {
     ))
   }, [updateIndicators])
 
-  const setVwapAnchor = useCallback((anchor: VwapAnchor) => {
-    updateIndicators((current) => ({ ...current, vwap: { visible: true, anchor } }))
-  }, [updateIndicators])
 
   const toggleMovingAverage = useCallback((kind: MovingAverageKind) => {
     updateIndicators((current) => ({
@@ -516,7 +488,41 @@ function WorkspaceApp({ user, onLogout, onUserRefresh }: WorkspaceAppProps) {
   const removeCompare = useCallback((symbol: string) => {
     updateIndicators((current) => ({ ...current, compare: current.compare.filter((item) => item !== symbol) }))
   }, [updateIndicators])
-  const [studyQuery, setStudyQuery] = useState('')
+  const [indicatorsOpen, setIndicatorsOpen] = useState(false)
+  // "My scripts": the user's scripts, the editor, and the settings of a script on the chart.
+  const [scripts, setScripts] = useState<UserScript[]>(() => loadScripts(user.id))
+  const [scriptEditor, setScriptEditor] = useState<{ script?: UserScript }>()
+  const [scriptSettingsId, setScriptSettingsId] = useState<string>()
+  const addScriptInstance = useCallback((script: UserScript) => {
+    updateIndicators((current) => (current.scripts.length >= MAX_SCRIPT_INSTANCES ? current : {
+      ...current,
+      scripts: [...current.scripts, { id: `script-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`, scriptId: script.id, name: script.name, source: script.source, inputs: [], visible: true }],
+    }))
+  }, [updateIndicators])
+  /** Saving a script updates its copies on the chart (their inputs are kept when the script still has them). */
+  const saveScript = useCallback((script: UserScript, addToChart: boolean) => {
+    setScripts((current) => (current.some((item) => item.id === script.id) ? current.map((item) => (item.id === script.id ? script : item)) : [...current, script]))
+    updateIndicators((current) => ({ ...current, scripts: current.scripts.map((item) => (item.scriptId === script.id ? { ...item, name: script.name, source: script.source } : item)) }))
+    if (addToChart) addScriptInstance(script)
+    setScriptEditor(undefined)
+  }, [addScriptInstance, updateIndicators])
+  const deleteScript = useCallback((id: string) => {
+    setScripts((current) => current.filter((item) => item.id !== id))
+    updateIndicators((current) => ({ ...current, scripts: current.scripts.filter((item) => item.scriptId !== id) }))
+  }, [updateIndicators])
+  const changeScriptInstance = useCallback((instance: ScriptInstance) => {
+    updateIndicators((current) => ({ ...current, scripts: current.scripts.map((item) => (item.id === instance.id ? instance : item)) }))
+  }, [updateIndicators])
+  const removeScriptInstance = useCallback((id: string) => {
+    updateIndicators((current) => ({ ...current, scripts: current.scripts.filter((item) => item.id !== id) }))
+    setScriptSettingsId((current) => (current === id ? undefined : current))
+  }, [updateIndicators])
+  const toggleFavoriteIndicator = useCallback((id: string) => {
+    setPreferences((current) => ({
+      ...current,
+      favoriteIndicators: current.favoriteIndicators.includes(id) ? current.favoriteIndicators.filter((item) => item !== id) : [...current.favoriteIndicators, id],
+    }))
+  }, [])
   const addStudy = useCallback((type: StudyType) => {
     const id = `study-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`
     updateIndicators((current) => (current.studies.length >= MAX_STUDIES ? current : { ...current, studies: [...current.studies, newStudy(type, id)] }))
@@ -529,9 +535,6 @@ function WorkspaceApp({ user, onLogout, onUserRefresh }: WorkspaceAppProps) {
     setStudySettingsId((current) => (current === id ? undefined : current))
   }, [updateIndicators])
 
-  const toggleDominance = useCallback((key: DominanceKey) => {
-    updateIndicators((current) => ({ ...current, dominance: { ...current.dominance, [key]: !current.dominance[key] } }))
-  }, [updateIndicators])
 
   /** Changes the symbol or timeframe of the active chart (the main chart of the tab, or one of its split panes). */
   const updateActivePane = useCallback((changes: Partial<PaneSpec>) => {
@@ -932,7 +935,7 @@ function WorkspaceApp({ user, onLogout, onUserRefresh }: WorkspaceAppProps) {
         setAlertsOpen(true)
         return
       }
-      const otherWindowOpen = symbolSearch !== null || profileOpen || adminOpen || superchartOpen || chartSettingsOpen || studySettingsId !== undefined || drawingSettings !== undefined || document.querySelector('[role="dialog"], [role="menu"]') !== null
+      const otherWindowOpen = symbolSearch !== null || indicatorsOpen || scriptEditor !== undefined || profileOpen || adminOpen || superchartOpen || chartSettingsOpen || studySettingsId !== undefined || drawingSettings !== undefined || document.querySelector('[role="dialog"], [role="menu"]') !== null
       if (!otherWindowOpen && isChartTypingKey(event, target)) {
         if (/^[0-9]$/.test(event.key)) { event.preventDefault(); setIntervalError(''); setIntervalInput(event.key); return }
         if (/^[a-zA-Z]$/.test(event.key)) { event.preventDefault(); setSearchSeed(event.key.toUpperCase()); setSymbolSearch('change'); return }
@@ -975,7 +978,7 @@ function WorkspaceApp({ user, onLogout, onUserRefresh }: WorkspaceAppProps) {
 
     globalThis.addEventListener('keydown', handleKeyDown)
     return () => globalThis.removeEventListener('keydown', handleKeyDown)
-  }, [adminOpen, chartSettingsOpen, studySettingsId, drawingSettings, changeInterval, chooseCursor, chooseTool, controller, drawingStore, intervalInput, market.pricePrecision, profileOpen, replayActive, replayPlaying, selectedDrawingId, superchartOpen, symbolSearch, takeSnapshot])
+  }, [adminOpen, indicatorsOpen, scriptEditor, chartSettingsOpen, studySettingsId, drawingSettings, changeInterval, chooseCursor, chooseTool, controller, drawingStore, intervalInput, market.pricePrecision, profileOpen, replayActive, replayPlaying, selectedDrawingId, superchartOpen, symbolSearch, takeSnapshot])
 
   // A click anywhere closes the timeframe box, as in TradingView.
   useEffect(() => {
@@ -1018,6 +1021,7 @@ function WorkspaceApp({ user, onLogout, onUserRefresh }: WorkspaceAppProps) {
     return () => globalThis.clearTimeout(timer)
   }, [workspace])
   useEffect(() => saveAlerts(user.id, alerts), [alerts, user.id])
+  useEffect(() => saveScripts(user.id, scripts), [scripts, user.id])
   useEffect(() => saveGroups(user.id, groupState), [groupState, user.id])
 
   // Another device changed something (merged into storage by userSync): show it without a reload.
@@ -1027,6 +1031,7 @@ function WorkspaceApp({ user, onLogout, onUserRefresh }: WorkspaceAppProps) {
       'layouts:v1': () => setSavedLayouts(loadSavedLayouts(user.id)),
       'drawings:v1': () => drawingStore.reloadFromRepository(),
       'alerts:v1': () => setAlerts(loadAlerts(user.id)),
+      'scripts:v1': () => setScripts(loadScripts(user.id)),
       'groups:v1': () => setGroupState(loadGroups(user.id)),
       'layout-folders:v1': () => setLayoutFolders(loadLayoutFolders(user.id)),
       'rect-templates:v1': () => setTemplateState(loadTemplates(user.id)),
@@ -1061,7 +1066,6 @@ function WorkspaceApp({ user, onLogout, onUserRefresh }: WorkspaceAppProps) {
       if (!timeframeMenuRef.current?.contains(target)) setTimeframeMenuOpen(false)
       if (!snapshotMenuRef.current?.contains(target)) setSnapshotMenuOpen(false)
       if (!chartTypeMenuRef.current?.contains(target)) setChartTypeMenuOpen(false)
-      if (!indicatorMenuRef.current?.contains(target)) setIndicatorMenuOpen(false)
       if (!splitMenuRef.current?.contains(target)) setSplitMenuOpen(false)
     }
     globalThis.addEventListener('mousedown', closeDetachedMenus)
@@ -1198,7 +1202,8 @@ function WorkspaceApp({ user, onLogout, onUserRefresh }: WorkspaceAppProps) {
     (indicators.vwap.visible ? 1 : 0) +
     (indicators.qvwap.visible ? 1 : 0) +
     Object.values(indicators.dominance).filter(Boolean).length +
-    indicators.studies.length
+    indicators.studies.length +
+    indicators.scripts.length
   const connectionLabel = connectionCopy(runtime)
   const marketDrawings = drawingSnapshot.drawings.filter((drawing) => drawing.marketId === market.marketId)
   const selectedDrawing = drawingSnapshot.drawings.find((drawing) => drawing.id === selectedDrawingId)
@@ -1552,151 +1557,11 @@ function WorkspaceApp({ user, onLogout, onUserRefresh }: WorkspaceAppProps) {
           <button
             type="button"
             className={activeIndicatorCount > 0 ? 'indicators-button active' : 'indicators-button'}
-            aria-expanded={indicatorMenuOpen}
-            onClick={() => setIndicatorMenuOpen((open) => !open)}
+            aria-haspopup="dialog"
+            onClick={() => setIndicatorsOpen(true)}
           >
             <LayersIcon /> Indicators
           </button>
-          {indicatorMenuOpen && (
-            <div className="top-menu indicator-menu">
-              <div className="indicator-menu-head">
-                <strong>Indicators</strong>
-                <small>{activeIndicatorCount} active</small>
-              </div>
-              <input
-                className="indicator-search"
-                type="search"
-                placeholder="Search indicators (RSI, MACD, Bollinger …)"
-                aria-label="Search indicators"
-                value={studyQuery}
-                onChange={(event) => setStudyQuery(event.target.value)}
-                autoFocus
-              />
-              {STUDY_TYPES.filter((type) => {
-                const needle = studyQuery.trim().toLowerCase()
-                const definition = STUDIES[type]
-                return !needle || `${definition.name} ${definition.short} ${definition.description}`.toLowerCase().includes(needle)
-              }).map((type) => {
-                const definition = STUDIES[type]
-                const count = indicators.studies.filter((study) => study.type === type).length
-                return (
-                  <button
-                    type="button"
-                    className="indicator-row study-library-row"
-                    key={type}
-                    disabled={indicators.studies.length >= MAX_STUDIES || (market.kind === 'dominance' && type === 'volumeProfile')}
-                    title={definition.description}
-                    onClick={() => addStudy(type)}
-                  >
-                    <span><b>{definition.name}</b><small>{definition.pane === 'price' ? 'On the candles' : 'Own pane'}{count > 0 ? ` · ${count} on chart` : ''}</small></span>
-                    <PlusIcon />
-                  </button>
-                )
-              })}
-              <div className="indicator-section-title"><b>Built in</b></div>
-              <button
-                type="button"
-                className="indicator-row"
-                onClick={() => setWorkspace((current) => ({ ...current, volumeVisible: !current.volumeVisible }))}
-              >
-                <span><b>Volume</b><small>Binance base-asset volume</small></span>
-                {workspace.volumeVisible ? <EyeIcon /> : <EyeOffIcon />}
-              </button>
-
-              {(['sma', 'ema'] as const).map((kind) => {
-                const settings = indicators[kind]
-                return (
-                  <div className="indicator-group" key={kind}>
-                    <button type="button" className="indicator-row" onClick={() => toggleMovingAverage(kind)}>
-                      <span>
-                        <b>{kind === 'sma' ? 'Simple Moving Average' : 'Exponential Moving Average'}</b>
-                        <small>{MOVING_AVERAGE_LABELS[kind]} of the close · up to {MAX_MOVING_AVERAGE_PERIODS} lengths</small>
-                      </span>
-                      {movingAverageActive(settings) ? <EyeIcon /> : <EyeOffIcon />}
-                    </button>
-                    <div className="indicator-periods">
-                      {settings.periods.map((period, index) => (
-                        <span
-                          className="period-chip"
-                          style={{ '--chip-color': MOVING_AVERAGE_COLORS[kind][index % MOVING_AVERAGE_COLORS[kind].length] } as CSSProperties}
-                          key={period}
-                        >
-                          {period}
-                          <button
-                            type="button"
-                            aria-label={`Remove ${MOVING_AVERAGE_LABELS[kind]} ${period}`}
-                            onClick={() => updateIndicators((current) => ({ ...current, [kind]: removeMovingAveragePeriod(current[kind], period) }))}
-                          >
-                            ×
-                          </button>
-                        </span>
-                      ))}
-                      <form onSubmit={(event) => { event.preventDefault(); addMovingAverage(kind) }}>
-                        <input
-                          type="number"
-                          min="1"
-                          max={MAX_MOVING_AVERAGE_PERIOD}
-                          placeholder="Length"
-                          aria-label={`${MOVING_AVERAGE_LABELS[kind]} length`}
-                          value={maDraft[kind]}
-                          onChange={(event) => setMaDraft((current) => ({ ...current, [kind]: event.target.value }))}
-                        />
-                        <button type="submit">Add</button>
-                      </form>
-                    </div>
-                    {maError?.kind === kind && <small className="indicator-error">{maError.message}</small>}
-                  </div>
-                )
-              })}
-
-              <div className="indicator-group">
-                <button type="button" className="indicator-row" onClick={() => toggleVwap('vwap')}>
-                  <span>
-                    <b>VWAP</b>
-                    <small>Volume-weighted average price · restarts every {VWAP_ANCHOR_LABELS[indicators.vwap.anchor].toLowerCase()}</small>
-                  </span>
-                  {indicators.vwap.visible ? <EyeIcon /> : <EyeOffIcon />}
-                </button>
-                <div className="indicator-periods">
-                  <select
-                    className="vwap-anchor"
-                    aria-label="VWAP restarts every"
-                    value={indicators.vwap.anchor}
-                    onChange={(event) => setVwapAnchor(event.target.value as VwapAnchor)}
-                  >
-                    {VWAP_ANCHORS.map((anchor) => <option value={anchor} key={anchor}>Restarts every {VWAP_ANCHOR_LABELS[anchor].toLowerCase()} (UTC)</option>)}
-                  </select>
-                </div>
-              </div>
-              <button type="button" className="indicator-row" onClick={() => toggleVwap('qvwap')}>
-                <span>
-                  <b>QVWAP</b>
-                  <small>Quarterly VWAP · average price paid since the start of the quarter</small>
-                </span>
-                {indicators.qvwap.visible ? <EyeIcon /> : <EyeOffIcon />}
-              </button>
-
-              <div className="indicator-section-title">
-                <b>Market dominance</b>
-                <small>CoinGecko caps, Binance prices · estimated</small>
-              </div>
-              {(['btc', 'usdt', 'alt'] as const).map((key) => (
-                <button type="button" className="indicator-row" key={key} onClick={() => toggleDominance(key)}>
-                  <span>
-                    <b>{DOMINANCE_DESCRIPTIONS[key]}</b>
-                    <small>{DOMINANCE_LABELS[key]} · % of total crypto market cap</small>
-                  </span>
-                  {indicators.dominance[key] ? <EyeIcon /> : <EyeOffIcon />}
-                </button>
-              ))}
-              {(indicators.dominance.btc || indicators.dominance.usdt || indicators.dominance.alt) && runtime.dominance === 'loading' && (
-                <p className="indicator-note">Importing dominance data…</p>
-              )}
-              {(indicators.dominance.btc || indicators.dominance.usdt || indicators.dominance.alt) && runtime.dominance === 'error' && (
-                <p className="indicator-note error">Could not import dominance data: {runtime.dominanceError}</p>
-              )}
-            </div>
-          )}
         </div>
 
         <button
@@ -1960,6 +1825,9 @@ function WorkspaceApp({ user, onLogout, onUserRefresh }: WorkspaceAppProps) {
                 onStudyRemove={removeStudy}
                 onStudySettings={setStudySettingsId}
                 onCompareRemove={removeCompare}
+                onScriptChange={changeScriptInstance}
+                onScriptRemove={removeScriptInstance}
+                onScriptSettings={setScriptSettingsId}
                 onOpenSettings={openChartSettings}
               />
             ))}
@@ -2626,6 +2494,44 @@ function WorkspaceApp({ user, onLogout, onUserRefresh }: WorkspaceAppProps) {
           onDelete={deleteSavedLayout}
         />
       )}
+
+      {indicatorsOpen && (
+        <IndicatorsDialog
+          indicators={indicators}
+          volumeVisible={workspace.volumeVisible}
+          market={market}
+          dominanceNote={runtime.dominance === 'loading' ? 'Importing dominance data…' : runtime.dominance === 'error' ? `Could not import dominance data: ${runtime.dominanceError}` : undefined}
+          favorites={preferences.favoriteIndicators}
+          scripts={scripts}
+          onUpdate={updateIndicators}
+          onToggleVolume={() => setWorkspace((current) => ({ ...current, volumeVisible: !current.volumeVisible }))}
+          onAddStudy={addStudy}
+          onAddScript={addScriptInstance}
+          onEditScript={(script) => setScriptEditor({ script })}
+          onDeleteScript={deleteScript}
+          onToggleFavorite={toggleFavoriteIndicator}
+          onClose={() => setIndicatorsOpen(false)}
+        />
+      )}
+
+      {scriptEditor && <ScriptEditorDialog script={scriptEditor.script} onSave={saveScript} onClose={() => setScriptEditor(undefined)} />}
+
+      {scriptSettingsId && indicators.scripts.some((item) => item.id === scriptSettingsId) && (() => {
+        const instance = indicators.scripts.find((item) => item.id === scriptSettingsId)!
+        return (
+          <ScriptSettingsDialog
+            key={instance.id}
+            instance={instance}
+            onChange={changeScriptInstance}
+            onEdit={() => {
+              setScriptSettingsId(undefined)
+              setScriptEditor({ script: scripts.find((item) => item.id === instance.scriptId) ?? { id: instance.scriptId, name: instance.name, source: instance.source, updatedAtMs: 0 } })
+            }}
+            onRemove={() => removeScriptInstance(instance.id)}
+            onClose={() => setScriptSettingsId(undefined)}
+          />
+        )
+      })()}
 
       {studySettingsId && indicators.studies.some((study) => study.id === studySettingsId) && (
         <StudySettingsDialog

@@ -21,7 +21,9 @@ import { ChartContextMenu } from './ChartContextMenu'
 import { FuturesStatsRow } from './FuturesStatsRow'
 import { formatPrice } from './format'
 import { getMarket } from '../chart/markets'
-import { LegendIndicatorValues, LegendOhlc, LegendStudyValues, LegendVolume } from './LegendValues'
+import { LegendIndicatorValues, LegendOhlc, LegendScriptValues, LegendStudyValues, LegendVolume } from './LegendValues'
+import { compiledScript } from '../chart/scriptIndicator'
+import type { ScriptInstance } from '../chart/indicators'
 import type { PriceAlert } from './alerts'
 import { capTier, coinSymbol, formatUsdCompact, loadMarketCaps, type MarketCapInfo } from './marketCap'
 import type { AlertLine } from '../chart/KLineChartController'
@@ -67,6 +69,10 @@ interface ChartPaneProps {
   onStudyRemove(id: string): void
   onStudySettings(id: string): void
   onCompareRemove(symbol: string): void
+  /** User scripts on the chart: eye, settings and remove buttons in the legend. */
+  onScriptChange(instance: ScriptInstance): void
+  onScriptRemove(id: string): void
+  onScriptSettings(id: string): void
   onOpenSettings(): void
 }
 
@@ -121,6 +127,9 @@ export function ChartPane({
   onStudyRemove,
   onStudySettings,
   onCompareRemove,
+  onScriptChange,
+  onScriptRemove,
+  onScriptSettings,
   onOpenSettings,
 }: ChartPaneProps) {
   const [runtime, setRuntime] = useState<ChartRuntimeState>(() => INITIAL_RUNTIME(interval))
@@ -270,6 +279,24 @@ export function ChartPane({
             </span>
           </div>
         ))}
+        {indicators.scripts.map((instance) => {
+          const compiled = compiledScript(instance.source)
+          const broken = compiled instanceof Error
+          return (
+            <div className={instance.visible && !broken ? 'chart-indicator-row study-row' : 'chart-indicator-row study-row muted'} key={instance.id}>
+              <span title={broken ? compiled.message : instance.name}>{instance.name}{!broken && compiled.inputs.length > 0 ? ` ${compiled.inputs.map((input, index) => instance.inputs[index] ?? input.defaultValue).join(' ')}` : ''}</span>
+              {broken && <b className="price-down">error</b>}
+              {!broken && instance.visible && compiled.overlay && <LegendScriptValues controller={controller} quote={quote} instanceId={instance.id} precision={compiled.precision ?? market.pricePrecision} />}
+              <span className="study-actions">
+                <button type="button" title={instance.visible ? 'Hide' : 'Show'} aria-label={`${instance.visible ? 'Hide' : 'Show'} ${instance.name}`} onClick={() => onScriptChange({ ...instance, visible: !instance.visible })}>
+                  {instance.visible ? <EyeIcon /> : <EyeOffIcon />}
+                </button>
+                <button type="button" title="Settings" aria-label={`Settings of ${instance.name}`} onClick={() => onScriptSettings(instance.id)}><SettingsIcon /></button>
+                <button type="button" title="Remove" aria-label={`Remove ${instance.name}`} onClick={() => onScriptRemove(instance.id)}><CloseIcon /></button>
+              </span>
+            </div>
+          )
+        })}
         {indicators.studies.map((study) => (
           <div className={study.visible ? 'chart-indicator-row study-row' : 'chart-indicator-row study-row muted'} key={study.id}>
             <span title={STUDIES[study.type].name}>{studyLabel(study)}</span>

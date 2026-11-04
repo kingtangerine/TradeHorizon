@@ -104,3 +104,22 @@ export function LegendStudyValues({ controller, studyId, colors, precision }: {
     </>
   )
 }
+
+/** Values of a user script on the candles, at the hovered candle or the newest one. */
+export function LegendScriptValues({ controller, instanceId, precision }: {
+  controller: KLineChartController | null
+  instanceId: string
+  precision: number
+  /** Changes on every price update, so live values re-render while nothing is hovered. */
+  quote: ChartQuote | null
+}) {
+  const hover = useHoveredCandle(controller)
+  const values = controller ? controller.scriptValuesAt(instanceId, hover?.index) : []
+  return (
+    <>
+      {values.map((item, position) => (item.value === undefined ? null : (
+        <b key={position} style={{ color: item.color }} title={item.title}>{formatPrice(item.value, precision)}</b>
+      )))}
+    </>
+  )
+}

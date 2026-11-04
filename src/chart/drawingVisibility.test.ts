@@ -25,3 +25,17 @@ describe('drawing visibility and levels', () => {
     expect(fibLevels({ fibLevels: [] })).toEqual([...FIB_LEVELS])
   })
 })
+
+describe('Fibonacci retracement settings', () => {
+  it('keeps older drawings as they were and gives new ones TradingView levels', async () => {
+    const { TV_FIB_ROWS, fibLevelText, fibSettings } = await import('./drawingVisibility')
+    expect(fibSettings({}).rows.map((row) => row.v)).toEqual([...FIB_LEVELS])
+    expect(fibSettings({ fibLevels: [0.5, 1] }).rows).toEqual([{ v: 0.5, c: '#4caf50', on: true }, { v: 1, c: '#787b86', on: true }])
+    const custom = fibSettings({ fibRows: [{ v: 0.618, c: '#123456', on: false }, { v: 'x' }], fibReverse: true, fibLabelSide: 'right', fibOneColor: '#ffffff' })
+    expect(custom.rows).toEqual([{ v: 0.618, c: '#123456', on: false }])
+    expect([custom.reverse, custom.labelSide, custom.oneColor, custom.background]).toEqual([true, 'right', '#ffffff', true])
+    expect(TV_FIB_ROWS.filter((row) => row.on)).toHaveLength(11)
+    expect(fibLevelText(0.618, true)).toBe('61.8%')
+    expect(fibLevelText(1.618, false)).toBe('1.618')
+  })
+})

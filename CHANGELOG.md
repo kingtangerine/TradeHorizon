@@ -7,6 +7,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [0.28.0] - 2026-11-04
+
+### Added
+- **Indicators window, as in TradingView**: the Indicators button opens a window instead of a drop-down.
+  - Sections: **Favorites**, **My scripts**, **Technicals**, **Trending** and **Market dominance**, with one search over all of them.
+  - Star any row to keep it in Favorites. Rows show what is already on the chart. The window stays open while you add indicators.
+- **My scripts**: write your own indicators in a small Pine-like language, in an editor with a reference panel.
+  - Example: `plot(ema(close, input(12, "Length")))`.
+  - What is available:
+    - prices (open, high, low, close, volume, hl2, hlc3, ohlc4) and `close[1]` for earlier candles
+    - sma, ema, rma, wma, vwma, rsi, atr, stdev, highest, lowest, change, roc, cum
+    - crossover and crossunder; and, or, not; `cond ? a : b`
+    - maths functions
+    - `input()` for settings, `plot()` (up to 8 lines), `hline()` and `indicator("Name", overlay=true)` for scripts drawn on the candles
+  - Mistakes are shown with their line before saving.
+  - Scripts are saved with your account and sync to your other devices. Each script on a chart has its own input values, changed from its gear button in the legend.
+  - Scripts run in TradeHorizon's own interpreter, never as page code, so a script cannot reach your account or the page.
+- **Fibonacci retracement settings, as in TradingView** (double-click the drawing):
+  - 24 levels (the usual 11 shown), each with on/off, value and colour, plus *Use one colour* and *TradingView defaults*.
+  - Trend line on/off, extend lines left or right, and the background with its transparency.
+  - Reverse, prices and levels labels, levels as values or percents, and labels on the left or right.
+
+### Changed
+- The Exponential Moving Average starts at length 12.
+- New Fibonacci retracements use TradingView's level list. Existing ones keep their levels.
 ## [0.27.0] - 2026-11-04
 
 ### Added

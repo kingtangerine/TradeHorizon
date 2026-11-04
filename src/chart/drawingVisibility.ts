@@ -41,3 +41,84 @@ export function fibLevels(style: DrawingStyle | undefined): number[] {
     .slice(0, MAX_FIB_LEVELS)
   return levels.length > 0 ? levels : [...FIB_LEVELS]
 }
+
+// --- Fibonacci retracement settings (TradingView's Style tab) ----------------------------------------------------
+
+export interface FibLevelRow {
+  /** The level (0.618 …). */
+  readonly v: number
+  readonly c: string
+  readonly on: boolean
+}
+
+export interface FibSettings {
+  readonly rows: readonly FibLevelRow[]
+  /** The dashed line between the two points. */
+  readonly trend: boolean
+  readonly extendLeft: boolean
+  readonly extendRight: boolean
+  readonly background: boolean
+  /** Swap which point is 0 and which is 1. */
+  readonly reverse: boolean
+  readonly prices: boolean
+  readonly levels: boolean
+  /** Labels as 61.8% instead of 0.618. */
+  readonly percent: boolean
+  readonly labelSide: 'left' | 'right'
+  /** One colour for every level instead of each level's own. */
+  readonly oneColor: string | null
+}
+
+/** TradingView's level list: the first eleven are shown by default. */
+export const TV_FIB_ROWS: readonly FibLevelRow[] = [
+  { v: 0, c: '#787b86', on: true }, { v: 0.236, c: '#f23645', on: true }, { v: 0.382, c: '#ff9800', on: true },
+  { v: 0.5, c: '#4caf50', on: true }, { v: 0.618, c: '#089981', on: true }, { v: 0.786, c: '#00bcd4', on: true },
+  { v: 1, c: '#787b86', on: true }, { v: 1.618, c: '#2962ff', on: true }, { v: 2.618, c: '#f23645', on: true },
+  { v: 3.618, c: '#9c27b0', on: true }, { v: 4.236, c: '#e91e63', on: true },
+  { v: 1.272, c: '#ff9800', on: false }, { v: 1.414, c: '#f23645', on: false }, { v: 2, c: '#089981', on: false },
+  { v: 2.272, c: '#ff9800', on: false }, { v: 2.414, c: '#4caf50', on: false }, { v: 3, c: '#00bcd4', on: false },
+  { v: 3.272, c: '#787b86', on: false }, { v: 3.414, c: '#2962ff', on: false }, { v: 4, c: '#f23645', on: false },
+  { v: 4.272, c: '#9c27b0', on: false }, { v: 4.414, c: '#e91e63', on: false }, { v: 4.618, c: '#ff9800', on: false },
+  { v: 4.764, c: '#089981', on: false },
+]
+
+export const MAX_FIB_ROWS = 30
+const HEX_COLOR = /^#[0-9a-f]{6}$/i
+
+/** The retracement's settings, from its style. Drawings made before these settings keep their levels (all shown). */
+export function fibSettings(style: DrawingStyle | undefined): FibSettings {
+  const flag = (key: string, fallback: boolean) => (typeof style?.[key] === 'boolean' ? style[key] as boolean : fallback)
+  let rows: FibLevelRow[]
+  const stored = style?.fibRows
+  if (Array.isArray(stored)) {
+    rows = stored.flatMap((item) => {
+      const row = item as { v?: unknown, c?: unknown, on?: unknown } | null
+      if (!row || typeof row.v !== 'number' || !Number.isFinite(row.v) || row.v < -5 || row.v > 10) return []
+      return [{ v: row.v, c: typeof row.c === 'string' && HEX_COLOR.test(row.c) ? row.c : '#787b86', on: row.on !== false }]
+    }).slice(0, MAX_FIB_ROWS)
+  } else if (Array.isArray(style?.fibLevels)) {
+    rows = fibLevels(style).map((v) => ({ v, c: TV_FIB_ROWS.find((row) => row.v === v)?.c ?? '#787b86', on: true }))
+  } else {
+    // Older drawings without settings show the levels they always showed.
+    rows = [...FIB_LEVELS].map((v) => ({ ...(TV_FIB_ROWS.find((row) => row.v === v) ?? { v, c: '#787b86', on: true }), on: true }))
+  }
+  const oneColor = typeof style?.fibOneColor === 'string' && HEX_COLOR.test(style.fibOneColor) ? style.fibOneColor : null
+  return {
+    rows,
+    trend: flag('fibTrend', true),
+    extendLeft: flag('fibExtendLeft', false),
+    extendRight: flag('fibExtendRight', false),
+    background: flag('fibBackground', true),
+    reverse: flag('fibReverse', false),
+    prices: flag('fibPrices', true),
+    levels: flag('fibLevelsText', true),
+    percent: flag('fibPercent', false),
+    labelSide: style?.fibLabelSide === 'right' ? 'right' : 'left',
+    oneColor,
+  }
+}
+
+/** "0.618" or "61.8%", for the labels and the settings. */
+export function fibLevelText(level: number, percent: boolean): string {
+  return percent ? `${Number((level * 100).toFixed(2))}%` : String(Number(level.toFixed(4)))
+}

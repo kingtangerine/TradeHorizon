@@ -19,6 +19,7 @@ import {
   PITCHFORK_OVERLAY_NAME,
   PRICE_LABEL_OVERLAY_NAME,
 } from './overlayNames'
+import { TV_FIB_ROWS } from './drawingVisibility'
 
 /**
  * How a tool is placed: one click, two points (click-click or drag), three points (click three times, or drag the
@@ -105,7 +106,8 @@ export const DRAWING_TOOLS: Readonly<Record<DrawingType, DrawingToolSpec>> = {
     placement: 'twoPoint',
     hint: 'Drag from the swing start to the swing end, or click both.',
     shortcut: 'F',
-    defaultStyle: { color: '#787b86', lineWidth: 1, lineStyle: 'solid', fillOpacity: 8 },
+    // New retracements get TradingView's level list (older ones keep theirs: see fibSettings).
+    defaultStyle: { color: '#787b86', lineWidth: 1, lineStyle: 'solid', fillOpacity: 8, fibRows: TV_FIB_ROWS.map((row) => ({ ...row })) },
   },
   longPosition: {
     label: 'Long position',

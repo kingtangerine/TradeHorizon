@@ -11,6 +11,8 @@ export interface Preferences {
   readonly highLowLabels: boolean
   /** Colours and canvas of the chart (chart settings window). */
   readonly appearance: ChartAppearance
+  /** Starred rows of the Indicators window ("study:rsi", "builtin:ema", "script:<id>" …). */
+  readonly favoriteIndicators: readonly string[]
 }
 
 export type GridLines = 'both' | 'vertical' | 'horizontal' | 'none'
@@ -27,7 +29,7 @@ export interface ChartAppearance {
 
 export const DEFAULT_APPEARANCE: ChartAppearance = { upColor: '#089981', downColor: '#f23645', wicks: true, background: null, grid: 'both', lastPriceLine: true }
 
-export const DEFAULT_PREFERENCES: Preferences = { candleCountdown: true, alertLines: true, timeZone: 'auto', highLowLabels: false, appearance: DEFAULT_APPEARANCE }
+export const DEFAULT_PREFERENCES: Preferences = { candleCountdown: true, alertLines: true, timeZone: 'auto', highLowLabels: false, appearance: DEFAULT_APPEARANCE, favoriteIndicators: [] }
 
 const COLOR = /^#[0-9a-fA-F]{6}$/
 
@@ -58,6 +60,7 @@ export function parsePreferences(value: unknown): Preferences {
     timeZone: typeof raw.timeZone === 'string' && raw.timeZone.length <= 64 ? raw.timeZone : DEFAULT_PREFERENCES.timeZone,
     highLowLabels: typeof raw.highLowLabels === 'boolean' ? raw.highLowLabels : DEFAULT_PREFERENCES.highLowLabels,
     appearance: parseAppearance(raw.appearance),
+    favoriteIndicators: Array.isArray(raw.favoriteIndicators) ? [...new Set(raw.favoriteIndicators.filter((item): item is string => typeof item === 'string' && item.length <= 80))].slice(0, 100) : [],
   }
 }
 

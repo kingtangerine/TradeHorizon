@@ -19,10 +19,13 @@ import { exchangeSymbol } from '../market/binance/futures'
 import { fetchMarketKlines, subscribeMarketKlines } from '../market/sources'
 import { COMPARE_INDICATOR_NAME, registerCompareOverlay, type CompareSeries } from './compareOverlay'
 import { registerWave3Overlays } from './overlaysWave3'
+import { SCRIPT_INDICATOR_NAME, compiledScript, registerScriptIndicator, type ScriptExtend } from './scriptIndicator'
+import { runScript } from './script'
+import type { ScriptInstance } from './indicators'
 import { COMPARE_COLORS, compareChange, scaledCompare } from './compare'
 import { getMarket, type CryptoMarket as CompareMarket } from './markets'
 import { STUDIES, type Study } from './studies'
-import { fibLevels, visibleOnInterval } from './drawingVisibility'
+import { fibSettings, visibleOnInterval } from './drawingVisibility'
 import { broadcastCrosshair, broadcastTime, followerBarSpace, joinSyncGroup, type SyncMember, type SyncedCrosshair, type SyncedTime } from './chartSync'
 import { ALERT_LINE_OVERLAY_NAME } from './overlayNames'
 import { QVWAP_INDICATOR_NAME, VWAP_INDICATOR_NAME, registerVwapIndicators } from './vwapIndicator'
@@ -150,6 +153,7 @@ registerVolumeOverlay()
 registerSeriesOverlays()
 registerStudyIndicators()
 registerCompareOverlay()
+registerScriptIndicator()
 
 /** The candle under the crosshair, for the legend (TradingView shows the hovered candle's values). */
 export interface HoverState {
@@ -379,6 +383,8 @@ export class KLineChartController {
   #compareEpoch = 0
   /** Indicator-library studies on the chart: study id -> klinecharts indicator. */
   readonly #studyIds = new Map<string, { indicatorId: string, type: Study['type'] }>()
+  /** User scripts on the chart: instance id -> klinecharts indicator, its pane and its plots. */
+  readonly #scriptIds = new Map<string, { indicatorId: string, overlay: boolean, extend: ScriptExtend }>()
   /** Date-range button waiting for its timeframe's candles. */
   #pendingRange?: { fromMs: number, interval: MarketInterval }
   readonly #hoverListeners = new Set<() => void>()
@@ -1400,6 +1406,79 @@ export class KLineChartController {
     this.#applyDominance(settings.dominance)
     this.#applyStudies(settings.studies)
     this.#applyCompare(settings.compare)
+    this.#applyScripts(settings.scripts)
+  }
+
+  /** User scripts: run once here to learn their plots (titles, colours), then klinecharts recalculates them itself. */
+  #applyScripts(instances: readonly ScriptInstance[]): void {
+    const wanted = new Map(instances.map((item) => [item.id, item]))
+    for (const [id, entry] of this.#scriptIds) {
+      const instance = wanted.get(id)
+      const script = instance ? compiledScript(instance.source) : undefined
+      if (!instance || !script || script instanceof Error || script.overlay !== entry.overlay) {
+        this.#chart.removeIndicator({ id: entry.indicatorId })
+        this.#scriptIds.delete(id)
+      }
+    }
+    const data = this.#chart.getDataList()
+    for (const instance of instances) {
+      const script = compiledScript(instance.source)
+      if (script instanceof Error) continue
+      let extend: ScriptExtend
+      try {
+        const sample = runScript(script, data.slice(-300), instance.inputs)
+        extend = {
+          source: instance.source,
+          inputs: instance.inputs,
+          plots: sample.plots.map((plot) => ({ title: plot.title, color: plot.color, width: plot.width })),
+          hlines: sample.hlines.map((line) => ({ value: line.value, color: line.color })),
+        }
+      } catch {
+        continue
+      }
+      const precision = script.precision ?? (script.overlay ? (this.#chart.getSymbol()?.pricePrecision ?? 2) : 2)
+      const name = script.title || instance.name
+      const legend = (indicator: { result?: Array<Record<string, number | undefined>> }, dataIndex: number | undefined) => ({
+        name,
+        calcParamsText: instance.inputs.length > 0 ? ` ${(instance.inputs.length ? instance.inputs : script.inputs.map((input) => input.defaultValue)).join(' ')}` : '',
+        features: [],
+        legends: extend.plots.map((plot, index) => {
+          const value = indicator.result?.[dataIndex ?? (indicator.result.length - 1)]?.[`p${index}`]
+          return { title: { text: `${plot.title}: `, color: plot.color }, value: { text: value === undefined ? '—' : value.toFixed(precision), color: plot.color } }
+        }),
+      })
+      const config = {
+        name: SCRIPT_INDICATOR_NAME,
+        visible: instance.visible,
+        precision,
+        extendData: extend,
+        styles: { lines: Array.from({ length: 8 }, (_, index) => ({ color: extend.plots[index]?.color ?? 'transparent', size: extend.plots[index]?.width ?? 1.5 })) },
+        createTooltipDataSource: script.overlay
+          ? () => HIDDEN_INDICATOR_TOOLTIP
+          : ({ indicator, crosshair }: { indicator: { result?: Array<Record<string, number | undefined>> }, crosshair: { dataIndex?: number } }) => legend(indicator, crosshair.dataIndex),
+      }
+      const existing = this.#scriptIds.get(instance.id)
+      if (existing) {
+        this.#chart.overrideIndicator({ id: existing.indicatorId, ...config } as never)
+        existing.extend = extend
+        continue
+      }
+      const paneId = script.overlay ? 'candle_pane' : `trade-horizon:script:${instance.id}`
+      const created = this.#chart.createIndicator({ ...config, paneId } as never, script.overlay)
+      if (!created) continue
+      this.#scriptIds.set(instance.id, { indicatorId: created, overlay: script.overlay, extend })
+      if (!script.overlay) this.#chart.setPaneOptions({ id: paneId, height: 120, minHeight: 64 })
+    }
+  }
+
+  /** A script's plots at a candle (the newest when `index` is undefined), for the legend of scripts on the candles. */
+  public scriptValuesAt(instanceId: string, index?: number): Array<{ title: string, color: string, value?: number }> {
+    const entry = this.#scriptIds.get(instanceId)
+    if (!entry || this.#disposed) return []
+    const at = index ?? this.#chart.getDataList().length - 1
+    const indicator = this.#chart.getIndicators({ id: entry.indicatorId })[0] as { result?: Array<Record<string, number | undefined>> } | undefined
+    const row = indicator?.result?.[at]
+    return entry.extend.plots.map((plot, plotIndex) => ({ title: plot.title, color: plot.color, value: row?.[`p${plotIndex}`] }))
   }
 
   #applyCompare(symbols: readonly string[]): void {
@@ -2601,7 +2680,7 @@ export class KLineChartController {
       styles: {
         // A drawing in a multi-selection is drawn a little thicker, so the group can be seen.
         line: { color, size: lineWidth + (this.#multiSelection.has(id) ? 1.5 : 0), style: lineStyle, dashedValue: [6, 4] },
-        fibLevels: type === 'fibRetracement' ? fibLevels(style).join(',') : '',
+        fibConfig: type === 'fibRetracement' ? JSON.stringify(fibSettings(style)) : '',
         rect: {
           // "No color" for a rectangle's line: fill only (a zero-width border would still be drawn 1px wide).
           style: style.noBorder === true ? 'fill' : 'stroke_fill',

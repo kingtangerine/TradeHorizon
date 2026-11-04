@@ -1,10 +1,10 @@
 import { useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { INTERVAL_GROUPS, INTERVAL_GROUP_LABELS, MAX_FIB_LEVELS, fibLevels, hiddenGroups } from '../chart/drawingVisibility'
+import { INTERVAL_GROUPS, INTERVAL_GROUP_LABELS, MAX_FIB_ROWS, TV_FIB_ROWS, fibLevelText, fibSettings, hiddenGroups, type FibLevelRow } from '../chart/drawingVisibility'
 import { zonedInputToTime } from '../chart/dateRanges'
 import { localTime } from '../chart/timeAxis'
 import { DRAWING_TOOLS } from '../chart/tools'
-import { isDecimalPrice, type Anchor, type Drawing, type DrawingUpdate } from '../drawings'
+import { isDecimalPrice, type Anchor, type Drawing, type DrawingUpdate, type JsonValue } from '../drawings'
 import { ColorPicker } from './ColorPicker'
 import { CloseIcon } from './Icons'
 
@@ -47,7 +47,7 @@ function timeInput(ms: number, timeZone: string): string {
 }
 
 /** Tools with a fill colour and opacity. */
-const FILLED = new Set<Drawing['type']>(['rectangle', 'fibRetracement', 'ellipse', 'parallelChannel', 'pitchfork', 'dateRange'])
+const FILLED = new Set<Drawing['type']>(['rectangle', 'ellipse', 'parallelChannel', 'pitchfork', 'dateRange'])
 
 const text = (value: unknown, fallback: string) => (typeof value === 'string' ? value : fallback)
 const num = (value: unknown, fallback: number) => (typeof value === 'number' && Number.isFinite(value) ? value : fallback)
@@ -56,7 +56,7 @@ export function DrawingSettingsDialog({ drawing, timeZone, pricePrecision, initi
   const [tab, setTab] = useState<DrawingSettingsTab>(initialTab)
   const tool = DRAWING_TOOLS[drawing.type]
   const style = drawing.style
-  const setStyle = (changes: Record<string, string | number | boolean | readonly string[] | readonly number[] | null>) => onUpdate({ style: { ...style, ...changes } })
+  const setStyle = (changes: Record<string, JsonValue>) => onUpdate({ style: { ...style, ...changes } })
   const position = drawing.type === 'longPosition' || drawing.type === 'shortPosition'
 
   useEffect(() => {
@@ -118,12 +118,10 @@ export function DrawingSettingsDialog({ drawing, timeZone, pricePrecision, initi
 function StyleTab({ drawing, position, setStyle }: {
   drawing: Drawing
   position: boolean
-  setStyle(changes: Record<string, string | number | boolean | readonly string[] | readonly number[] | null>): void
+  setStyle(changes: Record<string, JsonValue>): void
 }) {
   const style = drawing.style
   const type = drawing.type
-  const [levelDraft, setLevelDraft] = useState('')
-  const levels = fibLevels(style)
   return (
     <>
       {position ? (
@@ -195,38 +193,85 @@ function StyleTab({ drawing, position, setStyle }: {
               </label>
             </>
           )}
-          {type === 'fibRetracement' && (
-            <>
-              <h4>Levels</h4>
-              <div className="fib-levels">
-                {levels.map((level) => (
-                  <span className="fib-level" key={level}>
-                    {level}
-                    <button type="button" aria-label={`Remove level ${level}`} disabled={levels.length <= 1} onClick={() => setStyle({ fibLevels: levels.filter((item) => item !== level) })}>×</button>
-                  </span>
-                ))}
-              </div>
-              <form
-                className="chart-settings-row"
-                onSubmit={(event) => {
-                  event.preventDefault()
-                  const value = Number(levelDraft)
-                  if (!Number.isFinite(value) || value < -5 || value > 10 || levels.length >= MAX_FIB_LEVELS) return
-                  setStyle({ fibLevels: [...levels, value] })
-                  setLevelDraft('')
-                }}
-              >
-                <span>Add level</span>
-                <span className="chart-settings-inline">
-                  <input className="study-input" type="number" step="0.001" placeholder="e.g. 2.618" value={levelDraft} onChange={(event) => setLevelDraft(event.target.value)} />
-                  <button type="submit" className="small-button">Add</button>
-                  <button type="button" className="small-button" onClick={() => setStyle({ fibLevels: null })}>Defaults</button>
-                </span>
-              </form>
-            </>
-          )}
+          {type === 'fibRetracement' && <FibSection style={style} setStyle={setStyle} />}
         </>
       )}
+    </>
+  )
+}
+
+/** Fibonacci retracement, as TradingView's Style tab: the level table (on, value, colour) and the line and label options. */
+function FibSection({ style, setStyle }: { style: Drawing['style'], setStyle(changes: Record<string, JsonValue>): void }) {
+  const settings = fibSettings(style)
+  const setRows = (rows: readonly FibLevelRow[]) => setStyle({ fibRows: rows.map((row) => ({ v: row.v, c: row.c, on: row.on })) })
+  const updateRow = (index: number, patch: Partial<FibLevelRow>) => setRows(settings.rows.map((row, position) => (position === index ? { ...row, ...patch } : row)))
+  const toggle = (key: string, label: string, value: boolean) => (
+    <label className="chart-settings-row">
+      <span>{label}</span>
+      <input type="checkbox" checked={value} onChange={(event) => setStyle({ [key]: event.target.checked })} />
+    </label>
+  )
+  return (
+    <>
+      {toggle('fibTrend', 'Trend line', settings.trend)}
+      <h4>Levels</h4>
+      <div className="fib-grid">
+        {settings.rows.map((row, index) => (
+          <div className={row.on ? 'fib-row' : 'fib-row off'} key={`${index}-${row.v}`}>
+            <input type="checkbox" checked={row.on} aria-label={`Show level ${row.v}`} onChange={(event) => updateRow(index, { on: event.target.checked })} />
+            <input
+              type="number"
+              step="0.001"
+              className="fib-value"
+              defaultValue={row.v}
+              aria-label="Level"
+              onBlur={(event) => { const value = Number(event.target.value); if (Number.isFinite(value) && value >= -5 && value <= 10 && value !== row.v) updateRow(index, { v: value }) }}
+              onKeyDown={(event) => { if (event.key === 'Enter') (event.target as HTMLInputElement).blur() }}
+            />
+            <ColorPicker label={`Colour of level ${row.v}`} value={settings.oneColor ?? row.c} onChange={(color) => updateRow(index, { c: color })} />
+            <button type="button" className="fib-remove" aria-label={`Remove level ${row.v}`} disabled={settings.rows.length <= 1} onClick={() => setRows(settings.rows.filter((_, position) => position !== index))}>×</button>
+          </div>
+        ))}
+      </div>
+      <div className="chart-settings-inline fib-actions">
+        <button type="button" className="small-button" disabled={settings.rows.length >= MAX_FIB_ROWS} onClick={() => setRows([...settings.rows, { v: Math.max(0, ...settings.rows.map((row) => row.v)) + 0.5, c: '#2962ff', on: true }])}>Add level</button>
+        <button type="button" className="small-button" onClick={() => setRows(TV_FIB_ROWS)}>TradingView defaults</button>
+      </div>
+      <div className="chart-settings-row">
+        <span>Use one colour</span>
+        <span className="chart-settings-inline">
+          <input type="checkbox" checked={settings.oneColor !== null} onChange={(event) => setStyle({ fibOneColor: event.target.checked ? '#2962ff' : null })} />
+          {settings.oneColor && <ColorPicker label="Colour of all levels" value={settings.oneColor} onChange={(color) => setStyle({ fibOneColor: color })} />}
+        </span>
+      </div>
+      <h4>Lines</h4>
+      {toggle('fibExtendLeft', 'Extend lines left', settings.extendLeft)}
+      {toggle('fibExtendRight', 'Extend lines right', settings.extendRight)}
+      <div className="chart-settings-row">
+        <span>Background</span>
+        <span className="chart-settings-inline">
+          <input type="checkbox" checked={settings.background} onChange={(event) => setStyle({ fibBackground: event.target.checked })} />
+          <input type="range" min="0" max="60" disabled={!settings.background} value={typeof style.fillOpacity === 'number' ? style.fillOpacity : 8} aria-label="Background opacity" onChange={(event) => setStyle({ fillOpacity: Number(event.target.value) })} />
+        </span>
+      </div>
+      {toggle('fibReverse', 'Reverse', settings.reverse)}
+      <h4>Labels</h4>
+      {toggle('fibPrices', 'Prices', settings.prices)}
+      {toggle('fibLevelsText', 'Levels', settings.levels)}
+      <label className="chart-settings-row">
+        <span>Levels as</span>
+        <select value={settings.percent ? 'percent' : 'values'} onChange={(event) => setStyle({ fibPercent: event.target.value === 'percent' })}>
+          <option value="values">Values ({fibLevelText(0.618, false)})</option>
+          <option value="percent">Percents ({fibLevelText(0.618, true)})</option>
+        </select>
+      </label>
+      <label className="chart-settings-row">
+        <span>Labels on the</span>
+        <select value={settings.labelSide} onChange={(event) => setStyle({ fibLabelSide: event.target.value })}>
+          <option value="left">Left</option>
+          <option value="right">Right</option>
+        </select>
+      </label>
     </>
   )
 }
