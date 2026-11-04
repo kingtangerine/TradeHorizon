@@ -1,8 +1,24 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import type { CryptoMarket } from '../chart/markets'
+import { displaySymbol, type CryptoMarket } from '../chart/markets'
 import { CloseIcon, SearchIcon } from './Icons'
 
 const CATEGORIES = ['All', 'Spot', 'Futures', 'Indices'] as const
+
+/** TradingView's "All sources" filter. */
+const SOURCES = [
+  { value: 'all', label: 'All sources' },
+  { value: 'binance', label: 'Binance' },
+  { value: 'bybit', label: 'Bybit' },
+  { value: 'okx', label: 'OKX' },
+  { value: 'bitget', label: 'Bitget' },
+  { value: 'gate', label: 'Gate' },
+] as const
+type Source = (typeof SOURCES)[number]['value']
+
+/** Only the best matches are drawn: the whole catalog has about ten thousand pairs. */
+const MAX_ROWS = 150
+
+const sourceOf = (item: CryptoMarket): string => item.exchange.replace('-futures', '')
 
 interface SymbolSearchProps {
   markets: readonly CryptoMarket[]
@@ -14,7 +30,8 @@ interface SymbolSearchProps {
 }
 
 function matchRank(item: CryptoMarket, needle: string): number {
-  const symbol = item.symbol.toLowerCase()
+  // "bybit:btc" searches that exchange's symbol; otherwise the symbol is compared without its exchange prefix.
+  const symbol = (needle.includes(':') ? item.symbol : displaySymbol(item.symbol)).toLowerCase()
   const base = item.baseAsset.toLowerCase()
   const name = item.name.toLowerCase().replace(/[\s/]+/g, '')
   if (symbol === needle) return 0
@@ -47,10 +64,12 @@ export function SymbolSearch({ markets, current, onSelect, onClose, initialQuery
   const [query, setQuery] = useState(initialQuery ?? current.symbol)
   const [category, setCategory] = useState<(typeof CATEGORIES)[number]>('All')
   const [highlight, setHighlight] = useState(0)
+  const [source, setSource] = useState<Source>('all')
   const inputRef = useRef<HTMLInputElement>(null)
   const results = useMemo(() => matchMarkets(query, markets).filter((item) => (
-    category === 'All' || (category === 'Spot' ? item.kind === 'spot' : category === 'Futures' ? item.kind === 'futures' : item.kind === 'dominance')
-  )), [query, markets, category])
+    (category === 'All' || (category === 'Spot' ? item.kind === 'spot' : category === 'Futures' ? item.kind === 'futures' : item.kind === 'dominance')) &&
+    (source === 'all' || (item.kind !== 'dominance' && sourceOf(item) === source))
+  )).slice(0, MAX_ROWS), [query, markets, category, source])
   const activeIndex = Math.min(highlight, Math.max(0, results.length - 1))
 
   useEffect(() => {
@@ -131,6 +150,14 @@ export function SymbolSearch({ markets, current, onSelect, onClose, initialQuery
               {item}
             </button>
           ))}
+          <select
+            className="symbol-search-source"
+            value={source}
+            aria-label="Exchange"
+            onChange={(event) => { setSource(event.target.value as Source); setHighlight(0); if (query === current.symbol) setQuery('') }}
+          >
+            {SOURCES.map((item) => <option value={item.value} key={item.value}>{item.label}</option>)}
+          </select>
         </div>
 
         <div className="symbol-search-list" role="listbox" aria-label="Symbols">
@@ -145,9 +172,10 @@ export function SymbolSearch({ markets, current, onSelect, onClose, initialQuery
               onClick={() => onSelect(item)}
             >
               <span className="symbol-row-badge" style={{ background: badgeColor(item) }}>{item.mark}</span>
-              <strong>{item.symbol}</strong>
+              <strong>{displaySymbol(item.symbol)}</strong>
               <span className="symbol-row-name">{item.kind === 'spot' ? `${item.name} / ${item.quoteAsset === 'BTC' ? 'Bitcoin' : 'TetherUS'}` : item.name}</span>
-              <small>{item.kind === 'spot' ? `${item.venue.toLowerCase()} spot` : item.kind === 'futures' ? 'perpetual · futures' : 'index · estimated'}</small>
+              <small>{item.kind === 'spot' ? 'spot' : item.kind === 'futures' ? 'perpetual' : 'index · estimated'}</small>
+              {item.kind !== 'dominance' && <em className={`symbol-row-venue venue-${sourceOf(item)}`}>{sourceOf(item).toUpperCase()}</em>}
             </button>
           ))}
           {results.length === 0 && (

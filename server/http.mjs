@@ -89,6 +89,7 @@ const CSP = [
   [
     "connect-src 'self'",
     'https://data-api.binance.vision', 'https://fapi.binance.com', 'https://api.bybit.com', 'https://api.coingecko.com',
+    'https://www.okx.com', 'https://api.bitget.com', 'https://api.gateio.ws',
     'wss://data-stream.binance.vision', 'wss://fstream.binance.com', 'wss://stream.bybit.com',
   ].join(' '),
   "worker-src 'self'",

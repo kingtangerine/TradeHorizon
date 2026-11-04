@@ -16,6 +16,7 @@ import { VOLUME_OVERLAY_NAME, registerVolumeOverlay } from './volumeOverlay'
 import { BASELINE_NAME, HEIKIN_ASHI_NAME, registerSeriesOverlays } from './seriesOverlay'
 import { registerStudyIndicators, studyIndicatorName } from './studyIndicators'
 import { exchangeSymbol } from '../market/binance/futures'
+import { fetchMarketKlines, subscribeMarketKlines } from '../market/sources'
 import { COMPARE_INDICATOR_NAME, registerCompareOverlay, type CompareSeries } from './compareOverlay'
 import { registerWave3Overlays } from './overlaysWave3'
 import { COMPARE_COLORS, compareChange, scaledCompare } from './compare'
@@ -39,15 +40,9 @@ import {
   type DrawingStore,
 } from '../drawings'
 import {
-  BinanceKlineSubscription,
-  BINANCE_FUTURES_REST_ENDPOINT,
-  BINANCE_FUTURES_WS_ENDPOINT,
-  BybitKlineSubscription,
-  fetchBybitKlines,
   LatestBinanceKlinesLoader,
   MARKET_INTERVAL_SPECS,
   StaleMarketDataRequestError,
-  fetchBinanceKlines,
   type Candle,
   type DominanceRow,
   type FetchBinanceKlinesOptions,
@@ -747,10 +742,7 @@ export class KLineChartController {
           this.#patchRuntime({ error: error.message })
         },
       }
-      const exchange = this.#market.exchange
-      this.#stream = exchange === 'bybit'
-        ? new BybitKlineSubscription(streamOptions)
-        : new BinanceKlineSubscription(exchange === 'binance-futures' ? { ...streamOptions, endpoint: BINANCE_FUTURES_WS_ENDPOINT } : streamOptions)
+      this.#stream = subscribeMarketKlines(this.#market, streamOptions)
     },
 
     unsubscribeBar: () => {
@@ -1483,8 +1475,7 @@ export class KLineChartController {
   }
 
   #fetchKlinesFor(market: CompareMarket, options: FetchBinanceKlinesOptions): Promise<Candle[]> {
-    if (market.exchange === 'bybit') return fetchBybitKlines(options)
-    return fetchBinanceKlines(market.exchange === 'binance-futures' ? { ...options, endpoint: BINANCE_FUTURES_REST_ENDPOINT } : options)
+    return fetchMarketKlines(market, options)
   }
 
   /** The automatic price range widened to fit the visible part of the compare lines. */
@@ -2387,9 +2378,7 @@ export class KLineChartController {
 
   /** Candle history from the exchange this market trades on. */
   #fetchKlines(options: FetchBinanceKlinesOptions): Promise<Candle[]> {
-    const { exchange } = this.#market
-    if (exchange === 'bybit') return fetchBybitKlines(options)
-    return fetchBinanceKlines(exchange === 'binance-futures' ? { ...options, endpoint: BINANCE_FUTURES_REST_ENDPOINT } : options)
+    return fetchMarketKlines(this.#market, options)
   }
 
   async #backfillAfterReconnect(

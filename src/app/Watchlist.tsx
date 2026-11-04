@@ -187,7 +187,7 @@ export function Watchlist({ state, findMarket, currentSymbol, onState, onOpen, o
               />
               <span className="watchlist-symbol">
                 <strong>{market?.pair ?? item.symbol}</strong>
-                <small>{market?.name ?? 'Unavailable'}</small>
+                <small>{market ? `${market.name}${market.exchange !== 'binance' && market.exchange !== 'binance-futures' && market.kind !== 'dominance' ? ` · ${market.venue}` : ''}` : 'Unavailable'}</small>
               </span>
               <span className="watchlist-last num">{quote ? formatPrice(quote.last, market) : '—'}</span>
               <span className={quote ? (up ? 'watchlist-change num price-up' : 'watchlist-change num price-down') : 'watchlist-change num'}>

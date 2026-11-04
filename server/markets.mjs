@@ -6,6 +6,7 @@ import { join } from 'node:path'
 const BINANCE_EXCHANGE_INFO = 'https://data-api.binance.vision/api/v3/exchangeInfo?showPermissionSets=false'
 const BYBIT_INSTRUMENTS = 'https://api.bybit.com/v5/market/instruments-info?category=spot&limit=1000'
 const BINANCE_FUTURES_INFO = 'https://fapi.binance.com/fapi/v1/exchangeInfo'
+import { fetchVenueListings } from './venues.mjs'
 const COINGECKO = {
   global: 'https://api.coingecko.com/api/v3/global',
   markets: 'https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&order=market_cap_desc&per_page=100&page=1',
@@ -112,6 +113,18 @@ export function parseBinanceFuturesListings(payload) {
   return listings.sort((a, b) => a.baseAsset.localeCompare(b.baseAsset))
 }
 
+/**
+ * The whole catalog, as TradingView lists a pair once per exchange: Binance first (plain symbols), then Binance
+ * perpetuals, Bybit (pairs Binance lacks keep their plain symbol, the others get "BYBIT:"), and the other exchanges.
+ */
+export function mergeAllListings(binance, bybit, binanceFutures, others) {
+  const seen = new Set(binance.map((item) => item.symbol))
+  const bybitSpot = bybit.map((item) => (seen.has(item.symbol) ? { ...item, symbol: `BYBIT:${item.symbol}`, apiSymbol: item.symbol } : item))
+  const all = [...binance, ...binanceFutures, ...bybitSpot, ...others]
+  const unique = new Set()
+  return all.filter((item) => (unique.has(item.symbol) ? false : (unique.add(item.symbol), true)))
+}
+
 /** Binance first; Bybit only adds pairs Binance does not list. */
 export function mergeListings(binance, bybit) {
   const seen = new Set(binance.map((item) => item.symbol))
@@ -126,7 +139,7 @@ export function createMarketService({ dataDir, fetchImpl = (url, init) => fetch(
 
   function setCatalog(next) {
     catalog = next
-    bySymbol = new Map(next.listings.map((item) => [item.symbol, item.exchange ?? 'binance']))
+    bySymbol = new Map(next.listings.map((item) => [item.symbol, item]))
   }
 
   if (existsSync(catalogFile)) {
@@ -152,7 +165,8 @@ export function createMarketService({ dataDir, fetchImpl = (url, init) => fetch(
         log.warn?.(`[markets] Binance futures list unavailable: ${error.message}`)
         return []
       })
-      const next = { fetchedAtMs: Date.now(), listings: [...mergeListings(binance, bybit), ...futures] }
+      const others = await fetchVenueListings(getJson, log)
+      const next = { fetchedAtMs: Date.now(), listings: mergeAllListings(binance, bybit, futures, others) }
       setCatalog(next)
       try {
         writeFileSync(`${catalogFile}.tmp`, JSON.stringify(next))
@@ -218,9 +232,15 @@ export function createMarketService({ dataDir, fetchImpl = (url, init) => fetch(
     /** Where a symbol trades, or undefined when it is not a listed pair (for example an index like BTC.D). */
     exchangeOf(symbol) {
       if (FUTURES_SYMBOLS.has(symbol)) return 'binance-futures'
-      // Perpetuals are named "XXXUSDT.P"; they trade on Binance Futures even before the catalog has loaded.
+      const listed = bySymbol.get(symbol)
+      if (listed) return listed.exchange ?? 'binance'
+      // Plain perpetuals ("XXXUSDT.P") trade on Binance Futures even before the catalog has loaded.
       if (typeof symbol === 'string' && symbol.endsWith('.P') && SYMBOL.test(symbol.slice(0, -2))) return 'binance-futures'
-      return bySymbol.get(symbol)
+      return undefined
+    },
+    /** The exchange's own symbol for one of ours ("OKX:BTCUSDT" -> "BTC-USDT", "BYBIT:SOLUSDT.P" -> "SOLUSDT"). */
+    apiSymbolOf(symbol) {
+      return bySymbol.get(symbol)?.apiSymbol ?? String(symbol).replace(/^[A-Z]+:/, '').replace(/\.P$/, '')
     },
     coingecko,
   }

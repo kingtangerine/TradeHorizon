@@ -124,6 +124,7 @@ const alerts = createAlertService({
     setAlertsValue: (userId, value) => { store.data.store(userId, ALERTS_KEY, value) },
   },
   exchangeOf: (symbol) => markets.exchangeOf(symbol),
+  apiSymbolOf: (symbol) => markets.apiSymbolOf(symbol),
   // Every channel the user has set up; one failing channel never blocks the others.
   notify: async (userId, payload) => { await Promise.allSettled([push.send(userId, payload), telegram.send(userId, payload)]) },
 })

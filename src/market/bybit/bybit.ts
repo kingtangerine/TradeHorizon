@@ -10,6 +10,10 @@ import { marketIdFor, normalizeBinanceSpotSymbol, type Candle } from "../types";
 
 export const BYBIT_REST_ENDPOINT = "https://api.bybit.com/v5/market";
 export const BYBIT_WS_ENDPOINT = "wss://stream.bybit.com/v5/public/spot";
+export const BYBIT_LINEAR_WS_ENDPOINT = "wss://stream.bybit.com/v5/public/linear";
+
+/** Spot pairs, or USDT perpetuals ("linear" contracts). */
+export type BybitCategory = "spot" | "linear";
 
 const PAGE_LIMIT = 1000;
 const DAY_MS = 86_400_000;
@@ -80,9 +84,10 @@ async function fetchNativePage(
   range: { startTimeMs?: number; endTimeMs?: number },
   fetcher: MarketDataFetch,
   signal?: AbortSignal,
+  category: BybitCategory = "spot",
 ): Promise<Candle[]> {
   const url = new URL(`${BYBIT_REST_ENDPOINT}/kline`);
-  url.searchParams.set("category", "spot");
+  url.searchParams.set("category", category);
   url.searchParams.set("symbol", symbol);
   url.searchParams.set("interval", NATIVE_INTERVALS[interval] as string);
   url.searchParams.set("limit", String(limit));
@@ -120,7 +125,7 @@ function aggregate(base: readonly Candle[], interval: MarketInterval, spanMs: nu
 
 /** Same contract as fetchBinanceKlines: ascending candles, at most `limit`, ending at endTimeMs when given. */
 export async function fetchBybitKlines(
-  options: FetchBinanceKlinesOptions,
+  options: FetchBinanceKlinesOptions & { category?: BybitCategory },
   fetcher: MarketDataFetch = (input, init) => globalThis.fetch(input, init),
 ): Promise<Candle[]> {
   const symbol = normalizeBinanceSpotSymbol(options.symbol ?? "");
@@ -128,7 +133,7 @@ export async function fetchBybitKlines(
   const aggregated = AGGREGATED[options.interval];
 
   if (!aggregated) {
-    return fetchNativePage(symbol, options.interval, limit, { startTimeMs: options.startTimeMs, endTimeMs: options.endTimeMs }, fetcher, options.signal);
+    return fetchNativePage(symbol, options.interval, limit, { startTimeMs: options.startTimeMs, endTimeMs: options.endTimeMs }, fetcher, options.signal, options.category);
   }
 
   // Page the base interval backwards until enough candles exist for `limit` whole aggregated bars.
@@ -136,7 +141,7 @@ export async function fetchBybitKlines(
   let base: Candle[] = [];
   let endTimeMs = options.endTimeMs;
   while (base.length < wanted) {
-    const page = await fetchNativePage(symbol, aggregated.base, PAGE_LIMIT, { endTimeMs }, fetcher, options.signal);
+    const page = await fetchNativePage(symbol, aggregated.base, PAGE_LIMIT, { endTimeMs }, fetcher, options.signal, options.category);
     if (page.length === 0) break;
     base = [...page, ...base];
     if (page.length < PAGE_LIMIT) break;
@@ -185,6 +190,7 @@ export function parseBybitInstruments(payload: unknown): BinanceSpotListing[] {
 
 export interface BybitKlineSubscriptionOptions {
   symbol: string;
+  category?: BybitCategory;
   interval: MarketInterval;
   onCandle(candle: Candle): void;
   onStatus?(status: KlineStreamStatus): void;
@@ -258,7 +264,7 @@ export class BybitKlineSubscription {
     const tick = async (): Promise<void> => {
       if (!this.#active || generation !== this.#generation) return;
       try {
-        const candles = await fetchBybitKlines({ symbol: this.symbol, interval: this.interval, limit: 2 });
+        const candles = await fetchBybitKlines({ symbol: this.symbol, interval: this.interval, limit: 2, category: this.#options.category });
         if (!this.#active || generation !== this.#generation) return;
         if (this.#attempt !== 0 || this.#timer === undefined) this.#status("open");
         this.#attempt = 0;
@@ -276,7 +282,7 @@ export class BybitKlineSubscription {
     const generation = this.#generation;
     if (!this.#active) return;
     this.#status(this.#attempt === 0 ? "connecting" : "reconnecting");
-    const socket = new WebSocket(BYBIT_WS_ENDPOINT);
+    const socket = new WebSocket(this.#options.category === "linear" ? BYBIT_LINEAR_WS_ENDPOINT : BYBIT_WS_ENDPOINT);
     this.#socket = socket;
     const topic = `kline.${NATIVE_INTERVALS[this.interval]}.${this.symbol}`;
     const current = () => this.#active && generation === this.#generation && this.#socket === socket;

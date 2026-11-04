@@ -8,6 +8,7 @@ import {
   type BinanceSpotListing,
   type MarketDataFetch,
 } from '../market'
+import type { ExchangeId } from '../market/sources'
 
 export interface CryptoMarket {
   readonly symbol: string
@@ -20,7 +21,9 @@ export interface CryptoMarket {
   /** Stable key for drawings and alerts. */
   readonly marketId: string
   /** Exchange that serves candles for this market. */
-  readonly exchange: 'binance' | 'bybit' | 'binance-futures'
+  readonly exchange: ExchangeId
+  /** The exchange's own symbol when it differs from ours (BTC-USDT on OKX, BTC_USDT on Gate). */
+  readonly apiSymbol?: string
   /** Spot pair, or a market-wide dominance index built from CoinGecko data. */
   readonly kind: 'spot' | 'futures' | 'dominance'
   /** Which engine-built index a `dominance` market shows. */
@@ -150,45 +153,48 @@ const COIN_NAMES: Readonly<Record<string, string>> = {
 const registry = new Map<string, CryptoMarket>(
   [...CRYPTO_MARKETS, BTCDOM_MARKET, ...DOMINANCE_MARKETS].map((item) => [item.symbol, item]),
 )
-// v4: the catalog includes Binance USDT-M perpetuals ("BTCUSDT.P").
-const CATALOG_CACHE_KEY = 'trade-horizon:markets:v4'
+// v5: every exchange (Binance, Bybit, OKX, Bitget, Gate; spot and perpetuals), stored compactly: ~10,000 pairs.
+const CATALOG_CACHE_KEY = 'trade-horizon:markets:v5'
 const CATALOG_TTL_MS = 12 * 60 * 60 * 1000
 let cacheRestored = false
 
+/** Exchange names as the symbol search and the chart show them. */
+export const VENUE_NAMES: Readonly<Record<ExchangeId, string>> = {
+  binance: 'Binance', 'binance-futures': 'Binance Futures',
+  bybit: 'Bybit', 'bybit-futures': 'Bybit Futures',
+  okx: 'OKX', 'okx-futures': 'OKX Futures',
+  bitget: 'Bitget', 'bitget-futures': 'Bitget Futures',
+  gate: 'Gate', 'gate-futures': 'Gate Futures',
+}
+
+/** The symbol without our exchange prefix ("BYBIT:BTCUSDT.P" -> "BTCUSDT.P"), as TradingView shows it next to the exchange. */
+export function displaySymbol(symbol: string): string {
+  return symbol.replace(/^[A-Z]+:/, '')
+}
+
 function marketFromListing(listing: BinanceSpotListing): CryptoMarket {
   const exchange = listing.exchange ?? 'binance'
-  if (exchange === 'binance-futures') {
-    const plain = exchangeSymbol(listing.symbol)
-    // Same name and badge as the coin's spot pair (Bitcoin, ₿) when there is one.
-    const spot = registry.get(`${listing.baseAsset}USDT`)
-    return {
-      symbol: listing.symbol,
-      baseAsset: listing.baseAsset,
-      name: `${spot?.name ?? COIN_NAMES[listing.baseAsset] ?? listing.baseAsset} perpetual`,
-      mark: spot?.mark ?? listing.baseAsset.charAt(0),
-      pricePrecision: listing.pricePrecision,
-      volumePrecision: listing.volumePrecision,
-      quoteAsset: 'USDT',
-      marketId: `binance:futures:${plain}`,
-      exchange,
-      kind: 'futures',
-      venue: 'Binance Futures',
-      pair: `${listing.baseAsset} / USDT.P`,
-    }
-  }
+  const futures = exchange.endsWith('-futures')
+  const quote = listing.quoteAsset ?? 'USDT'
+  // The same name and badge as the coin's Binance pair (Bitcoin, ₿) when there is one.
+  const known = registry.get(`${listing.baseAsset}USDT`)
+  const name = known?.name ?? COIN_NAMES[listing.baseAsset] ?? listing.baseAsset
+  // ids keep the shape older data uses: binance:spot:BTCUSDT, binance:futures:BTCUSDT, bybit:spot:ZETAUSDT …
+  const core = exchangeSymbol(displaySymbol(listing.symbol))
   return {
     symbol: listing.symbol,
     baseAsset: listing.baseAsset,
-    name: COIN_NAMES[listing.baseAsset] ?? listing.baseAsset,
-    mark: listing.baseAsset.charAt(0),
+    name: futures ? `${name} perpetual` : name,
+    mark: known?.mark ?? listing.baseAsset.charAt(0),
     pricePrecision: listing.pricePrecision,
     volumePrecision: listing.volumePrecision,
-    quoteAsset: listing.quoteAsset ?? 'USDT',
-    marketId: marketIdFor(listing.symbol, exchange),
+    quoteAsset: futures ? 'USDT' : quote,
+    marketId: `${exchange.replace('-futures', '')}:${futures ? 'futures' : 'spot'}:${core}`,
     exchange,
-    kind: 'spot',
-    venue: exchange === 'bybit' ? 'Bybit' : 'Binance',
-    pair: `${listing.baseAsset} / ${listing.quoteAsset ?? 'USDT'}`,
+    ...(listing.apiSymbol ? { apiSymbol: listing.apiSymbol } : {}),
+    kind: futures ? 'futures' : 'spot',
+    venue: VENUE_NAMES[exchange],
+    pair: futures ? `${listing.baseAsset} / USDT.P` : `${listing.baseAsset} / ${quote}`,
   }
 }
 
@@ -198,16 +204,34 @@ function registerListings(listings: readonly BinanceSpotListing[]): void {
   }
 }
 
+/** Listings as short arrays in the local cache, so ten thousand pairs stay well under the storage limit. */
+type PackedListing = [string, string, number, number, string?, string?, string?]
+
+function packListing(listing: BinanceSpotListing): PackedListing {
+  return [listing.symbol, listing.baseAsset, listing.pricePrecision, listing.volumePrecision, listing.exchange ?? '', listing.quoteAsset ?? '', listing.apiSymbol ?? '']
+}
+
+function unpackListing(value: unknown): unknown {
+  if (!Array.isArray(value)) return null
+  const [symbol, baseAsset, pricePrecision, volumePrecision, exchange, quoteAsset, apiSymbol] = value as PackedListing
+  return {
+    symbol, baseAsset, pricePrecision, volumePrecision,
+    ...(exchange ? { exchange } : {}),
+    ...(quoteAsset ? { quoteAsset } : {}),
+    ...(apiSymbol ? { apiSymbol } : {}),
+  }
+}
+
 function readCatalogCache(): { fetchedAtMs: number; listings: BinanceSpotListing[] } | null {
   try {
     const value = JSON.parse(localStorage.getItem(CATALOG_CACHE_KEY) ?? 'null') as {
       fetchedAtMs?: unknown
-      listings?: unknown
+      compact?: unknown
     } | null
-    if (!value || typeof value.fetchedAtMs !== 'number' || !Array.isArray(value.listings)) return null
-    const listings = value.listings.filter((item): item is BinanceSpotListing => (
+    if (!value || typeof value.fetchedAtMs !== 'number' || !Array.isArray(value.compact)) return null
+    const listings = value.compact.map(unpackListing).filter((item): item is BinanceSpotListing => (
       typeof item === 'object' && item !== null &&
-      /^[A-Z0-9]{2,30}(\.P)?$/.test((item as BinanceSpotListing).symbol) &&
+      /^([A-Z]+:)?[A-Z0-9_-]{2,40}(\.P)?$/.test((item as BinanceSpotListing).symbol) &&
       typeof (item as BinanceSpotListing).baseAsset === 'string' &&
       Number.isInteger((item as BinanceSpotListing).pricePrecision) &&
       Number.isInteger((item as BinanceSpotListing).volumePrecision)
@@ -250,7 +274,7 @@ async function fetchServerCatalog(fetcher: MarketDataFetch | undefined, signal?:
 function isListing(item: unknown): item is BinanceSpotListing {
   const value = item as BinanceSpotListing | null
   return typeof value === 'object' && value !== null &&
-    /^[A-Z0-9]{2,30}(\.P)?$/.test(value.symbol) && typeof value.baseAsset === 'string' &&
+    /^([A-Z]+:)?[A-Z0-9_-]{2,40}(\.P)?$/.test(value.symbol) && typeof value.baseAsset === 'string' &&
     Number.isInteger(value.pricePrecision) && Number.isInteger(value.volumePrecision)
 }
 
@@ -277,7 +301,7 @@ export async function refreshMarketCatalog(
   }
   registerListings(listings)
   try {
-    localStorage.setItem(CATALOG_CACHE_KEY, JSON.stringify({ fetchedAtMs: nowMs, listings }))
+    localStorage.setItem(CATALOG_CACHE_KEY, JSON.stringify({ fetchedAtMs: nowMs, compact: listings.map(packListing) }))
   } catch {
     // The list still works for this session if storage is full or unavailable.
   }

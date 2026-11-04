@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [0.27.0] - 2026-11-04
+
+### Added
+- **More exchanges, as TradingView shows them**: symbol search lists a pair once per exchange: Binance, Bybit, OKX, Bitget and Gate, each with spot and USDT perpetuals.
+  - The exchange is shown on every row. An **All sources** menu narrows the list to one exchange.
+  - The coin list grew from about 770 coins to about 3,000 (7,700 pairs). For example, SWARMSUSDT is now there on Gate (spot and perpetual) as well as Binance (perpetual).
+  - Charts, live prices, watchlist prices, compare and alerts work on every exchange; the server checks alerts there too.
+  - Timeframes an exchange does not have are built from shorter candles (8h on OKX, weeks on Gate futures …).
+- The toolbar, the watchlist and the alerts panel show which exchange a symbol is from when it is not Binance.
+
+### Changed
+- Bybit pairs that Binance also lists are now in the list too, as `BYBIT:…`. Bybit-only pairs keep their names, so existing charts, drawings and alerts are unaffected.
+- The coin list is cached in a compact form, so the larger list fits in the browser's storage.
 ## [0.26.0] - 2026-11-03
 
 Closer to TradingView, part 3.

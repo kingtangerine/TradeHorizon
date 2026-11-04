@@ -10,7 +10,7 @@ import {
 } from 'react'
 import { DISPLAY_INTERVALS } from '../chart/intervals'
 import type { KLineChartController } from '../chart/KLineChartController'
-import { allMarkets, getMarket, refreshMarketCatalog } from '../chart/markets'
+import { allMarkets, getMarket, refreshMarketCatalog, displaySymbol } from '../chart/markets'
 import type { ChartRuntimeState } from '../chart/types'
 import {
   DrawingStore,
@@ -227,7 +227,7 @@ function announceAlerts(items: ReadonlyArray<{ symbol: string, targetPrice: numb
   }
   for (const item of items) {
     if ('Notification' in globalThis && Notification.permission === 'granted') {
-      new Notification(`${item.symbol} price alert`, {
+      new Notification(`${displaySymbol(item.symbol)} price alert`, {
         body: `Price reached ${(item.price ?? item.targetPrice).toLocaleString()} (target ${item.targetPrice.toLocaleString()}).`,
       })
     }
@@ -1355,7 +1355,8 @@ function WorkspaceApp({ user, onLogout, onUserRefresh }: WorkspaceAppProps) {
           onClick={() => setSymbolSearch('change')}
         >
           <span className="asset-badge">{market.mark}</span>
-          <strong>{market.symbol}</strong>
+          <strong>{displaySymbol(market.symbol)}</strong>
+          {market.kind !== 'dominance' && market.exchange !== 'binance' && market.exchange !== 'binance-futures' && <small className="symbol-button-venue">{market.venue.replace(' Futures', '')}</small>}
         </button>
         <button
           type="button"
@@ -2413,7 +2414,7 @@ function WorkspaceApp({ user, onLogout, onUserRefresh }: WorkspaceAppProps) {
             <div className="object-market-row">
               <span className="object-market-symbol">{market.mark}</span>
               <div>
-                <strong>{market.symbol}</strong>
+                <strong>{displaySymbol(market.symbol)}</strong>
                 <span>{market.venue} {marketKindLabel(market)} · {interval}</span>
               </div>
             </div>

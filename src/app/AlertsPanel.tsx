@@ -44,7 +44,12 @@ const FORM_KINDS: Readonly<Record<FormKind, { label: string, condition: AlertCon
   moveDown: { label: 'Moving down %', condition: 'movePercent', direction: 'below' },
 }
 
-const shortSymbol = (symbol: string) => symbol.replace(/(USDT|USDC|FDUSD|BUSD)$/, '')
+/** "BYBIT:SOLUSDT.P" -> "BYBIT SOL.P": the coin, and the exchange when it is not Binance. */
+const shortSymbol = (symbol: string) => {
+  const exchange = /^([A-Z]+):/.exec(symbol)?.[1]
+  const coin = symbol.replace(/^[A-Z]+:/, '').replace(/(USDT|USDC|FDUSD|BUSD)(.P)?$/, '$2')
+  return exchange ? `${exchange} ${coin}` : coin
+}
 
 function formatTime(ms: number): string {
   const date = new Date(ms)

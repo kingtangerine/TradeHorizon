@@ -3722,3 +3722,16 @@ button:disabled {
 .tool-flyout button.active { color: var(--tv-blue, #2962ff); }
 .tool-flyout button svg { width: 18px; height: 18px; }
 .tool-flyout kbd { color: var(--muted); font: inherit; font-size: .72rem; }
+
+/* Symbol search: exchange of each row and the sources filter (TradingView) */
+.symbol-search-source { margin-left: auto; height: 28px; padding: 0 8px; border: 1px solid var(--border-strong); border-radius: 14px; color: var(--text); background: var(--bg); font: inherit; font-size: .76rem; }
+.symbol-row-venue { min-width: 54px; padding: 2px 6px; border-radius: 4px; color: var(--muted); background: var(--tv-hover, rgb(255 255 255 / 6%)); font-size: .66rem; font-style: normal; font-weight: 700; letter-spacing: .04em; text-align: center; }
+.symbol-row-venue.venue-binance { color: #f0b90b; }
+.symbol-row-venue.venue-bybit { color: #f7a600; }
+.symbol-row-venue.venue-okx { color: #d1d4dc; }
+.symbol-row-venue.venue-bitget { color: #00c8d7; }
+.symbol-row-venue.venue-gate { color: #2354e6; }
+.symbol-button-venue { margin-left: 4px; padding: 1px 5px; border-radius: 3px; color: var(--muted); background: var(--tv-hover, rgb(255 255 255 / 6%)); font-size: .64rem; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; }
+/* A fifth column for the exchange of each symbol row */
+.symbol-row { grid-template-columns: 24px 150px minmax(0, 1fr) auto 64px; }
+@media (max-width: 640px) { .symbol-row { grid-template-columns: 24px 96px minmax(0, 1fr) 56px; } }

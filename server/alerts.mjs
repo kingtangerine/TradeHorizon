@@ -10,6 +10,7 @@ import { join } from 'node:path'
 import webpush from 'web-push'
 import { createSendQueue } from './sendQueue.mjs'
 import { alertMessage, conditionMet, conditionOf, evaluateAlert, isExpired, isValidAlert } from './alertRules.mjs'
+import { VENUE_TICKERS } from './venues.mjs'
 
 export const ALERTS_KEY = 'alerts:v1'
 const POLL_MS = 10_000
@@ -85,7 +86,10 @@ async function getJson(url, fetchImpl) {
 }
 
 /** Latest prices for { exchange: symbols[] }. One failing exchange only drops its own symbols. */
-export async function fetchLastPrices(groups, fetchImpl = (url, init) => fetch(url, init)) {
+/** Our symbol -> the exchange's own one when nothing better is known ("BYBIT:BTCUSDT.P" -> "BTCUSDT"). */
+const plainApiSymbol = (symbol) => String(symbol).replace(/^[A-Z]+:/, '').replace(/\.P$/, '')
+
+export async function fetchLastPrices(groups, fetchImpl = (url, init) => fetch(url, init), apiSymbolOf = plainApiSymbol) {
   const prices = new Map()
   const jobs = []
   const binance = groups.binance ?? []
@@ -94,13 +98,25 @@ export async function fetchLastPrices(groups, fetchImpl = (url, init) => fetch(u
     jobs.push(getJson(`https://data-api.binance.vision/api/v3/ticker/price?symbols=${encodeURIComponent(JSON.stringify(chunk))}`, fetchImpl)
       .then((rows) => { for (const row of rows) prices.set(row.symbol, Number(row.price)) }))
   }
+  // The other exchanges: one ticker request per exchange covers every symbol watched there.
+  for (const [exchange, ticker] of Object.entries(VENUE_TICKERS)) {
+    const symbols = groups[exchange] ?? []
+    if (symbols.length === 0) continue
+    const wanted = new Map(symbols.map((symbol) => [apiSymbolOf(symbol), symbol]))
+    jobs.push(getJson(ticker.url, fetchImpl).then((payload) => {
+      for (const row of ticker.rows(payload) ?? []) {
+        const symbol = wanted.get(row?.[ticker.symbol])
+        if (symbol) prices.set(symbol, Number(row[ticker.price]))
+      }
+    }))
+  }
   for (const symbol of groups['binance-futures'] ?? []) {
     // Perpetuals are stored as "XXXUSDT.P"; Binance knows them without the suffix.
-    jobs.push(getJson(`https://fapi.binance.com/fapi/v1/ticker/price?symbol=${encodeURIComponent(symbol.replace(/\.P$/, ''))}`, fetchImpl)
+    jobs.push(getJson(`https://fapi.binance.com/fapi/v1/ticker/price?symbol=${encodeURIComponent(apiSymbolOf(symbol))}`, fetchImpl)
       .then((row) => { prices.set(symbol, Number(row.price)) }))
   }
   for (const symbol of groups.bybit ?? []) {
-    jobs.push(getJson(`https://api.bybit.com/v5/market/tickers?category=spot&symbol=${encodeURIComponent(symbol)}`, fetchImpl)
+    jobs.push(getJson(`https://api.bybit.com/v5/market/tickers?category=spot&symbol=${encodeURIComponent(apiSymbolOf(symbol))}`, fetchImpl)
       .then((payload) => { prices.set(symbol, Number(payload.result?.list?.[0]?.lastPrice)) }))
   }
   await Promise.allSettled(jobs)
@@ -114,7 +130,7 @@ export async function fetchLastPrices(groups, fetchImpl = (url, init) => fetch(u
  * @param notify     async (userId, payload) => void
  * @param feed       optional live price feed: { setSymbols({ exchange: symbols[] }) } (see priceFeed.mjs)
  */
-export function createAlertService({ store, exchangeOf, fetchPrices = fetchLastPrices, notify = async () => {}, feed, now = () => Date.now(), log = console }) {
+export function createAlertService({ store, exchangeOf, apiSymbolOf, fetchPrices = (groups) => fetchLastPrices(groups, undefined, apiSymbolOf), notify = async () => {}, feed, now = () => Date.now(), log = console }) {
   /** userId -> alerts that can still fire */
   const active = new Map()
   /** symbol -> last price seen */
@@ -158,7 +174,8 @@ export function createAlertService({ store, exchangeOf, fetchPrices = fetchLastP
     const key = JSON.stringify(Object.entries(groups).map(([exchange, symbols]) => [exchange, [...symbols].sort()]).sort())
     if (key !== watchedKey) {
       watchedKey = key
-      feed?.setSymbols(groups)
+      // The live feed reports plain symbols, so prefixed ones ("BYBIT:BTCUSDT") are left to polling.
+      feed?.setSymbols(Object.fromEntries(Object.entries(groups).map(([exchange, symbols]) => [exchange, symbols.filter((symbol) => !symbol.includes(':'))])))
     }
   }
 

@@ -195,7 +195,7 @@ export function ChartPane({
 
       <div className="chart-legend" aria-label="Current market and indicators">
         <LegendOhlc controller={controller} quote={quote} precision={market.pricePrecision} />
-        {market.kind === 'futures' && <FuturesStatsRow symbol={market.symbol} baseAsset={market.baseAsset} precision={market.pricePrecision} />}
+        {market.exchange === 'binance-futures' && <FuturesStatsRow symbol={market.symbol} baseAsset={market.baseAsset} precision={market.pricePrecision} />}
         {capShown && (
           <div
             className="chart-cap-row"

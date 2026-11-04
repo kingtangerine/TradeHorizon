@@ -1,6 +1,7 @@
 import { dominanceCandles, fetchDominancePage, loadDominanceWeights } from '../chart/dominance'
 import type { CryptoMarket } from '../chart/markets'
 import { exchangeSymbol } from '../market/binance/futures'
+import { POLLED_VENUES, fetchVenueQuotes, type PolledVenue } from '../market/venues'
 import type { WatchQuote } from './watchlists'
 
 // Latest price and 24h change for the watchlist. One request per exchange (or per symbol where
@@ -53,7 +54,7 @@ async function binanceFutures(symbols: readonly string[], signal?: AbortSignal):
 async function bybitSpot(symbols: readonly string[], signal?: AbortSignal): Promise<Quotes> {
   const quotes: Quotes = {}
   await Promise.all(symbols.map(async (symbol) => {
-    const payload = await getJson(`${BYBIT_TICKERS}?category=spot&symbol=${encodeURIComponent(symbol)}`, signal) as {
+    const payload = await getJson(`${BYBIT_TICKERS}?category=spot&symbol=${encodeURIComponent(exchangeSymbol(symbol.replace(/^BYBIT:/, '')))}`, signal) as {
       result?: { list?: Array<Record<string, unknown>> }
     }
     const row = payload.result?.list?.[0]
@@ -66,6 +67,28 @@ async function bybitSpot(symbols: readonly string[], signal?: AbortSignal): Prom
   return quotes
 }
 
+/** One ticker request per exchange covers every watched symbol there (Bybit perpetuals, OKX, Bitget, Gate). */
+async function venueQuotes(venue: 'bybit-futures' | PolledVenue, markets: readonly CryptoMarket[], signal?: AbortSignal): Promise<Quotes> {
+  if (markets.length === 0) return {}
+  const bySymbol = new Map(markets.map((market) => [market.apiSymbol ?? exchangeSymbol(market.symbol.replace(/^[A-Z]+:/, '')), market.symbol]))
+  const quotes: Quotes = {}
+  if (venue === 'bybit-futures') {
+    const payload = await getJson(`${BYBIT_TICKERS}?category=linear`, signal) as { result?: { list?: Array<Record<string, unknown>> } }
+    for (const row of payload.result?.list ?? []) {
+      const symbol = bySymbol.get(String(row.symbol))
+      const last = num(row.lastPrice)
+      const previous = num(row.prevPrice24h)
+      if (symbol && last !== undefined && previous !== undefined && previous > 0) quotes[symbol] = { last, change: last - previous, changePercent: ((last - previous) / previous) * 100 }
+    }
+    return quotes
+  }
+  for (const [apiSymbol, quote] of await fetchVenueQuotes(venue, signal)) {
+    const symbol = bySymbol.get(apiSymbol)
+    if (symbol) quotes[symbol] = quote
+  }
+  return quotes
+}
+
 /** Live quotes for exchange-traded symbols. A failing exchange only leaves its own symbols without a quote. */
 export async function fetchExchangeQuotes(markets: readonly CryptoMarket[], signal?: AbortSignal): Promise<Quotes> {
   const symbolsOn = (exchange: CryptoMarket['exchange']) => markets
@@ -75,6 +98,7 @@ export async function fetchExchangeQuotes(markets: readonly CryptoMarket[], sign
     binanceSpot(symbolsOn('binance'), signal),
     binanceFutures(symbolsOn('binance-futures'), signal),
     bybitSpot(symbolsOn('bybit'), signal),
+    ...(['bybit-futures', ...POLLED_VENUES] as const).map((venue) => venueQuotes(venue, markets.filter((market) => market.exchange === venue), signal)),
   ])
   return Object.assign({}, ...settled.map((result) => (result.status === 'fulfilled' ? result.value : {}))) as Quotes
 }
