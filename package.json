@@ -1,6 +1,7 @@
 {
   "name": "trade-horizon",
   "private": true,
+  "license": "UNLICENSED",
   "version": "0.28.0",
   "type": "module",
   "engines": {
