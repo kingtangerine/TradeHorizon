@@ -9,16 +9,40 @@ export class MarketDataParseError extends Error {
   }
 }
 
-/** Thrown when a market-data HTTP request gets a non-2xx response (used for every venue despite the Binance wording). */
+/** Exchange names by API host, so errors name the exchange that failed. Futures come first: they share binance.com. */
+const MARKET_SOURCES: ReadonlyArray<readonly [RegExp, string]> = [
+  [/(^|\.)fapi\.binance\.com$/, 'Binance Futures'],
+  [/(^|\.)binance\.(com|vision)$/, 'Binance'],
+  [/(^|\.)bybit\.com$/, 'Bybit'],
+  [/(^|\.)okx\.com$/, 'OKX'],
+  [/(^|\.)bitget\.com$/, 'Bitget'],
+  [/(^|\.)gateio\.ws$/, 'Gate'],
+]
+
+/** The exchange behind a market-data URL, e.g. "Bybit"; an unknown host is returned as is, and a malformed URL as "Market data". */
+export function marketSourceOf(url: string | URL): string {
+  let host: string
+  try {
+    host = new URL(url).hostname
+  } catch {
+    return 'Market data' // Not a URL we can read: say what failed without guessing an exchange.
+  }
+  return MARKET_SOURCES.find(([pattern]) => pattern.test(host))?.[1] ?? host
+}
+
+/** Thrown when a market-data HTTP request gets a non-2xx response; `source` names the exchange, read from the request URL. */
 export class MarketDataHttpError extends Error {
   readonly status: number
   readonly statusText: string
+  readonly source: string
 
-  constructor(status: number, statusText: string) {
-    super(`Binance market-data request failed (${status} ${statusText})`)
+  constructor(status: number, statusText: string, url: string | URL) {
+    const source = marketSourceOf(url)
+    super(`${source} market-data request failed (${status}${statusText ? ` ${statusText}` : ''})`)
     this.name = 'MarketDataHttpError'
     this.status = status
     this.statusText = statusText
+    this.source = source
   }
 }
 

@@ -76,7 +76,7 @@ export async function fetchBinanceKlines(options: FetchBinanceKlinesOptions, fet
   })
 
   if (!response.ok) {
-    throw new MarketDataHttpError(response.status, response.statusText)
+    throw new MarketDataHttpError(response.status, response.statusText, url)
   }
 
   const payload = (await response.json()) as unknown

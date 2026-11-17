@@ -61,7 +61,7 @@ export async function fetchBinanceFuturesListings(
   signal?: AbortSignal,
 ): Promise<BinanceSpotListing[]> {
   const response = await fetcher(new URL(BINANCE_FUTURES_EXCHANGE_INFO), { method: 'GET', headers: { Accept: 'application/json' }, signal })
-  if (!response.ok) throw new MarketDataHttpError(response.status, response.statusText)
+  if (!response.ok) throw new MarketDataHttpError(response.status, response.statusText, BINANCE_FUTURES_EXCHANGE_INFO)
   return parseBinanceFuturesListings(await response.json())
 }
 
@@ -83,7 +83,7 @@ export async function fetchFuturesStats(symbol: string, signal?: AbortSignal): P
   const plain = encodeURIComponent(exchangeSymbol(symbol))
   const [premium, interest] = await Promise.all([
     globalThis.fetch(`${PREMIUM_INDEX}?symbol=${plain}`, { signal }).then((response) => {
-      if (!response.ok) throw new MarketDataHttpError(response.status, response.statusText)
+      if (!response.ok) throw new MarketDataHttpError(response.status, response.statusText, PREMIUM_INDEX)
       return response.json() as Promise<Record<string, unknown>>
     }),
     globalThis
