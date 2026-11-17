@@ -79,6 +79,7 @@ export async function enablePush(): Promise<PushStatus> {
     body: JSON.stringify({ subscription: subscription.toJSON() }),
   })
   if (!response.ok) {
+    // Best-effort cleanup; the error that matters is the server's answer, thrown below.
     await subscription.unsubscribe().catch(() => undefined)
     const { error } = await response.json().catch(() => ({ error: undefined })) as { error?: string }
     throw new Error(error ?? 'The server rejected this device for notifications.')
@@ -90,6 +91,7 @@ export async function disablePush(): Promise<PushStatus> {
   if (!pushSupported()) return 'unsupported'
   const subscription = await (await registration()).pushManager.getSubscription()
   if (subscription) {
+    // Turning alerts off must work offline too: the server drops dead subscriptions on its own when a send fails.
     await fetch('/api/push/unsubscribe', {
       method: 'POST',
       headers: authHeaders(),

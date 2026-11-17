@@ -50,6 +50,7 @@ function createStream(protocol, { WebSocketImpl, onPrice, log, now }) {
   let connectedAtMs = 0
   let messageId = 1
   let stopped = false
+  let reportedBadMessage = false
 
   const sendJson = (payload) => { try { socket?.send(JSON.stringify(payload)) } catch { /* reconnect handles it */ } }
 
@@ -114,7 +115,14 @@ function createStream(protocol, { WebSocketImpl, onPrice, log, now }) {
     socket.onmessage = (event) => {
       lastMessageAtMs = now()
       let message
-      try { message = JSON.parse(typeof event.data === 'string' ? event.data : String(event.data)) } catch { return }
+      try {
+        message = JSON.parse(typeof event.data === 'string' ? event.data : String(event.data))
+      } catch (error) {
+        // One bad frame should not stop the feed; warn once per connection so a broken stream is still visible.
+        if (!reportedBadMessage) log.warn?.(`[prices] ${protocol.name}: ignoring a message that is not JSON (${error.message})`)
+        reportedBadMessage = true
+        return
+      }
       for (const [symbol, price] of protocol.parse(message)) {
         if (typeof symbol === 'string' && Number.isFinite(price) && price > 0) onPrice(symbol, price)
       }

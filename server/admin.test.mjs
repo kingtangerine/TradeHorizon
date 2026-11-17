@@ -8,7 +8,7 @@ const item = (value, extra = {}) => ({ value: JSON.stringify(value), updatedAtMs
 
 describe('admin helpers', () => {
   it('reads the admin list from TH_ADMIN_EMAILS', () => {
-    expect([...adminEmails(' Me@Example.com, ops@x.io ,')]).toEqual(['me@example.com', 'ops@x.io'])
+    expect([...adminEmails(' Me@Example.com, ops@example.net ,')]).toEqual(['me@example.com', 'ops@example.net'])
     expect(adminEmails(undefined).size).toBe(0)
   })
 

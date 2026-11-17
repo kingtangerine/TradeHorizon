@@ -73,6 +73,7 @@ export async function fetchFuturesStats(symbol: string, signal?: AbortSignal): P
     }),
     globalThis.fetch(`${OPEN_INTEREST}?symbol=${plain}`, { signal })
       .then((response) => (response.ok ? response.json() as Promise<Record<string, unknown>> : undefined))
+      // Open interest is optional in the legend: without it the funding rate and mark price still show.
       .catch(() => undefined),
   ]);
   const fundingRate = Number(premium.lastFundingRate);
