@@ -9,9 +9,14 @@ export const BASELINE_NAME = 'tradeHorizonBaseline'
 const UP = '#089981'
 const DOWN = '#f23645'
 
-interface SeriesRow { open?: number, high?: number, low?: number, close?: number }
+interface SeriesRow {
+  open?: number
+  high?: number
+  low?: number
+  close?: number
+}
 
-function visibleSpan(chart: { getVisibleRange(): { from: number, to: number } }, length: number): [number, number] {
+function visibleSpan(chart: { getVisibleRange(): { from: number; to: number } }, length: number): [number, number] {
   const range = chart.getVisibleRange()
   return [Math.max(0, Math.floor(range.from)), Math.min(length, Math.ceil(range.to))]
 }
@@ -22,7 +27,10 @@ export function registerSeriesOverlays(): void {
     registerIndicator<SeriesRow>({
       name: HEIKIN_ASHI_NAME,
       shortName: 'Heikin Ashi',
-      figures: [{ key: 'high', type: 'line' }, { key: 'low', type: 'line' }],
+      figures: [
+        { key: 'high', type: 'line' },
+        { key: 'low', type: 'line' },
+      ],
       calc: (dataList: KLineData[]) => heikinAshi(dataList),
       draw: ({ ctx, chart, indicator, xAxis, yAxis }) => {
         const rows = indicator.result
@@ -57,14 +65,19 @@ export function registerSeriesOverlays(): void {
         if (level === undefined || to - from < 2) return true
         ctx.setLineDash([])
         const baseY = yAxis.convertToPixel(level)
-        const points = data.slice(from, to).map((bar, offset) => ({ x: xAxis.convertToPixel(from + offset), y: yAxis.convertToPixel(bar.close) }))
+        const points = data
+          .slice(from, to)
+          .map((bar, offset) => ({ x: xAxis.convertToPixel(from + offset), y: yAxis.convertToPixel(bar.close) }))
         const path = new Path2D()
         path.moveTo(points[0].x, baseY)
         for (const point of points) path.lineTo(point.x, point.y)
         path.lineTo(points[points.length - 1].x, baseY)
         path.closePath()
         // Above the baseline green, below red: the same path clipped to each side.
-        for (const [color, y, height] of [[UP, 0, baseY], [DOWN, baseY, bounding.height - baseY]] as const) {
+        for (const [color, y, height] of [
+          [UP, 0, baseY],
+          [DOWN, baseY, bounding.height - baseY],
+        ] as const) {
           ctx.save()
           ctx.beginPath()
           ctx.rect(0, y, bounding.width, height)

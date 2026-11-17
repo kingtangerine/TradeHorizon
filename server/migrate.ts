@@ -36,8 +36,7 @@ export interface ImportOptions {
 }
 
 export type ImportResult =
-  | { imported: false, reason: string }
-  | { imported: true, users: number, items: number, sessions: number, skipped: string[] }
+  { imported: false; reason: string } | { imported: true; users: number; items: number; sessions: number; skipped: string[] }
 
 const stamp = (now: number) => new Date(now).toISOString().replace(/[:.]/g, '-')
 
@@ -58,7 +57,10 @@ export function importLegacyJson(store: Store, dataDir: string, { now = Date.now
       // The old server wrote this file; every account and session is checked below before it is imported.
       legacy = { users: [], sessions: [], ...(JSON.parse(readFileSync(usersFile, 'utf8')) as Partial<LegacyUsersFile>) }
     } catch (error) {
-      throw new Error(`Cannot read ${usersFile} to move the accounts into the database (${(error as Error).message}). Restore it from a backup, then restart.`, { cause: error })
+      throw new Error(
+        `Cannot read ${usersFile} to move the accounts into the database (${(error as Error).message}). Restore it from a backup, then restart.`,
+        { cause: error },
+      )
     }
   }
 
@@ -66,9 +68,17 @@ export function importLegacyJson(store: Store, dataDir: string, { now = Date.now
   const seenEmails = new Set<string>()
   const accounts: LegacyUser[] = []
   for (const user of Array.isArray(legacy.users) ? legacy.users : []) {
-    const email = String(user?.email ?? '').trim().toLowerCase()
-    if (typeof user?.id !== 'string' || !email || typeof user.passwordHash !== 'string') { skipped.push(`account without id/email/password: ${user?.id ?? '?'}`); continue }
-    if (seenEmails.has(email)) { skipped.push(`second account for ${email}: ${user.id}`); continue }
+    const email = String(user?.email ?? '')
+      .trim()
+      .toLowerCase()
+    if (typeof user?.id !== 'string' || !email || typeof user.passwordHash !== 'string') {
+      skipped.push(`account without id/email/password: ${user?.id ?? '?'}`)
+      continue
+    }
+    if (seenEmails.has(email)) {
+      skipped.push(`second account for ${email}: ${user.id}`)
+      continue
+    }
     seenEmails.add(email)
     accounts.push({ ...user, email })
   }
@@ -78,12 +88,18 @@ export function importLegacyJson(store: Store, dataDir: string, { now = Date.now
   const userData: [string, Record<string, ImportedItem>][] = []
   for (const name of files) {
     const userId = name.slice(0, -5)
-    if (!accountIds.has(userId)) { skipped.push(`data without an account: ${name}`); continue }
+    if (!accountIds.has(userId)) {
+      skipped.push(`data without an account: ${name}`)
+      continue
+    }
     let data: unknown
     try {
       data = JSON.parse(readFileSync(join(userDataDir, name), 'utf8'))
     } catch (error) {
-      throw new Error(`Cannot read ${join(userDataDir, name)} to move it into the database (${(error as Error).message}). Restore it from a backup or remove it, then restart.`, { cause: error })
+      throw new Error(
+        `Cannot read ${join(userDataDir, name)} to move it into the database (${(error as Error).message}). Restore it from a backup or remove it, then restart.`,
+        { cause: error },
+      )
     }
     if (typeof data !== 'object' || data === null) continue
     // Each item's value is checked when it is imported below.
@@ -120,7 +136,9 @@ export function importLegacyJson(store: Store, dataDir: string, { now = Date.now
     // Check before anything is renamed: the database must hold exactly what was read.
     const counts = store.counts()
     if (counts.users !== accounts.length || counts.items !== itemCount) {
-      throw new Error(`Import check failed (accounts ${counts.users}/${accounts.length}, items ${counts.items}/${itemCount}); nothing was changed.`)
+      throw new Error(
+        `Import check failed (accounts ${counts.users}/${accounts.length}, items ${counts.items}/${itemCount}); nothing was changed.`,
+      )
     }
     store.meta.set('migratedFromJsonAtMs', now)
   })
@@ -130,6 +148,8 @@ export function importLegacyJson(store: Store, dataDir: string, { now = Date.now
   if (existsSync(usersFile)) renameSync(usersFile, usersFile + suffix)
   if (existsSync(userDataDir)) renameSync(userDataDir, userDataDir + suffix)
   for (const reason of skipped) log.warn?.(`[database] not imported: ${reason}`)
-  log.log?.(`[database] moved ${accounts.length} accounts, ${itemCount} saved items and ${sessionCount} sessions from JSON files into the database; old files kept as *${suffix}`)
+  log.log?.(
+    `[database] moved ${accounts.length} accounts, ${itemCount} saved items and ${sessionCount} sessions from JSON files into the database; old files kept as *${suffix}`,
+  )
   return { imported: true, users: accounts.length, items: itemCount, sessions: sessionCount, skipped }
 }

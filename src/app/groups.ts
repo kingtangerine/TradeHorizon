@@ -21,7 +21,7 @@ export function groupsKey(userId: string): string {
 
 export function parseGroups(value: unknown): GroupState {
   if (typeof value !== 'object' || value === null) return EMPTY_GROUPS
-  const raw = value as { groups?: unknown, assignments?: unknown }
+  const raw = value as { groups?: unknown; assignments?: unknown }
   const groups: DrawingGroup[] = []
   if (Array.isArray(raw.groups)) {
     for (const item of raw.groups) {

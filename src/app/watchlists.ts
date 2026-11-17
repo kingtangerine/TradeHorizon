@@ -38,7 +38,7 @@ function cleanName(name: string, fallback: string): string {
 
 export function parseWatchlists(value: unknown): WatchlistState {
   if (typeof value !== 'object' || value === null) return defaultWatchlists()
-  const raw = value as { lists?: unknown, activeId?: unknown }
+  const raw = value as { lists?: unknown; activeId?: unknown }
   const lists: Watchlist[] = []
   if (Array.isArray(raw.lists)) {
     for (const entry of raw.lists) {
@@ -87,11 +87,11 @@ function updateActive(state: WatchlistState, change: (list: Watchlist) => Watchl
 }
 
 export function addSymbol(state: WatchlistState, symbol: string): WatchlistState {
-  return updateActive(state, (list) => (
+  return updateActive(state, (list) =>
     list.items.some((item) => item.symbol === symbol) || list.items.length >= MAX_ITEMS
       ? list
-      : { ...list, items: [...list.items, { symbol }] }
-  ))
+      : { ...list, items: [...list.items, { symbol }] },
+  )
 }
 
 export function removeSymbol(state: WatchlistState, symbol: string): WatchlistState {

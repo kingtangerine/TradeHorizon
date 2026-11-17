@@ -1,14 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { DRAWING_TYPES } from '../drawings'
-import {
-  clampPositionLevels,
-  fibLevelPrice,
-  lockToAxis,
-  magnetPrice,
-  positionPoints,
-  rectanglePoints,
-  translatePoints,
-} from './geometry'
+import { clampPositionLevels, fibLevelPrice, lockToAxis, magnetPrice, positionPoints, rectanglePoints, translatePoints } from './geometry'
 import { drawingFromOverlay } from './model'
 import { DRAWING_TOOLS, TOOL_ORDER, anchorCountFor } from './tools'
 
@@ -146,9 +138,14 @@ describe('drawing tool table', () => {
 
   it('rebuilds a rectangle from its bounding box even when its handles were dragged out of order', () => {
     const flipped = [
-      { timestamp: 2000, value: 100 }, { timestamp: 1500, value: 100 }, { timestamp: 1000, value: 100 },
-      { timestamp: 1000, value: 150 }, { timestamp: 1000, value: 200 }, { timestamp: 1500, value: 200 },
-      { timestamp: 2000, value: 200 }, { timestamp: 2000, value: 150 },
+      { timestamp: 2000, value: 100 },
+      { timestamp: 1500, value: 100 },
+      { timestamp: 1000, value: 100 },
+      { timestamp: 1000, value: 150 },
+      { timestamp: 1000, value: 200 },
+      { timestamp: 1500, value: 200 },
+      { timestamp: 2000, value: 200 },
+      { timestamp: 2000, value: 150 },
     ]
     const drawing = drawingFromOverlay({ id: 'r', points: flipped } as never, 'binance:spot:BTCUSDT', undefined, 'rectangle')
     expect(drawing?.anchors[0]).toEqual({ timeMs: 1000, price: '200' })

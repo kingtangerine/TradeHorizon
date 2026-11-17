@@ -26,10 +26,7 @@ export function intervalToPeriod(interval: MarketInterval): Period {
 }
 
 export function periodToInterval(period: Period): MarketInterval | null {
-  for (const [interval, candidate] of Object.entries(PERIODS) as Array<[
-    MarketInterval,
-    Period,
-  ]>) {
+  for (const [interval, candidate] of Object.entries(PERIODS) as Array<[MarketInterval, Period]>) {
     if (candidate.type === period.type && candidate.span === period.span) {
       return interval
     }

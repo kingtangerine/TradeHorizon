@@ -50,7 +50,14 @@ const PREFIX = 'tradehorizon-'
 
 const fileStamp = (now: number) => new Date(now).toISOString().slice(0, 19).replace(/[-:]/g, '').replace('T', '-')
 
-export function createBackupService({ store, dir, keep = 14, everyMs = DAY_MS, log = console, now = () => Date.now() }: BackupServiceOptions): BackupService {
+export function createBackupService({
+  store,
+  dir,
+  keep = 14,
+  everyMs = DAY_MS,
+  log = console,
+  now = () => Date.now(),
+}: BackupServiceOptions): BackupService {
   mkdirSync(dir, { recursive: true })
   let timer: NodeJS.Timeout | undefined
   let lastError: string | undefined
@@ -89,7 +96,11 @@ export function createBackupService({ store, dir, keep = 14, everyMs = DAY_MS, l
   function runIfDue() {
     const last = Number(store.meta.get('lastBackupAtMs')) || 0
     if (now() - last >= everyMs) {
-      try { run() } catch { /* reported in status() */ }
+      try {
+        run()
+      } catch {
+        /* reported in status() */
+      }
     }
   }
 
@@ -101,7 +112,9 @@ export function createBackupService({ store, dir, keep = 14, everyMs = DAY_MS, l
       timer = setInterval(runIfDue, Math.min(everyMs, 60 * 60 * 1000))
       timer.unref?.()
     },
-    stop() { clearInterval(timer) },
+    stop() {
+      clearInterval(timer)
+    },
     status() {
       const copies = list()
       return {

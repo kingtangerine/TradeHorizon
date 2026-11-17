@@ -61,7 +61,9 @@ let sqlite: { DatabaseSync: typeof DatabaseSync }
 try {
   sqlite = await import('node:sqlite')
 } catch {
-  throw new Error(`TradeHorizon needs Node.js 22.13 or newer for its built-in database (this server runs ${process.version}). Choose a newer Node.js version for the app and restart it.`)
+  throw new Error(
+    `TradeHorizon needs Node.js 22.13 or newer for its built-in database (this server runs ${process.version}). Choose a newer Node.js version for the app and restart it.`,
+  )
 }
 
 /** Bumped when the tables change; each step below runs once, in order, on databases older than it. */
@@ -140,28 +142,32 @@ interface Aggregate<R extends Row> {
 function toUser(row: UserRow): User
 function toUser(row: UserRow | undefined): User | undefined
 function toUser(row: UserRow | undefined): User | undefined {
-  return row && ({
-    id: row.id,
-    email: row.email,
-    displayName: row.display_name,
-    passwordHash: row.password_hash,
-    createdAtMs: row.created_at,
-    lastLoginAtMs: row.last_login_at ?? undefined,
-    lastSeenAtMs: row.last_seen_at ?? undefined,
-    passwordTemporary: row.password_temporary === 1,
-  })
+  return (
+    row && {
+      id: row.id,
+      email: row.email,
+      displayName: row.display_name,
+      passwordHash: row.password_hash,
+      createdAtMs: row.created_at,
+      lastLoginAtMs: row.last_login_at ?? undefined,
+      lastSeenAtMs: row.last_seen_at ?? undefined,
+      passwordTemporary: row.password_temporary === 1,
+    }
+  )
 }
 
 function toItem(row: ItemRow): DataItem
 function toItem(row: ItemRow | undefined): DataItem | undefined
 function toItem(row: ItemRow | undefined): DataItem | undefined {
-  return row && ({
-    value: row.value,
-    updatedAtMs: row.updated_at,
-    rev: row.rev,
-    ...(row.saved_by ? { by: row.saved_by } : {}),
-    ...(row.saved_by_name ? { byName: row.saved_by_name } : {}),
-  })
+  return (
+    row && {
+      value: row.value,
+      updatedAtMs: row.updated_at,
+      rev: row.rev,
+      ...(row.saved_by ? { by: row.saved_by } : {}),
+      ...(row.saved_by_name ? { byName: row.saved_by_name } : {}),
+    }
+  )
 }
 
 const itemsOf = (rows: ItemRow[]): UserData => Object.fromEntries(rows.map((row) => [row.key, toItem(row)]))
@@ -186,7 +192,9 @@ export function openDatabase(file: string) {
 
   const currentVersion = aggregate<{ user_version: number }>('PRAGMA user_version').get().user_version
   if (currentVersion > SCHEMA_VERSION) {
-    throw new Error(`The database was created by a newer TradeHorizon (schema ${currentVersion}). Update the app instead of going back to this version.`)
+    throw new Error(
+      `The database was created by a newer TradeHorizon (schema ${currentVersion}). Update the app instead of going back to this version.`,
+    )
   }
   for (let next = currentVersion + 1; next <= SCHEMA_VERSION; next += 1) {
     transaction(() => {
@@ -212,24 +220,36 @@ export function openDatabase(file: string) {
     userByEmail: query<UserRow>('SELECT * FROM users WHERE email = ?'),
     allUsers: query<UserRow>('SELECT * FROM users ORDER BY created_at'),
     countUsers: aggregate<{ n: number }>('SELECT COUNT(*) AS n FROM users'),
-    insertUser: db.prepare('INSERT INTO users (id, email, display_name, password_hash, created_at, last_login_at, last_seen_at) VALUES (?, ?, ?, ?, ?, ?, ?)'),
+    insertUser: db.prepare(
+      'INSERT INTO users (id, email, display_name, password_hash, created_at, last_login_at, last_seen_at) VALUES (?, ?, ?, ?, ?, ?, ?)',
+    ),
     deleteUser: db.prepare('DELETE FROM users WHERE id = ?'),
     setPassword: db.prepare('UPDATE users SET password_hash = ?, password_temporary = ? WHERE id = ?'),
     setLastLogin: db.prepare('UPDATE users SET last_login_at = ? WHERE id = ?'),
     setLastSeen: db.prepare('UPDATE users SET last_seen_at = ? WHERE id = ?'),
-    userStats: aggregate<{ total: number, signups24h: number | null, signups7d: number | null, active24h: number | null, active7d: number | null }>(`SELECT
+    userStats: aggregate<{
+      total: number
+      signups24h: number | null
+      signups7d: number | null
+      active24h: number | null
+      active7d: number | null
+    }>(`SELECT
       COUNT(*) AS total,
       SUM(created_at > ?) AS signups24h, SUM(created_at > ?) AS signups7d,
       SUM(last_seen_at > ?) AS active24h, SUM(last_seen_at > ?) AS active7d
       FROM users`),
 
     insertSession: db.prepare('INSERT INTO sessions (token_hash, user_id, expires_at) VALUES (?, ?, ?)'),
-    sessionUser: query<UserRow>('SELECT users.* FROM sessions JOIN users ON users.id = sessions.user_id WHERE sessions.token_hash = ? AND sessions.expires_at > ?'),
+    sessionUser: query<UserRow>(
+      'SELECT users.* FROM sessions JOIN users ON users.id = sessions.user_id WHERE sessions.token_hash = ? AND sessions.expires_at > ?',
+    ),
     deleteSession: db.prepare('DELETE FROM sessions WHERE token_hash = ?'),
     deleteUserSessions: db.prepare('DELETE FROM sessions WHERE user_id = ?'),
     deleteOtherSessions: db.prepare('DELETE FROM sessions WHERE user_id = ? AND token_hash != ?'),
     purgeSessions: db.prepare('DELETE FROM sessions WHERE expires_at <= ?'),
-    userSessions: query<{ expires_at: number }>('SELECT expires_at FROM sessions WHERE user_id = ? AND expires_at > ? ORDER BY expires_at DESC'),
+    userSessions: query<{ expires_at: number }>(
+      'SELECT expires_at FROM sessions WHERE user_id = ? AND expires_at > ? ORDER BY expires_at DESC',
+    ),
     countSessions: aggregate<{ n: number }>('SELECT COUNT(*) AS n FROM sessions WHERE expires_at > ?'),
     countUserSessions: aggregate<{ n: number }>('SELECT COUNT(*) AS n FROM sessions WHERE user_id = ? AND expires_at > ?'),
 
@@ -240,7 +260,8 @@ export function openDatabase(file: string) {
     countKeys: aggregate<{ n: number }>('SELECT COUNT(*) AS n FROM user_data WHERE user_id = ?'),
     bytes: aggregate<{ n: number }>('SELECT COALESCE(SUM(LENGTH(CAST(value AS BLOB))), 0) AS n FROM user_data WHERE user_id = ?'),
     usersWithKey: query<{ user_id: string }>('SELECT user_id FROM user_data WHERE key = ?'),
-    upsertItem: db.prepare(`INSERT INTO user_data (user_id, key, value, updated_at, rev, saved_by, saved_by_name) VALUES (?, ?, ?, ?, ?, ?, ?)
+    upsertItem:
+      db.prepare(`INSERT INTO user_data (user_id, key, value, updated_at, rev, saved_by, saved_by_name) VALUES (?, ?, ?, ?, ?, ?, ?)
       ON CONFLICT (user_id, key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at, rev = excluded.rev,
       saved_by = excluded.saved_by, saved_by_name = excluded.saved_by_name`),
     countItems: aggregate<{ n: number }>('SELECT COUNT(*) AS n FROM user_data'),
@@ -262,19 +283,41 @@ export function openDatabase(file: string) {
     all: () => q.allUsers.all().map((row) => toUser(row)),
     count: () => q.countUsers.get().n,
     create(user: NewUser): User {
-      q.insertUser.run(user.id, user.email, user.displayName, user.passwordHash, user.createdAtMs, user.lastLoginAtMs ?? null, user.lastSeenAtMs ?? null)
+      q.insertUser.run(
+        user.id,
+        user.email,
+        user.displayName,
+        user.passwordHash,
+        user.createdAtMs,
+        user.lastLoginAtMs ?? null,
+        user.lastSeenAtMs ?? null,
+      )
       return users.get(user.id)! // just inserted
     },
     /** `temporary`: set by an admin, to be replaced by the user after signing in. */
-    setPassword: (id: string, passwordHash: string, temporary = false) => { q.setPassword.run(passwordHash, temporary ? 1 : 0, id) },
-    setLastLogin: (id: string, atMs: number) => { q.setLastLogin.run(atMs, id) },
-    setLastSeen: (id: string, atMs: number) => { q.setLastSeen.run(atMs, id) },
+    setPassword: (id: string, passwordHash: string, temporary = false) => {
+      q.setPassword.run(passwordHash, temporary ? 1 : 0, id)
+    },
+    setLastLogin: (id: string, atMs: number) => {
+      q.setLastLogin.run(atMs, id)
+    },
+    setLastSeen: (id: string, atMs: number) => {
+      q.setLastSeen.run(atMs, id)
+    },
     /** Removes the account; its sessions and data go with it (foreign keys). */
-    remove: (id: string) => { q.deleteUser.run(id) },
+    remove: (id: string) => {
+      q.deleteUser.run(id)
+    },
     stats(now: number): UserStats {
       const day = 86_400_000
       const row = q.userStats.get(now - day, now - 7 * day, now - day, now - 7 * day)
-      return { total: row.total, signups24h: row.signups24h ?? 0, signups7d: row.signups7d ?? 0, active24h: row.active24h ?? 0, active7d: row.active7d ?? 0 }
+      return {
+        total: row.total,
+        signups24h: row.signups24h ?? 0,
+        signups7d: row.signups7d ?? 0,
+        active24h: row.active24h ?? 0,
+        active7d: row.active7d ?? 0,
+      }
     },
   }
 
@@ -285,9 +328,15 @@ export function openDatabase(file: string) {
     },
     /** The signed-in user for a session, or undefined when the session is unknown or expired. */
     user: (tokenHash: string, now = Date.now()) => toUser(q.sessionUser.get(tokenHash, now)),
-    remove: (tokenHash: string) => { q.deleteSession.run(tokenHash) },
-    removeForUser: (userId: string) => { q.deleteUserSessions.run(userId) },
-    removeOthers: (userId: string, keepTokenHash: string) => { q.deleteOtherSessions.run(userId, keepTokenHash) },
+    remove: (tokenHash: string) => {
+      q.deleteSession.run(tokenHash)
+    },
+    removeForUser: (userId: string) => {
+      q.deleteUserSessions.run(userId)
+    },
+    removeOthers: (userId: string, keepTokenHash: string) => {
+      q.deleteOtherSessions.run(userId, keepTokenHash)
+    },
     forUser: (userId: string, now = Date.now()) => q.userSessions.all(userId, now).map((row) => ({ expiresAtMs: row.expires_at })),
     countActive: (now = Date.now()) => q.countSessions.get(now).n,
     countForUser: (userId: string, now = Date.now()) => q.countUserSessions.get(userId, now).n,
@@ -323,7 +372,9 @@ export function openDatabase(file: string) {
     transaction,
     meta: {
       get: (key: string) => q.getMeta.get(key)?.value,
-      set: (key: string, value: string | number) => { q.setMeta.run(key, String(value)) },
+      set: (key: string, value: string | number) => {
+        q.setMeta.run(key, String(value))
+      },
     },
     counts: () => ({ users: q.countUsers.get().n, items: q.countItems.get().n, sessions: q.countSessions.get(Date.now()).n }),
     /** Writes a consistent copy of the whole database to `targetFile` while the app keeps running. */
@@ -334,7 +385,9 @@ export function openDatabase(file: string) {
     importItem: (userId: string, key: string, item: ImportedItem) => {
       q.upsertItem.run(userId, key, item.value, item.updatedAtMs ?? Date.now(), item.rev, item.by ?? null, item.byName ?? null)
     },
-    importSession: (session: Session) => { q.insertSession.run(session.tokenHash, session.userId, session.expiresAtMs) },
+    importSession: (session: Session) => {
+      q.insertSession.run(session.tokenHash, session.userId, session.expiresAtMs)
+    },
     close: () => db.close(),
   }
 }

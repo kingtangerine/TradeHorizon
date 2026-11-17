@@ -40,11 +40,7 @@ export function rectanglePoints(a: ChartPoint, b: ChartPoint): ChartPoint[] {
 }
 
 /** Moves a whole drawing without re-snapping its anchors, so its shape survives any timeframe. */
-export function translatePoints(
-  points: readonly ChartPoint[],
-  deltaTimeMs: number,
-  deltaValue: number,
-): ChartPoint[] {
+export function translatePoints(points: readonly ChartPoint[], deltaTimeMs: number, deltaValue: number): ChartPoint[] {
   return points.map((point) => ({
     timestamp: Math.max(0, Math.round(point.timestamp + deltaTimeMs)),
     value: point.value + deltaValue,
@@ -52,11 +48,7 @@ export function translatePoints(
 }
 
 /** Shift-constrained placement: keep the dominant screen axis and flatten the other. */
-export function lockToAxis(
-  start: ChartPoint,
-  current: ChartPoint,
-  screenDelta: { readonly dx: number; readonly dy: number },
-): ChartPoint {
+export function lockToAxis(start: ChartPoint, current: ChartPoint, screenDelta: { readonly dx: number; readonly dy: number }): ChartPoint {
   return Math.abs(screenDelta.dx) >= Math.abs(screenDelta.dy)
     ? { timestamp: current.timestamp, value: start.value }
     : { timestamp: start.timestamp, value: current.value }
@@ -120,15 +112,9 @@ export function positionPoints(
     }
   }
 
-  const farTime = pointer && pointer.timestamp !== entry.timestamp
-    ? pointer.timestamp
-    : entry.timestamp + defaults.timeSpanMs
+  const farTime = pointer && pointer.timestamp !== entry.timestamp ? pointer.timestamp : entry.timestamp + defaults.timeSpanMs
 
-  return [
-    entry,
-    { timestamp: farTime, value: Math.max(0, targetValue) },
-    { timestamp: farTime, value: Math.max(0, stopValue) },
-  ]
+  return [entry, { timestamp: farTime, value: Math.max(0, targetValue) }, { timestamp: farTime, value: Math.max(0, stopValue) }]
 }
 
 /** Keeps the target on the profit side of entry and the stop on the loss side. */
@@ -156,12 +142,24 @@ export function clampDcaPrice(entry: number, stop: number, dca?: number): number
 }
 
 /** Drawings that cover an area: a click anywhere inside them lands on them. */
-const AREA_DRAWINGS = new Set(['rectangle', 'fibRetracement', 'longPosition', 'shortPosition', 'priceRange', 'ellipse', 'parallelChannel', 'pitchfork', 'fibExtension', 'dateRange', 'datePriceRange'])
+const AREA_DRAWINGS = new Set([
+  'rectangle',
+  'fibRetracement',
+  'longPosition',
+  'shortPosition',
+  'priceRange',
+  'ellipse',
+  'parallelChannel',
+  'pitchfork',
+  'fibExtension',
+  'dateRange',
+  'datePriceRange',
+])
 
 export interface StackableDrawing {
   readonly id: string
   readonly type: string
-  readonly anchors: ReadonlyArray<{ readonly timeMs: number, readonly price: string | number }>
+  readonly anchors: ReadonlyArray<{ readonly timeMs: number; readonly price: string | number }>
 }
 
 function marketArea(drawing: StackableDrawing): number {
@@ -197,7 +195,10 @@ export function fibExtensionPrice(first: number, second: number, third: number, 
   return third + (second - first) * level
 }
 
-interface Pixel { readonly x: number, readonly y: number }
+interface Pixel {
+  readonly x: number
+  readonly y: number
+}
 
 /** The point where the line from `from` through `to` reaches x = `toX` (a ray drawn to the chart's right edge). */
 export function extendLine(from: Pixel, to: Pixel, toX: number): Pixel {
@@ -214,7 +215,7 @@ export function parallelOffset(first: Pixel, second: Pixel, third: Pixel): numbe
 }
 
 /** Andrews' pitchfork: the median runs from point 1 through the middle of points 2 and 3. */
-export function pitchforkMedian(first: Pixel, second: Pixel, third: Pixel): { readonly from: Pixel, readonly through: Pixel } {
+export function pitchforkMedian(first: Pixel, second: Pixel, third: Pixel): { readonly from: Pixel; readonly through: Pixel } {
   return { from: first, through: { x: (second.x + third.x) / 2, y: (second.y + third.y) / 2 } }
 }
 

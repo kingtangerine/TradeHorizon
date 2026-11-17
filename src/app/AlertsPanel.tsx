@@ -1,5 +1,13 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
-import { groupAlerts, isTriggered, type AlertCondition, type AlertDirection, type AlertFilter, type AlertOptions, type PriceAlert } from './alerts'
+import {
+  groupAlerts,
+  isTriggered,
+  type AlertCondition,
+  type AlertDirection,
+  type AlertFilter,
+  type AlertOptions,
+  type PriceAlert,
+} from './alerts'
 import { MAX_MESSAGE_LENGTH, MOVE_WINDOWS_MS, describeAlert, isExpired } from '../../server/alertRules.ts'
 import { BellIcon, ChevronIcon, CloseIcon, EyeIcon, EyeOffIcon, PauseIcon, PlayIcon, SearchIcon, TrashIcon } from './Icons'
 import type { CryptoMarket } from '../chart/markets'
@@ -24,7 +32,7 @@ interface AlertsPanelProps {
   notifications: ReactNode
 }
 
-const FILTERS: ReadonlyArray<{ value: AlertFilter, label: string }> = [
+const FILTERS: ReadonlyArray<{ value: AlertFilter; label: string }> = [
   { value: 'active', label: 'Active' },
   { value: 'triggered', label: 'Triggered' },
   { value: 'all', label: 'All' },
@@ -33,7 +41,7 @@ const FILTERS: ReadonlyArray<{ value: AlertFilter, label: string }> = [
 type FormKind = 'crossingUp' | 'crossingDown' | 'greater' | 'less' | 'enterChannel' | 'exitChannel' | 'moveUp' | 'moveDown'
 
 /** The form's condition list, as TradingView words it. */
-const FORM_KINDS: Readonly<Record<FormKind, { label: string, condition: AlertCondition, direction?: AlertDirection }>> = {
+const FORM_KINDS: Readonly<Record<FormKind, { label: string; condition: AlertCondition; direction?: AlertDirection }>> = {
   crossingUp: { label: 'Crossing up', condition: 'crossing', direction: 'above' },
   crossingDown: { label: 'Crossing down', condition: 'crossing', direction: 'below' },
   greater: { label: 'Greater than', condition: 'greater', direction: 'above' },
@@ -54,13 +62,27 @@ const shortSymbol = (symbol: string) => {
 function formatTime(ms: number): string {
   const date = new Date(ms)
   const sameDay = date.toDateString() === new Date().toDateString()
-  return sameDay ? date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : date.toLocaleDateString([], { month: 'short', day: 'numeric' })
+  return sameDay
+    ? date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+    : date.toLocaleDateString([], { month: 'short', day: 'numeric' })
 }
 
 /** Price alerts side panel. Stays tidy with many alerts: filtered, searchable and grouped per coin. */
 export function AlertsPanel({
-  alerts, market, lastPrice, linesVisible, onToggleLines, onCreate, onToggle, onDelete, onClearTriggered, onOpenSymbol, onClose,
-  notificationSummary, notifications, initialPrice,
+  alerts,
+  market,
+  lastPrice,
+  linesVisible,
+  onToggleLines,
+  onCreate,
+  onToggle,
+  onDelete,
+  onClearTriggered,
+  onOpenSymbol,
+  onClose,
+  notificationSummary,
+  notifications,
+  initialPrice,
 }: AlertsPanelProps) {
   const [filter, setFilter] = useState<AlertFilter>('active')
   const [query, setQuery] = useState('')
@@ -78,7 +100,10 @@ export function AlertsPanel({
   const [price, setPrice] = useState(initialPrice ?? '')
   const priceRef = useRef<HTMLInputElement>(null)
   useEffect(() => {
-    if (initialPrice !== undefined) { priceRef.current?.focus(); priceRef.current?.select() }
+    if (initialPrice !== undefined) {
+      priceRef.current?.focus()
+      priceRef.current?.select()
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
   const [notificationsOpen, setNotificationsOpen] = useState(true)
@@ -90,12 +115,13 @@ export function AlertsPanel({
   const groups = useMemo(() => groupAlerts(alerts, filter, query, market.symbol), [alerts, filter, query, market.symbol])
   const precision = market.pricePrecision
 
-  const toggleGroup = (symbol: string) => setCollapsed((current) => {
-    const next = new Set(current)
-    if (next.has(symbol)) next.delete(symbol)
-    else next.add(symbol)
-    return next
-  })
+  const toggleGroup = (symbol: string) =>
+    setCollapsed((current) => {
+      const next = new Set(current)
+      if (next.has(symbol)) next.delete(symbol)
+      else next.add(symbol)
+      return next
+    })
 
   const distance = (alert: PriceAlert) => {
     if (alert.symbol !== market.symbol || !lastPrice || isTriggered(alert)) return undefined
@@ -106,7 +132,11 @@ export function AlertsPanel({
   return (
     <aside className="alerts-panel" aria-label="Price alerts">
       <header>
-        <div><BellIcon /><strong>Price alerts</strong>{counts.active > 0 && <span className="alerts-count">{counts.active}</span>}</div>
+        <div>
+          <BellIcon />
+          <strong>Price alerts</strong>
+          {counts.active > 0 && <span className="alerts-count">{counts.active}</span>}
+        </div>
         <span className="alerts-header-actions">
           <button
             type="button"
@@ -115,9 +145,12 @@ export function AlertsPanel({
             title={linesVisible ? 'Hide alert lines on the chart' : 'Show alert lines on the chart'}
             onClick={onToggleLines}
           >
-            {linesVisible ? <EyeIcon /> : <EyeOffIcon />}<span>On chart</span>
+            {linesVisible ? <EyeIcon /> : <EyeOffIcon />}
+            <span>On chart</span>
           </button>
-          <button type="button" onClick={onClose} aria-label="Close alerts"><CloseIcon /></button>
+          <button type="button" onClick={onClose} aria-label="Close alerts">
+            <CloseIcon />
+          </button>
         </span>
       </header>
 
@@ -150,33 +183,68 @@ export function AlertsPanel({
       >
         <strong>New alert · {shortSymbol(market.symbol)}</strong>
         <div className="alert-create-row">
-          <select value={kind} onChange={(event) => { const next = event.target.value as FormKind; setKind(next); setDirection(FORM_KINDS[next].direction ?? 'above') }} aria-label="Condition">
-            {(Object.keys(FORM_KINDS) as FormKind[]).map((item) => <option value={item} key={item}>{FORM_KINDS[item].label}</option>)}
+          <select
+            value={kind}
+            onChange={(event) => {
+              const next = event.target.value as FormKind
+              setKind(next)
+              setDirection(FORM_KINDS[next].direction ?? 'above')
+            }}
+            aria-label="Condition"
+          >
+            {(Object.keys(FORM_KINDS) as FormKind[]).map((item) => (
+              <option value={item} key={item}>
+                {FORM_KINDS[item].label}
+              </option>
+            ))}
           </select>
           {FORM_KINDS[kind].condition === 'movePercent' ? (
             <>
-              <input type="number" min="0.1" max="100" step="0.1" aria-label="Move size in percent" value={percent} onChange={(event) => setPercent(event.target.value)} />
+              <input
+                type="number"
+                min="0.1"
+                max="100"
+                step="0.1"
+                aria-label="Move size in percent"
+                value={percent}
+                onChange={(event) => setPercent(event.target.value)}
+              />
               <select value={windowMs} onChange={(event) => setWindowMs(Number(event.target.value))} aria-label="Within">
-                {MOVE_WINDOWS_MS.map((ms) => <option value={ms} key={ms}>in {ms >= 3_600_000 ? `${ms / 3_600_000}h` : `${ms / 60_000}m`}</option>)}
+                {MOVE_WINDOWS_MS.map((ms) => (
+                  <option value={ms} key={ms}>
+                    in {ms >= 3_600_000 ? `${ms / 3_600_000}h` : `${ms / 60_000}m`}
+                  </option>
+                ))}
               </select>
             </>
           ) : (
-          <input
-            ref={priceRef}
-            type="number"
-            min="0"
-            step="any"
-            required
-            aria-label={market.kind === 'dominance' ? 'Target level' : `Target price (${market.quoteAsset})`}
-            placeholder={lastPrice !== undefined ? String(lastPrice) : 'Price'}
-            value={price}
-            onChange={(event) => setPrice(event.target.value)}
-          />
+            <input
+              ref={priceRef}
+              type="number"
+              min="0"
+              step="any"
+              required
+              aria-label={market.kind === 'dominance' ? 'Target level' : `Target price (${market.quoteAsset})`}
+              placeholder={lastPrice !== undefined ? String(lastPrice) : 'Price'}
+              value={price}
+              onChange={(event) => setPrice(event.target.value)}
+            />
           )}
           {(FORM_KINDS[kind].condition === 'enterChannel' || FORM_KINDS[kind].condition === 'exitChannel') && (
-            <input type="number" min="0" step="any" required aria-label="Other side of the channel" placeholder="Upper / lower" value={upper} onChange={(event) => setUpper(event.target.value)} />
+            <input
+              type="number"
+              min="0"
+              step="any"
+              required
+              aria-label="Other side of the channel"
+              placeholder="Upper / lower"
+              value={upper}
+              onChange={(event) => setUpper(event.target.value)}
+            />
           )}
-          <button type="submit" title="Create alert"><BellIcon /> Add</button>
+          <button type="submit" title="Create alert">
+            <BellIcon /> Add
+          </button>
         </div>
         <button type="button" className="alert-more-toggle" aria-expanded={moreOpen} onClick={() => setMoreOpen((open) => !open)}>
           {moreOpen ? 'Fewer options' : 'Repeat, expiry and message…'}
@@ -201,7 +269,12 @@ export function AlertsPanel({
             </label>
             <label className="wide">
               <span>Message</span>
-              <input value={message} maxLength={MAX_MESSAGE_LENGTH} placeholder="Shown in the notification (optional)" onChange={(event) => setMessage(event.target.value)} />
+              <input
+                value={message}
+                maxLength={MAX_MESSAGE_LENGTH}
+                placeholder="Shown in the notification (optional)"
+                onChange={(event) => setMessage(event.target.value)}
+              />
             </label>
           </div>
         )}
@@ -211,8 +284,16 @@ export function AlertsPanel({
         </small>
       </form>
 
-      <details className="alert-notifications" open={notificationsOpen} onToggle={(event) => setNotificationsOpen(event.currentTarget.open)}>
-        <summary><span>Notifications · browser &amp; Telegram</span><small>{notificationSummary}</small><ChevronIcon /></summary>
+      <details
+        className="alert-notifications"
+        open={notificationsOpen}
+        onToggle={(event) => setNotificationsOpen(event.currentTarget.open)}
+      >
+        <summary>
+          <span>Notifications · browser &amp; Telegram</span>
+          <small>{notificationSummary}</small>
+          <ChevronIcon />
+        </summary>
         {notifications}
       </details>
 
@@ -234,11 +315,18 @@ export function AlertsPanel({
         {alerts.length > 6 && (
           <label className="alerts-search">
             <SearchIcon />
-            <input value={query} placeholder="Search coin" aria-label="Search alerts by coin" onChange={(event) => setQuery(event.target.value)} />
+            <input
+              value={query}
+              placeholder="Search coin"
+              aria-label="Search alerts by coin"
+              onChange={(event) => setQuery(event.target.value)}
+            />
           </label>
         )}
         {filter === 'triggered' && counts.triggered > 0 && (
-          <button type="button" className="alerts-clear" onClick={onClearTriggered}>Clear triggered</button>
+          <button type="button" className="alerts-clear" onClick={onClearTriggered}>
+            Clear triggered
+          </button>
         )}
       </div>
 
@@ -255,50 +343,73 @@ export function AlertsPanel({
                   {group.symbol === market.symbol && <em>On chart</em>}
                 </button>
                 {group.symbol !== market.symbol && (
-                  <button type="button" className="alert-group-open" onClick={() => onOpenSymbol(group.symbol)} title={`Open the ${shortSymbol(group.symbol)} chart`}>
+                  <button
+                    type="button"
+                    className="alert-group-open"
+                    onClick={() => onOpenSymbol(group.symbol)}
+                    title={`Open the ${shortSymbol(group.symbol)} chart`}
+                  >
                     Open chart
                   </button>
                 )}
               </header>
-              {!isCollapsed && group.alerts.map((alert) => {
-                const triggered = isTriggered(alert)
-                const away = distance(alert)
-                return (
-                  <div className={triggered ? 'alert-row triggered' : alert.enabled ? 'alert-row' : 'alert-row paused'} key={alert.id}>
-                    <span className={`alert-direction ${alert.direction}`} aria-label={alert.direction === 'above' ? 'Crosses above' : 'Crosses below'}>
-                      {alert.direction === 'above' ? '▲' : '▼'}
-                    </span>
-                    <div>
-                      <strong title={describeAlert(alert)}>
-                        {(alert.condition ?? 'crossing') === 'crossing' && !alert.line
-                          ? alert.targetPrice.toLocaleString('en-US', { maximumFractionDigits: alert.symbol === market.symbol ? precision : 8 })
-                          : describeAlert(alert)}
-                      </strong>
-                      <span>
-                        {triggered
-                          ? `Triggered ${formatTime(alert.triggeredAtMs!)}${alert.triggeredPrice !== undefined ? ` at ${alert.triggeredPrice.toLocaleString('en-US', { maximumFractionDigits: 8 })}` : ''}`
-                          : isExpired(alert, Date.now()) ? 'Expired' : alert.enabled ? 'Active' : 'Paused'}
-                        {alert.frequency === 'everyTime' && <b> · every time{alert.triggerCount ? ` (${alert.triggerCount}×)` : ''}</b>}
-                        {alert.expiresAtMs !== undefined && !triggered && !isExpired(alert, Date.now()) && <b> · until {formatTime(alert.expiresAtMs)}</b>}
-                        {away && !alert.line && !alert.condition && <b> · {away}</b>}
+              {!isCollapsed &&
+                group.alerts.map((alert) => {
+                  const triggered = isTriggered(alert)
+                  const away = distance(alert)
+                  return (
+                    <div className={triggered ? 'alert-row triggered' : alert.enabled ? 'alert-row' : 'alert-row paused'} key={alert.id}>
+                      <span
+                        className={`alert-direction ${alert.direction}`}
+                        aria-label={alert.direction === 'above' ? 'Crosses above' : 'Crosses below'}
+                      >
+                        {alert.direction === 'above' ? '▲' : '▼'}
                       </span>
-                      {alert.message && <em className="alert-message">“{alert.message}”</em>}
+                      <div>
+                        <strong title={describeAlert(alert)}>
+                          {(alert.condition ?? 'crossing') === 'crossing' && !alert.line
+                            ? alert.targetPrice.toLocaleString('en-US', {
+                                maximumFractionDigits: alert.symbol === market.symbol ? precision : 8,
+                              })
+                            : describeAlert(alert)}
+                        </strong>
+                        <span>
+                          {triggered
+                            ? `Triggered ${formatTime(alert.triggeredAtMs!)}${alert.triggeredPrice !== undefined ? ` at ${alert.triggeredPrice.toLocaleString('en-US', { maximumFractionDigits: 8 })}` : ''}`
+                            : isExpired(alert, Date.now())
+                              ? 'Expired'
+                              : alert.enabled
+                                ? 'Active'
+                                : 'Paused'}
+                          {alert.frequency === 'everyTime' && <b> · every time{alert.triggerCount ? ` (${alert.triggerCount}×)` : ''}</b>}
+                          {alert.expiresAtMs !== undefined && !triggered && !isExpired(alert, Date.now()) && (
+                            <b> · until {formatTime(alert.expiresAtMs)}</b>
+                          )}
+                          {away && !alert.line && !alert.condition && <b> · {away}</b>}
+                        </span>
+                        {alert.message && <em className="alert-message">“{alert.message}”</em>}
+                      </div>
+                      <button
+                        type="button"
+                        className="icon"
+                        onClick={() => onToggle(alert.id)}
+                        title={triggered ? 'Re-arm' : alert.enabled ? 'Pause' : 'Resume'}
+                        aria-label={triggered ? 'Re-arm alert' : alert.enabled ? 'Pause alert' : 'Resume alert'}
+                      >
+                        {alert.enabled ? <PauseIcon /> : <PlayIcon />}
+                      </button>
+                      <button
+                        type="button"
+                        className="icon delete"
+                        onClick={() => onDelete(alert.id)}
+                        aria-label="Delete alert"
+                        title="Delete"
+                      >
+                        <TrashIcon />
+                      </button>
                     </div>
-                    <button
-                      type="button"
-                      className="icon"
-                      onClick={() => onToggle(alert.id)}
-                      title={triggered ? 'Re-arm' : alert.enabled ? 'Pause' : 'Resume'}
-                      aria-label={triggered ? 'Re-arm alert' : alert.enabled ? 'Pause alert' : 'Resume alert'}
-                    >
-                      {alert.enabled ? <PauseIcon /> : <PlayIcon />}
-                    </button>
-                    <button type="button" className="icon delete" onClick={() => onDelete(alert.id)} aria-label="Delete alert" title="Delete">
-                      <TrashIcon />
-                    </button>
-                  </div>
-                )
-              })}
+                  )
+                })}
             </section>
           )
         })}
@@ -306,7 +417,11 @@ export function AlertsPanel({
           <div className="alerts-empty">
             {alerts.length === 0
               ? 'No price alerts yet.'
-              : query.trim() ? `No alerts for “${query.trim()}”.` : filter === 'triggered' ? 'Nothing has triggered yet.' : 'No active alerts.'}
+              : query.trim()
+                ? `No alerts for “${query.trim()}”.`
+                : filter === 'triggered'
+                  ? 'Nothing has triggered yet.'
+                  : 'No active alerts.'}
           </div>
         )}
       </div>

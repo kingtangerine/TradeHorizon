@@ -12,7 +12,14 @@ import { createHash, randomBytes } from 'node:crypto'
 import { mkdirSync } from 'node:fs'
 import { join } from 'node:path'
 
-const args: Record<string, string | undefined> = Object.fromEntries(process.argv.slice(2).reduce<[string, string | undefined][]>((pairs, value, index, all) => (value.startsWith('--') ? [...pairs, [value.slice(2), all[index + 1]]] : pairs), []))
+const args: Record<string, string | undefined> = Object.fromEntries(
+  process.argv
+    .slice(2)
+    .reduce<[string, string | undefined][]>(
+      (pairs, value, index, all) => (value.startsWith('--') ? [...pairs, [value.slice(2), all[index + 1]]] : pairs),
+      [],
+    ),
+)
 const dataDir = args['data-dir']
 const base = (args.base ?? 'http://127.0.0.1:8899').replace(/\/$/, '')
 const userCount = Number(args.users ?? 1000)
@@ -36,7 +43,9 @@ const tokens: string[] = []
 store.transaction(() => {
   for (let index = 0; index < userCount; index += 1) {
     const email = `user${index}@loadtest.local`
-    const user = store.users.byEmail(email) ?? store.users.create({ id: `loadtest-${index}`, email, displayName: `Load ${index}`, passwordHash: 'x:y', createdAtMs: Date.now() })
+    const user =
+      store.users.byEmail(email) ??
+      store.users.create({ id: `loadtest-${index}`, email, displayName: `Load ${index}`, passwordHash: 'x:y', createdAtMs: Date.now() })
     const token = randomBytes(32).toString('hex')
     store.sessions.create(createHash('sha256').update(token).digest('hex'), user.id, Date.now() + 86_400_000)
     tokens.push(token)
@@ -79,7 +88,11 @@ async function timed(kind: string, path: string, init: RequestInit): Promise<{ s
     status = response.status
     const text = await response.text()
     let body: ApiBody = {}
-    try { body = JSON.parse(text) as ApiBody } catch { /* not JSON */ }
+    try {
+      body = JSON.parse(text) as ApiBody
+    } catch {
+      /* not JSON */
+    }
     return { status, body }
   } catch {
     return { status: 0, body: {} }
@@ -106,10 +119,17 @@ async function simulatedUser(index: number, token: string) {
     if (Date.now() >= deadline) break
     const poll = await timed('sync check (every 15 s)', `/api/data?since=${since}`, { headers })
     if (typeof poll.body.rev === 'number') since = poll.body.rev
-    for (const [key, due, size, label] of [['layouts:v1', nextLayouts, 5_000, 'save layouts (5 KB)'], ['drawings:v1', nextDrawings, 60_000, 'save drawings (60 KB)']] as const) {
+    for (const [key, due, size, label] of [
+      ['layouts:v1', nextLayouts, 5_000, 'save layouts (5 KB)'],
+      ['drawings:v1', nextDrawings, 60_000, 'save drawings (60 KB)'],
+    ] as const) {
       if (Date.now() < due) continue
       const value = JSON.stringify([{ id: `item-${Date.now()}`, name: label, padding: padding(size) }])
-      const response = await timed(label, '/api/data', { method: 'PUT', headers, body: JSON.stringify({ key, value, baseRev: revs.get(key) ?? 0, device: { id: `device-${index}`, name: 'Load test' } }) })
+      const response = await timed(label, '/api/data', {
+        method: 'PUT',
+        headers,
+        body: JSON.stringify({ key, value, baseRev: revs.get(key) ?? 0, device: { id: `device-${index}`, name: 'Load test' } }),
+      })
       // Saved: the answer carries the new revision. Conflict: the answer carries the server's copy to build on.
       if (response.status === 200) revs.set(key, response.body.rev)
       else if (response.status === 409 && response.body.item) revs.set(key, response.body.item.rev)
@@ -121,8 +141,13 @@ async function simulatedUser(index: number, token: string) {
 
 const started = Date.now()
 const health = setInterval(async () => {
-  const body = await fetch(base + '/healthz').then((r) => r.json() as Promise<Health>).catch(() => null)
-  if (body?.eventLoopDelayMs) console.log(`  t=${Math.round((Date.now() - started) / 1000)}s server busy-wait p99 ${body.eventLoopDelayMs.p99} ms (max ${body.eventLoopDelayMs.max} ms), memory ${body.memoryMb ?? '?'} MB`)
+  const body = await fetch(base + '/healthz')
+    .then((r) => r.json() as Promise<Health>)
+    .catch(() => null)
+  if (body?.eventLoopDelayMs)
+    console.log(
+      `  t=${Math.round((Date.now() - started) / 1000)}s server busy-wait p99 ${body.eventLoopDelayMs.p99} ms (max ${body.eventLoopDelayMs.max} ms), memory ${body.memoryMb ?? '?'} MB`,
+    )
 }, 30_000)
 await Promise.all(tokens.map((token, index) => simulatedUser(index, token)))
 clearInterval(health)
@@ -135,8 +160,15 @@ for (const [kind, entry] of stats) {
   const sorted = [...entry.times].sort((a, b) => a - b)
   total += sorted.length
   const errors = [...entry.errors].map(([status, count]) => `${count}× ${status === 0 ? 'no answer' : status}`).join(', ')
-  console.log(`  ${kind.padEnd(26)} ${String(sorted.length).padStart(6)} requests   p50 ${pct(sorted, 0.5).toFixed(0).padStart(4)} ms   p95 ${pct(sorted, 0.95).toFixed(0).padStart(5)} ms   p99 ${pct(sorted, 0.99).toFixed(0).padStart(5)} ms   max ${sorted.at(-1)!.toFixed(0).padStart(5)} ms${errors ? `   errors: ${errors}` : ''}`)
+  console.log(
+    `  ${kind.padEnd(26)} ${String(sorted.length).padStart(6)} requests   p50 ${pct(sorted, 0.5).toFixed(0).padStart(4)} ms   p95 ${pct(sorted, 0.95).toFixed(0).padStart(5)} ms   p99 ${pct(sorted, 0.99).toFixed(0).padStart(5)} ms   max ${sorted.at(-1)!.toFixed(0).padStart(5)} ms${errors ? `   errors: ${errors}` : ''}`,
+  )
 }
 console.log(`  about ${(total / seconds).toFixed(0)} requests per second in total`)
-const final = await fetch(base + '/healthz').then((r) => r.json() as Promise<Health>).catch(() => null)
-if (final) console.log(`  server afterwards: busy-wait p99 ${final.eventLoopDelayMs?.p99} ms, memory ${final.memoryMb} MB, database ${(Number(final.database?.bytes) / 1048576).toFixed(1)} MB`)
+const final = await fetch(base + '/healthz')
+  .then((r) => r.json() as Promise<Health>)
+  .catch(() => null)
+if (final)
+  console.log(
+    `  server afterwards: busy-wait p99 ${final.eventLoopDelayMs?.p99} ms, memory ${final.memoryMb} MB, database ${(Number(final.database?.bytes) / 1048576).toFixed(1)} MB`,
+  )

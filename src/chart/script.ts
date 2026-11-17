@@ -16,7 +16,10 @@ export const MAX_PLOTS = 8
 export const MAX_HLINES = 8
 export const MAX_SOURCE_LENGTH = 20_000
 
-export interface ScriptInput { readonly title: string, readonly defaultValue: number }
+export interface ScriptInput {
+  readonly title: string
+  readonly defaultValue: number
+}
 
 export interface CompiledScript {
   readonly title: string
@@ -26,14 +29,36 @@ export interface CompiledScript {
   readonly program: readonly Statement[]
 }
 
-export interface ScriptPlot { readonly title: string, readonly color: string, readonly width: number, readonly values: Float64Array }
-export interface ScriptHline { readonly title: string, readonly color: string, readonly value: number }
-export interface ScriptResult { readonly plots: readonly ScriptPlot[], readonly hlines: readonly ScriptHline[] }
+export interface ScriptPlot {
+  readonly title: string
+  readonly color: string
+  readonly width: number
+  readonly values: Float64Array
+}
+export interface ScriptHline {
+  readonly title: string
+  readonly color: string
+  readonly value: number
+}
+export interface ScriptResult {
+  readonly plots: readonly ScriptPlot[]
+  readonly hlines: readonly ScriptHline[]
+}
 
-export interface ScriptBar { readonly timestamp: number, readonly open: number, readonly high: number, readonly low: number, readonly close: number, readonly volume?: number }
+export interface ScriptBar {
+  readonly timestamp: number
+  readonly open: number
+  readonly high: number
+  readonly low: number
+  readonly close: number
+  readonly volume?: number
+}
 
 export class ScriptError extends Error {
-  constructor(message: string, readonly line: number) {
+  constructor(
+    message: string,
+    readonly line: number,
+  ) {
     super(`Line ${line}: ${message}`)
   }
 }
@@ -41,13 +66,13 @@ export class ScriptError extends Error {
 // --- Tokens --------------------------------------------------------------------------------------------------------
 
 type Token =
-  | { kind: 'number', value: number, line: number }
-  | { kind: 'string', value: string, line: number }
-  | { kind: 'color', value: string, line: number }
-  | { kind: 'name', value: string, line: number }
-  | { kind: 'op', value: string, line: number }
-  | { kind: 'newline', line: number }
-  | { kind: 'end', line: number }
+  | { kind: 'number'; value: number; line: number }
+  | { kind: 'string'; value: string; line: number }
+  | { kind: 'color'; value: string; line: number }
+  | { kind: 'name'; value: string; line: number }
+  | { kind: 'op'; value: string; line: number }
+  | { kind: 'newline'; line: number }
+  | { kind: 'end'; line: number }
 
 const OPERATORS = ['==', '!=', '<=', '>=', '+', '-', '*', '/', '%', '(', ')', '[', ']', ',', '=', '<', '>', '?', ':']
 
@@ -57,15 +82,38 @@ function tokenize(source: string): Token[] {
   let index = 0
   while (index < source.length) {
     const char = source[index]
-    if (char === '\n') { tokens.push({ kind: 'newline', line }); line += 1; index += 1; continue }
-    if (char === ' ' || char === '\t' || char === '\r') { index += 1; continue }
-    if (source.startsWith('//', index)) { while (index < source.length && source[index] !== '\n') index += 1; continue }
+    if (char === '\n') {
+      tokens.push({ kind: 'newline', line })
+      line += 1
+      index += 1
+      continue
+    }
+    if (char === ' ' || char === '\t' || char === '\r') {
+      index += 1
+      continue
+    }
+    if (source.startsWith('//', index)) {
+      while (index < source.length && source[index] !== '\n') index += 1
+      continue
+    }
     const number = /^(\d+\.?\d*|\.\d+)(e[+-]?\d+)?/i.exec(source.slice(index, index + 40))
-    if (number) { tokens.push({ kind: 'number', value: Number(number[0]), line }); index += number[0].length; continue }
+    if (number) {
+      tokens.push({ kind: 'number', value: Number(number[0]), line })
+      index += number[0].length
+      continue
+    }
     const color = /^#([0-9a-f]{8}|[0-9a-f]{6})\b/i.exec(source.slice(index, index + 10))
-    if (color) { tokens.push({ kind: 'color', value: color[0], line }); index += color[0].length; continue }
+    if (color) {
+      tokens.push({ kind: 'color', value: color[0], line })
+      index += color[0].length
+      continue
+    }
     const name = /^[A-Za-z_][A-Za-z0-9_]*/.exec(source.slice(index, index + 64))
-    if (name) { tokens.push({ kind: 'name', value: name[0], line }); index += name[0].length; continue }
+    if (name) {
+      tokens.push({ kind: 'name', value: name[0], line })
+      index += name[0].length
+      continue
+    }
     if (char === '"' || char === "'") {
       const end = source.indexOf(char, index + 1)
       if (end < 0 || source.slice(index, end).includes('\n')) throw new ScriptError('the text is not closed with a quote', line)
@@ -74,7 +122,11 @@ function tokenize(source: string): Token[] {
       continue
     }
     const op = OPERATORS.find((item) => source.startsWith(item, index))
-    if (op) { tokens.push({ kind: 'op', value: op, line }); index += op.length; continue }
+    if (op) {
+      tokens.push({ kind: 'op', value: op, line })
+      index += op.length
+      continue
+    }
     throw new ScriptError(`unexpected "${char}"`, line)
   }
   tokens.push({ kind: 'end', line })
@@ -84,25 +136,29 @@ function tokenize(source: string): Token[] {
 // --- Syntax tree ---------------------------------------------------------------------------------------------------
 
 type Node =
-  | { type: 'number', value: number }
-  | { type: 'string', value: string }
-  | { type: 'name', name: string, line: number }
-  | { type: 'unary', op: string, operand: Node }
-  | { type: 'binary', op: string, left: Node, right: Node }
-  | { type: 'ternary', condition: Node, whenTrue: Node, whenFalse: Node }
-  | { type: 'history', target: Node, offset: Node }
-  | { type: 'call', name: string, args: Node[], named: Record<string, Node>, line: number, inputIndex?: number }
+  | { type: 'number'; value: number }
+  | { type: 'string'; value: string }
+  | { type: 'name'; name: string; line: number }
+  | { type: 'unary'; op: string; operand: Node }
+  | { type: 'binary'; op: string; left: Node; right: Node }
+  | { type: 'ternary'; condition: Node; whenTrue: Node; whenFalse: Node }
+  | { type: 'history'; target: Node; offset: Node }
+  | { type: 'call'; name: string; args: Node[]; named: Record<string, Node>; line: number; inputIndex?: number }
 
-export type Statement = { type: 'assign', name: string, value: Node, line: number } | { type: 'expr', value: Node, line: number }
+export type Statement = { type: 'assign'; name: string; value: Node; line: number } | { type: 'expr'; value: Node; line: number }
 
 class Parser {
   #tokens: Token[]
   #position = 0
   inputs: ScriptInput[] = []
 
-  constructor(tokens: Token[]) { this.#tokens = tokens }
+  constructor(tokens: Token[]) {
+    this.#tokens = tokens
+  }
 
-  get #token(): Token { return this.#tokens[this.#position] }
+  get #token(): Token {
+    return this.#tokens[this.#position]
+  }
 
   #isOp(value: string): boolean {
     const token = this.#token
@@ -122,7 +178,10 @@ class Parser {
   program(): Statement[] {
     const statements: Statement[] = []
     while (this.#token.kind !== 'end') {
-      if (this.#token.kind === 'newline') { this.#position += 1; continue }
+      if (this.#token.kind === 'newline') {
+        this.#position += 1
+        continue
+      }
       const line = this.#token.line
       const next = this.#tokens[this.#position + 1]
       const token = this.#token
@@ -150,18 +209,27 @@ class Parser {
 
   #or(): Node {
     let left = this.#and()
-    while (this.#isWord('or')) { this.#position += 1; left = { type: 'binary', op: 'or', left, right: this.#and() } }
+    while (this.#isWord('or')) {
+      this.#position += 1
+      left = { type: 'binary', op: 'or', left, right: this.#and() }
+    }
     return left
   }
 
   #and(): Node {
     let left = this.#not()
-    while (this.#isWord('and')) { this.#position += 1; left = { type: 'binary', op: 'and', left, right: this.#not() } }
+    while (this.#isWord('and')) {
+      this.#position += 1
+      left = { type: 'binary', op: 'and', left, right: this.#not() }
+    }
     return left
   }
 
   #not(): Node {
-    if (this.#isWord('not')) { this.#position += 1; return { type: 'unary', op: 'not', operand: this.#not() } }
+    if (this.#isWord('not')) {
+      this.#position += 1
+      return { type: 'unary', op: 'not', operand: this.#not() }
+    }
     return this.#comparison()
   }
 
@@ -194,8 +262,14 @@ class Parser {
   }
 
   #unary(): Node {
-    if (this.#isOp('-')) { this.#position += 1; return { type: 'unary', op: '-', operand: this.#unary() } }
-    if (this.#isOp('+')) { this.#position += 1; return this.#unary() }
+    if (this.#isOp('-')) {
+      this.#position += 1
+      return { type: 'unary', op: '-', operand: this.#unary() }
+    }
+    if (this.#isOp('+')) {
+      this.#position += 1
+      return this.#unary()
+    }
     let node = this.#primary()
     while (this.#isOp('[')) {
       this.#position += 1
@@ -208,8 +282,14 @@ class Parser {
 
   #primary(): Node {
     const token = this.#token
-    if (token.kind === 'number') { this.#position += 1; return { type: 'number', value: token.value } }
-    if (token.kind === 'string' || token.kind === 'color') { this.#position += 1; return { type: 'string', value: token.value } }
+    if (token.kind === 'number') {
+      this.#position += 1
+      return { type: 'number', value: token.value }
+    }
+    if (token.kind === 'string' || token.kind === 'color') {
+      this.#position += 1
+      return { type: 'string', value: token.value }
+    }
     if (token.kind === 'op' && token.value === '(') {
       this.#position += 1
       const inner = this.expression()
@@ -238,7 +318,8 @@ class Parser {
       const call: Node = { type: 'call', name: token.value, args, named, line: token.line }
       if (token.value === 'input') {
         const defaultValue = literalNumber(args[0] ?? named.defval)
-        if (defaultValue === undefined) throw new ScriptError('input() needs a number as its first value, like input(14, "Length")', token.line)
+        if (defaultValue === undefined)
+          throw new ScriptError('input() needs a number as its first value, like input(14, "Length")', token.line)
         const title = literalString(args[1] ?? named.title) ?? `Input ${this.inputs.length + 1}`
         call.inputIndex = this.inputs.length
         this.inputs.push({ title, defaultValue })
@@ -284,7 +365,14 @@ export function compileScript(source: string): CompiledScript {
     if (value.name === 'hline' && ++hlines > MAX_HLINES) throw new ScriptError(`at most ${MAX_HLINES} horizontal lines`, statement.line)
   }
   // A trial run over a few candles finds unknown names and functions before the script reaches a chart.
-  const sample = Array.from({ length: 30 }, (_, index) => ({ timestamp: index * 60_000, open: 100 + index, high: 101 + index, low: 99 + index, close: 100.5 + index, volume: 10 }))
+  const sample = Array.from({ length: 30 }, (_, index) => ({
+    timestamp: index * 60_000,
+    open: 100 + index,
+    high: 101 + index,
+    low: 99 + index,
+    close: 100.5 + index,
+    volume: 10,
+  }))
   const compiled = { title, overlay, precision, inputs: parser.inputs, program }
   runScript(compiled, sample)
   return compiled
@@ -303,7 +391,8 @@ function series(value: Value, length: number, line: number): Float64Array {
 }
 
 function length(value: Value, line: number): number {
-  if (typeof value !== 'number' || !Number.isFinite(value) || value < 1 || value > 5000) throw new ScriptError('a length must be a number between 1 and 5000', line)
+  if (typeof value !== 'number' || !Number.isFinite(value) || value < 1 || value > 5000)
+    throw new ScriptError('a length must be a number between 1 and 5000', line)
   return Math.round(value)
 }
 
@@ -332,7 +421,10 @@ function windowed(src: Float64Array, len: number, fn: (slice: number[]) => numbe
     const slice: number[] = []
     let valid = true
     for (let offset = index - len + 1; offset <= index; offset += 1) {
-      if (!Number.isFinite(src[offset])) { valid = false; break }
+      if (!Number.isFinite(src[offset])) {
+        valid = false
+        break
+      }
       slice.push(src[offset])
     }
     if (valid) out[index] = fn(slice)
@@ -351,7 +443,10 @@ function smoothing(src: Float64Array, len: number, alpha: number): Float64Array 
     if (!Number.isFinite(previous)) {
       sum += value
       count += 1
-      if (count === len) { previous = sum / len; out[index] = previous }
+      if (count === len) {
+        previous = sum / len
+        out[index] = previous
+      }
     } else {
       previous = alpha * value + (1 - alpha) * previous
       out[index] = previous
@@ -361,9 +456,11 @@ function smoothing(src: Float64Array, len: number, alpha: number): Float64Array 
 }
 
 function trueRange(bars: readonly ScriptBar[]): Float64Array {
-  return Float64Array.from(bars, (bar, index) => (index === 0
-    ? bar.high - bar.low
-    : Math.max(bar.high - bar.low, Math.abs(bar.high - bars[index - 1].close), Math.abs(bar.low - bars[index - 1].close))))
+  return Float64Array.from(bars, (bar, index) =>
+    index === 0
+      ? bar.high - bar.low
+      : Math.max(bar.high - bar.low, Math.abs(bar.high - bars[index - 1].close), Math.abs(bar.low - bars[index - 1].close)),
+  )
 }
 
 interface Context {
@@ -378,25 +475,38 @@ interface Context {
 function builtinSeries(name: string, context: Context): Float64Array | undefined {
   const { bars } = context
   switch (name) {
-    case 'open': return Float64Array.from(bars, (bar) => bar.open)
-    case 'high': return Float64Array.from(bars, (bar) => bar.high)
-    case 'low': return Float64Array.from(bars, (bar) => bar.low)
-    case 'close': return Float64Array.from(bars, (bar) => bar.close)
-    case 'volume': return Float64Array.from(bars, (bar) => bar.volume ?? NaN)
-    case 'hl2': return Float64Array.from(bars, (bar) => (bar.high + bar.low) / 2)
-    case 'hlc3': return Float64Array.from(bars, (bar) => (bar.high + bar.low + bar.close) / 3)
-    case 'ohlc4': return Float64Array.from(bars, (bar) => (bar.open + bar.high + bar.low + bar.close) / 4)
-    case 'bar_index': return Float64Array.from(bars, (_, index) => index)
-    case 'time': return Float64Array.from(bars, (bar) => bar.timestamp)
-    default: return undefined
+    case 'open':
+      return Float64Array.from(bars, (bar) => bar.open)
+    case 'high':
+      return Float64Array.from(bars, (bar) => bar.high)
+    case 'low':
+      return Float64Array.from(bars, (bar) => bar.low)
+    case 'close':
+      return Float64Array.from(bars, (bar) => bar.close)
+    case 'volume':
+      return Float64Array.from(bars, (bar) => bar.volume ?? NaN)
+    case 'hl2':
+      return Float64Array.from(bars, (bar) => (bar.high + bar.low) / 2)
+    case 'hlc3':
+      return Float64Array.from(bars, (bar) => (bar.high + bar.low + bar.close) / 3)
+    case 'ohlc4':
+      return Float64Array.from(bars, (bar) => (bar.open + bar.high + bar.low + bar.close) / 4)
+    case 'bar_index':
+      return Float64Array.from(bars, (_, index) => index)
+    case 'time':
+      return Float64Array.from(bars, (bar) => bar.timestamp)
+    default:
+      return undefined
   }
 }
 
 function evaluate(node: Node, context: Context): Value {
   const n = context.n
   switch (node.type) {
-    case 'number': return node.value
-    case 'string': return node.value
+    case 'number':
+      return node.value
+    case 'string':
+      return node.value
     case 'name': {
       if (node.name === 'true') return 1
       if (node.name === 'false') return 0
@@ -404,7 +514,10 @@ function evaluate(node: Node, context: Context): Value {
       const variable = context.variables.get(node.name)
       if (variable !== undefined) return variable
       const builtin = builtinSeries(node.name, context)
-      if (builtin) { context.variables.set(node.name, builtin); return builtin }
+      if (builtin) {
+        context.variables.set(node.name, builtin)
+        return builtin
+      }
       throw new ScriptError(`"${node.name}" is not defined`, node.line)
     }
     case 'unary': {
@@ -414,21 +527,71 @@ function evaluate(node: Node, context: Context): Value {
     case 'binary': {
       const left = evaluate(node.left, context)
       const right = evaluate(node.right, context)
-      const compare = (fn: (x: number, y: number) => boolean) => (x: number, y: number) => (Number.isNaN(x) || Number.isNaN(y) ? NaN : fn(x, y) ? 1 : 0)
+      const compare = (fn: (x: number, y: number) => boolean) => (x: number, y: number) =>
+        Number.isNaN(x) || Number.isNaN(y) ? NaN : fn(x, y) ? 1 : 0
       switch (node.op) {
-        case '+': return map2(left, right, n, 0, (x, y) => x + y)
-        case '-': return map2(left, right, n, 0, (x, y) => x - y)
-        case '*': return map2(left, right, n, 0, (x, y) => x * y)
-        case '/': return map2(left, right, n, 0, (x, y) => (y === 0 ? NaN : x / y))
-        case '%': return map2(left, right, n, 0, (x, y) => (y === 0 ? NaN : x % y))
-        case '==': return map2(left, right, n, 0, compare((x, y) => x === y))
-        case '!=': return map2(left, right, n, 0, compare((x, y) => x !== y))
-        case '<': return map2(left, right, n, 0, compare((x, y) => x < y))
-        case '<=': return map2(left, right, n, 0, compare((x, y) => x <= y))
-        case '>': return map2(left, right, n, 0, compare((x, y) => x > y))
-        case '>=': return map2(left, right, n, 0, compare((x, y) => x >= y))
-        case 'and': return map2(left, right, n, 0, (x, y) => (truthy(x) && truthy(y) ? 1 : 0))
-        default: return map2(left, right, n, 0, (x, y) => (truthy(x) || truthy(y) ? 1 : 0))
+        case '+':
+          return map2(left, right, n, 0, (x, y) => x + y)
+        case '-':
+          return map2(left, right, n, 0, (x, y) => x - y)
+        case '*':
+          return map2(left, right, n, 0, (x, y) => x * y)
+        case '/':
+          return map2(left, right, n, 0, (x, y) => (y === 0 ? NaN : x / y))
+        case '%':
+          return map2(left, right, n, 0, (x, y) => (y === 0 ? NaN : x % y))
+        case '==':
+          return map2(
+            left,
+            right,
+            n,
+            0,
+            compare((x, y) => x === y),
+          )
+        case '!=':
+          return map2(
+            left,
+            right,
+            n,
+            0,
+            compare((x, y) => x !== y),
+          )
+        case '<':
+          return map2(
+            left,
+            right,
+            n,
+            0,
+            compare((x, y) => x < y),
+          )
+        case '<=':
+          return map2(
+            left,
+            right,
+            n,
+            0,
+            compare((x, y) => x <= y),
+          )
+        case '>':
+          return map2(
+            left,
+            right,
+            n,
+            0,
+            compare((x, y) => x > y),
+          )
+        case '>=':
+          return map2(
+            left,
+            right,
+            n,
+            0,
+            compare((x, y) => x >= y),
+          )
+        case 'and':
+          return map2(left, right, n, 0, (x, y) => (truthy(x) && truthy(y) ? 1 : 0))
+        default:
+          return map2(left, right, n, 0, (x, y) => (truthy(x) || truthy(y) ? 1 : 0))
       }
     }
     case 'ternary': {
@@ -443,12 +606,14 @@ function evaluate(node: Node, context: Context): Value {
     case 'history': {
       const target = evaluate(node.target, context)
       const offset = evaluate(node.offset, context)
-      if (typeof offset !== 'number' || !Number.isInteger(offset) || offset < 0 || offset > 5000) throw new ScriptError('[ ] needs a whole number of candles back, like close[1]', 0)
+      if (typeof offset !== 'number' || !Number.isInteger(offset) || offset < 0 || offset > 5000)
+        throw new ScriptError('[ ] needs a whole number of candles back, like close[1]', 0)
       if (typeof target === 'number') return target
       const src = series(target, n, 0)
       return Float64Array.from(src, (_, index) => (index - offset >= 0 ? src[index - offset] : NaN))
     }
-    case 'call': return call(node, context)
+    case 'call':
+      return call(node, context)
   }
 }
 
@@ -467,25 +632,55 @@ function call(node: Extract<Node, { type: 'call' }>, context: Context): Value {
   const src = (index = 0) => series(arg(index, 'source'), n, line)
   const len = (index = 1) => length(arg(index, 'length'), line)
   switch (node.name) {
-    case 'indicator': return 0
-    case 'input': return context.inputs[node.inputIndex ?? -1] ?? Number.NaN
-    case 'sma': return windowed(src(), len(), (slice) => slice.reduce((sum, value) => sum + value, 0) / slice.length)
-    case 'sum': return windowed(src(), len(), (slice) => slice.reduce((sum, value) => sum + value, 0))
-    case 'ema': { const l = len(); return smoothing(src(), l, 2 / (l + 1)) }
-    case 'rma': { const l = len(); return smoothing(src(), l, 1 / l) }
-    case 'wma': return windowed(src(), len(), (slice) => { let weight = 0; let total = 0; slice.forEach((value, index) => { total += value * (index + 1); weight += index + 1 }); return total / weight })
+    case 'indicator':
+      return 0
+    case 'input':
+      return context.inputs[node.inputIndex ?? -1] ?? Number.NaN
+    case 'sma':
+      return windowed(src(), len(), (slice) => slice.reduce((sum, value) => sum + value, 0) / slice.length)
+    case 'sum':
+      return windowed(src(), len(), (slice) => slice.reduce((sum, value) => sum + value, 0))
+    case 'ema': {
+      const l = len()
+      return smoothing(src(), l, 2 / (l + 1))
+    }
+    case 'rma': {
+      const l = len()
+      return smoothing(src(), l, 1 / l)
+    }
+    case 'wma':
+      return windowed(src(), len(), (slice) => {
+        let weight = 0
+        let total = 0
+        slice.forEach((value, index) => {
+          total += value * (index + 1)
+          weight += index + 1
+        })
+        return total / weight
+      })
     case 'vwma': {
       const s = src()
       const l = len()
       const volume = builtinSeries('volume', context)!
-      const weighted = windowed(Float64Array.from(s, (value, index) => value * volume[index]), l, (slice) => slice.reduce((a, b) => a + b, 0))
+      const weighted = windowed(
+        Float64Array.from(s, (value, index) => value * volume[index]),
+        l,
+        (slice) => slice.reduce((a, b) => a + b, 0),
+      )
       const volumes = windowed(volume, l, (slice) => slice.reduce((a, b) => a + b, 0))
       return Float64Array.from(weighted, (value, index) => (volumes[index] ? value / volumes[index] : NaN))
     }
-    case 'stdev': return windowed(src(), len(), (slice) => { const mean = slice.reduce((a, b) => a + b, 0) / slice.length; return Math.sqrt(slice.reduce((a, b) => a + (b - mean) ** 2, 0) / slice.length) })
-    case 'highest': return windowed(src(), len(), (slice) => Math.max(...slice))
-    case 'lowest': return windowed(src(), len(), (slice) => Math.min(...slice))
-    case 'change': case 'mom': {
+    case 'stdev':
+      return windowed(src(), len(), (slice) => {
+        const mean = slice.reduce((a, b) => a + b, 0) / slice.length
+        return Math.sqrt(slice.reduce((a, b) => a + (b - mean) ** 2, 0) / slice.length)
+      })
+    case 'highest':
+      return windowed(src(), len(), (slice) => Math.max(...slice))
+    case 'lowest':
+      return windowed(src(), len(), (slice) => Math.min(...slice))
+    case 'change':
+    case 'mom': {
       const s = src()
       const back = node.args[1] || node.named.length ? len() : 1
       return Float64Array.from(s, (value, index) => (index - back >= 0 ? value - s[index - back] : NaN))
@@ -493,22 +688,39 @@ function call(node: Extract<Node, { type: 'call' }>, context: Context): Value {
     case 'roc': {
       const s = src()
       const back = len()
-      return Float64Array.from(s, (value, index) => (index - back >= 0 && s[index - back] !== 0 ? ((value - s[index - back]) / s[index - back]) * 100 : NaN))
+      return Float64Array.from(s, (value, index) =>
+        index - back >= 0 && s[index - back] !== 0 ? ((value - s[index - back]) / s[index - back]) * 100 : NaN,
+      )
     }
     case 'rsi': {
       const s = src()
       const l = len()
       const up = new Float64Array(n).fill(NaN)
       const down = new Float64Array(n).fill(NaN)
-      for (let index = 1; index < n; index += 1) { const delta = s[index] - s[index - 1]; up[index] = Math.max(delta, 0); down[index] = Math.max(-delta, 0) }
+      for (let index = 1; index < n; index += 1) {
+        const delta = s[index] - s[index - 1]
+        up[index] = Math.max(delta, 0)
+        down[index] = Math.max(-delta, 0)
+      }
       const avgUp = smoothing(up, l, 1 / l)
       const avgDown = smoothing(down, l, 1 / l)
-      return Float64Array.from(avgUp, (value, index) => (Number.isNaN(value) ? NaN : avgDown[index] === 0 ? 100 : 100 - 100 / (1 + value / avgDown[index])))
+      return Float64Array.from(avgUp, (value, index) =>
+        Number.isNaN(value) ? NaN : avgDown[index] === 0 ? 100 : 100 - 100 / (1 + value / avgDown[index]),
+      )
     }
-    case 'tr': return trueRange(context.bars)
-    case 'atr': { const l = length(arg(0, 'length'), line); return smoothing(trueRange(context.bars), l, 1 / l) }
-    case 'cum': { let total = 0; return Float64Array.from(src(), (value) => (Number.isFinite(value) ? (total += value) : total)) }
-    case 'crossover': case 'crossunder': case 'cross': {
+    case 'tr':
+      return trueRange(context.bars)
+    case 'atr': {
+      const l = length(arg(0, 'length'), line)
+      return smoothing(trueRange(context.bars), l, 1 / l)
+    }
+    case 'cum': {
+      let total = 0
+      return Float64Array.from(src(), (value) => (Number.isFinite(value) ? (total += value) : total))
+    }
+    case 'crossover':
+    case 'crossunder':
+    case 'cross': {
       const a = series(arg(0), n, line)
       const b = series(arg(1), n, line)
       return Float64Array.from(a, (value, index) => {
@@ -518,19 +730,39 @@ function call(node: Extract<Node, { type: 'call' }>, context: Context): Value {
         return (node.name === 'crossover' ? up : node.name === 'crossunder' ? downwards : up || downwards) ? 1 : 0
       })
     }
-    case 'abs': return map1(arg(0), n, line, Math.abs)
-    case 'sqrt': return map1(arg(0), n, line, Math.sqrt)
-    case 'log': return map1(arg(0), n, line, Math.log)
-    case 'exp': return map1(arg(0), n, line, Math.exp)
-    case 'floor': return map1(arg(0), n, line, Math.floor)
-    case 'ceil': return map1(arg(0), n, line, Math.ceil)
-    case 'round': { const digits = optional(1, 'precision'); const scale = typeof digits === 'number' ? 10 ** Math.round(digits) : 1; return map1(arg(0), n, line, (x) => Math.round(x * scale) / scale) }
-    case 'max': return map2(arg(0), arg(1), n, line, Math.max)
-    case 'min': return map2(arg(0), arg(1), n, line, Math.min)
-    case 'pow': return map2(arg(0), arg(1), n, line, Math.pow)
-    case 'avg': return node.args.map((item) => evaluate(item, context)).reduce((total, value) => map2(total, value, n, line, (x, y) => x + y), 0 as Value) as number | Float64Array
-    case 'nz': { const replacement = optional(1, 'replacement') ?? 0; return map2(arg(0), replacement, n, line, (x, y) => (Number.isFinite(x) ? x : y)) }
-    case 'na': return map1(arg(0), n, line, (x) => (Number.isFinite(x) ? 0 : 1))
+    case 'abs':
+      return map1(arg(0), n, line, Math.abs)
+    case 'sqrt':
+      return map1(arg(0), n, line, Math.sqrt)
+    case 'log':
+      return map1(arg(0), n, line, Math.log)
+    case 'exp':
+      return map1(arg(0), n, line, Math.exp)
+    case 'floor':
+      return map1(arg(0), n, line, Math.floor)
+    case 'ceil':
+      return map1(arg(0), n, line, Math.ceil)
+    case 'round': {
+      const digits = optional(1, 'precision')
+      const scale = typeof digits === 'number' ? 10 ** Math.round(digits) : 1
+      return map1(arg(0), n, line, (x) => Math.round(x * scale) / scale)
+    }
+    case 'max':
+      return map2(arg(0), arg(1), n, line, Math.max)
+    case 'min':
+      return map2(arg(0), arg(1), n, line, Math.min)
+    case 'pow':
+      return map2(arg(0), arg(1), n, line, Math.pow)
+    case 'avg':
+      return node.args
+        .map((item) => evaluate(item, context))
+        .reduce((total, value) => map2(total, value, n, line, (x, y) => x + y), 0 as Value) as number | Float64Array
+    case 'nz': {
+      const replacement = optional(1, 'replacement') ?? 0
+      return map2(arg(0), replacement, n, line, (x, y) => (Number.isFinite(x) ? x : y))
+    }
+    case 'na':
+      return map1(arg(0), n, line, (x) => (Number.isFinite(x) ? 0 : 1))
     case 'plot': {
       if (context.plots.length >= MAX_PLOTS) throw new ScriptError(`at most ${MAX_PLOTS} plots`, line)
       const values = series(arg(0, 'series'), n, line)
@@ -539,7 +771,8 @@ function call(node: Extract<Node, { type: 'call' }>, context: Context): Value {
       const width = optional(3, 'linewidth')
       context.plots.push({
         title: typeof title === 'string' ? title.slice(0, 40) : `Plot ${context.plots.length + 1}`,
-        color: typeof color === 'string' && /^#[0-9a-f]{6}([0-9a-f]{2})?$/i.test(color) ? color : PALETTE[context.plots.length % PALETTE.length],
+        color:
+          typeof color === 'string' && /^#[0-9a-f]{6}([0-9a-f]{2})?$/i.test(color) ? color : PALETTE[context.plots.length % PALETTE.length],
         width: typeof width === 'number' ? Math.max(1, Math.min(4, width)) : 1.5,
         values: Float64Array.from(values),
       })
@@ -554,7 +787,8 @@ function call(node: Extract<Node, { type: 'call' }>, context: Context): Value {
       context.hlines.push({ value, title: typeof title === 'string' ? title : '', color: typeof color === 'string' ? color : '#787b86' })
       return 0
     }
-    default: throw new ScriptError(`unknown function ${node.name}()`, line)
+    default:
+      throw new ScriptError(`unknown function ${node.name}()`, line)
   }
 }
 
@@ -572,11 +806,13 @@ export function runScript(script: CompiledScript, bars: readonly ScriptBar[], in
     try {
       const value = evaluate(statement.value, context)
       if (statement.type === 'assign') {
-        if (builtinSeries(statement.name, context) || ['true', 'false', 'na'].includes(statement.name)) throw new ScriptError(`"${statement.name}" is a built-in name`, statement.line)
+        if (builtinSeries(statement.name, context) || ['true', 'false', 'na'].includes(statement.name))
+          throw new ScriptError(`"${statement.name}" is a built-in name`, statement.line)
         context.variables.set(statement.name, value)
       }
     } catch (error) {
-      if (error instanceof ScriptError) throw error.line === 0 ? new ScriptError(error.message.replace(/^Line 0: /, ''), statement.line) : error
+      if (error instanceof ScriptError)
+        throw error.line === 0 ? new ScriptError(error.message.replace(/^Line 0: /, ''), statement.line) : error
       throw new ScriptError(error instanceof Error ? error.message : String(error), statement.line)
     }
   }

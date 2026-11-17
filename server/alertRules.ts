@@ -13,7 +13,12 @@
 
 export type AlertCondition = 'crossing' | 'greater' | 'less' | 'enterChannel' | 'exitChannel' | 'movePercent'
 
-export interface AlertLineAnchors { readonly t1: number, readonly p1: number, readonly t2: number, readonly p2: number }
+export interface AlertLineAnchors {
+  readonly t1: number
+  readonly p1: number
+  readonly t2: number
+  readonly p2: number
+}
 
 /** The fields of a stored alert that decide when it fires and how it is described. */
 export interface AlertRuleFields {
@@ -33,10 +38,16 @@ export interface AlertRuleFields {
 }
 
 /** What the evaluator remembers about an alert between prices (see evaluateAlert). */
-export interface AlertState { readonly met: boolean, readonly armed: boolean }
+export interface AlertState {
+  readonly met: boolean
+  readonly armed: boolean
+}
 
 /** One evaluateAlert step: whether the alert fires now and the state to keep. */
-export interface AlertEvaluation { readonly fire: boolean, readonly state: AlertState }
+export interface AlertEvaluation {
+  readonly fire: boolean
+  readonly state: AlertState
+}
 
 export const ALERT_CONDITIONS: readonly AlertCondition[] = ['crossing', 'greater', 'less', 'enterChannel', 'exitChannel', 'movePercent']
 export const EVERY_TIME_COOLDOWN_MS = 60_000
@@ -54,7 +65,14 @@ export function conditionOf(alert: { readonly condition?: unknown } | null | und
 /** The target price now: a level, or the trend line's price at this moment. */
 export function targetAt(alert: AlertRuleFields, nowMs: number): number {
   const line = alert?.line
-  if (line && Number.isFinite(line.t1) && Number.isFinite(line.t2) && line.t1 !== line.t2 && Number.isFinite(line.p1) && Number.isFinite(line.p2)) {
+  if (
+    line &&
+    Number.isFinite(line.t1) &&
+    Number.isFinite(line.t2) &&
+    line.t1 !== line.t2 &&
+    Number.isFinite(line.p1) &&
+    Number.isFinite(line.p2)
+  ) {
     return line.p1 + ((line.p2 - line.p1) * (nowMs - line.t1)) / (line.t2 - line.t1)
   }
   return alert.targetPrice
@@ -64,8 +82,10 @@ export function targetAt(alert: AlertRuleFields, nowMs: number): number {
 export function conditionMet(alert: AlertRuleFields, price: number, nowMs: number, referencePrice?: number): boolean {
   const target = targetAt(alert, nowMs)
   switch (conditionOf(alert)) {
-    case 'greater': return price > target
-    case 'less': return price < target
+    case 'greater':
+      return price > target
+    case 'less':
+      return price < target
     case 'enterChannel':
     case 'exitChannel': {
       const upper = isFiniteNumber(alert.upperPrice) ? alert.upperPrice : target
@@ -95,7 +115,13 @@ export function isExpired(alert: Partial<AlertRuleFields> | undefined, nowMs: nu
  * Decides one check. `state` is what the evaluator remembers about the alert: { met, armed } from the previous
  * price (undefined before the first one). Returns whether it fires now and the state to keep.
  */
-export function evaluateAlert(alert: AlertRuleFields, price: number, nowMs: number, state: AlertState | undefined, referencePrice?: number): AlertEvaluation {
+export function evaluateAlert(
+  alert: AlertRuleFields,
+  price: number,
+  nowMs: number,
+  state: AlertState | undefined,
+  referencePrice?: number,
+): AlertEvaluation {
   const met = conditionMet(alert, price, nowMs, referencePrice)
   if (isExpired(alert, nowMs)) return { fire: false, state: { met, armed: false } }
   const everyTime = alert.frequency === 'everyTime'
@@ -122,12 +148,23 @@ export function describeAlert(alert: AlertRuleFields): string {
   const window = windowMs >= 3_600_000 ? `${windowMs / 3_600_000}h` : `${Math.round(windowMs / 60_000)}m`
   let text: string
   switch (condition) {
-    case 'greater': text = `Greater than ${plain(alert.targetPrice)}`; break
-    case 'less': text = `Less than ${plain(alert.targetPrice)}`; break
-    case 'enterChannel': text = `Entering ${plain(Math.min(alert.targetPrice, alert.upperPrice ?? NaN))} – ${plain(Math.max(alert.targetPrice, alert.upperPrice ?? NaN))}`; break
-    case 'exitChannel': text = `Exiting ${plain(Math.min(alert.targetPrice, alert.upperPrice ?? NaN))} – ${plain(Math.max(alert.targetPrice, alert.upperPrice ?? NaN))}`; break
-    case 'movePercent': text = `Moving ${alert.direction === 'below' ? 'down' : 'up'} ${plain(Math.abs(alert.percent ?? NaN))}% in ${window}`; break
-    default: text = `Crossing ${alert.direction === 'below' ? 'down' : 'up'} ${alert.line ? 'trend line' : plain(alert.targetPrice)}`
+    case 'greater':
+      text = `Greater than ${plain(alert.targetPrice)}`
+      break
+    case 'less':
+      text = `Less than ${plain(alert.targetPrice)}`
+      break
+    case 'enterChannel':
+      text = `Entering ${plain(Math.min(alert.targetPrice, alert.upperPrice ?? NaN))} – ${plain(Math.max(alert.targetPrice, alert.upperPrice ?? NaN))}`
+      break
+    case 'exitChannel':
+      text = `Exiting ${plain(Math.min(alert.targetPrice, alert.upperPrice ?? NaN))} – ${plain(Math.max(alert.targetPrice, alert.upperPrice ?? NaN))}`
+      break
+    case 'movePercent':
+      text = `Moving ${alert.direction === 'below' ? 'down' : 'up'} ${plain(Math.abs(alert.percent ?? NaN))}% in ${window}`
+      break
+    default:
+      text = `Crossing ${alert.direction === 'below' ? 'down' : 'up'} ${alert.line ? 'trend line' : plain(alert.targetPrice)}`
   }
   return alert.line && condition !== 'crossing' ? `${text} (trend line)` : text
 }

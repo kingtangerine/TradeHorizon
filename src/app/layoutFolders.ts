@@ -1,14 +1,6 @@
 // Folders on the Superchart page. Same shape as the object-tree groups (groups.ts), so the
 // helpers are shared: a layout stays a plain SavedLayout and the folder is a label layer on top.
-import {
-  EMPTY_GROUPS,
-  assignToGroup,
-  createGroup,
-  deleteGroup,
-  parseGroups,
-  renameGroup,
-  type GroupState,
-} from './groups'
+import { EMPTY_GROUPS, assignToGroup, createGroup, deleteGroup, parseGroups, renameGroup, type GroupState } from './groups'
 
 export type LayoutFolderState = GroupState
 export const EMPTY_LAYOUT_FOLDERS: LayoutFolderState = EMPTY_GROUPS
@@ -36,12 +28,7 @@ export function saveLayoutFolders(userId: string, state: LayoutFolderState): voi
 }
 
 /** A new folder, optionally with layouts already in it. A blank name becomes "New folder". */
-export function createFolder(
-  state: LayoutFolderState,
-  name: string,
-  layoutIds: readonly string[] = [],
-  id?: string,
-): LayoutFolderState {
+export function createFolder(state: LayoutFolderState, name: string, layoutIds: readonly string[] = [], id?: string): LayoutFolderState {
   return createGroup(state, name.trim() || 'New folder', layoutIds, id)
 }
 

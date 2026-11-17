@@ -18,7 +18,7 @@ export function calculateLongPositionMetrics(
 ): LongPositionMetrics {
   const riskDistance = Math.abs(entry - stop)
   const targetDistance = Math.abs(target - entry)
-  const riskAmount = Math.max(0, accountSize) * Math.max(0, riskPercent) / 100
+  const riskAmount = (Math.max(0, accountSize) * Math.max(0, riskPercent)) / 100
   const quantity = riskDistance > 0 ? riskAmount / riskDistance : 0
   const rewardAmount = quantity * targetDistance
 
@@ -29,8 +29,8 @@ export function calculateLongPositionMetrics(
     quantity,
     rewardAmount,
     riskReward: riskDistance > 0 ? targetDistance / riskDistance : 0,
-    targetPercent: entry !== 0 ? targetDistance / Math.abs(entry) * 100 : 0,
-    stopPercent: entry !== 0 ? riskDistance / Math.abs(entry) * 100 : 0,
+    targetPercent: entry !== 0 ? (targetDistance / Math.abs(entry)) * 100 : 0,
+    stopPercent: entry !== 0 ? (riskDistance / Math.abs(entry)) * 100 : 0,
   }
 }
 
@@ -61,7 +61,7 @@ export function calculateDcaPositionMetrics(
   triggered: boolean,
 ): DcaPositionMetrics {
   const multiplier = Math.max(0, sizeMultiplier)
-  const riskAmount = Math.max(0, accountSize) * Math.max(0, riskPercent) / 100
+  const riskAmount = (Math.max(0, accountSize) * Math.max(0, riskPercent)) / 100
   const plannedRisk = Math.abs(entry - stop) + multiplier * Math.abs(dca - stop)
   const baseQuantity = plannedRisk > 0 ? riskAmount / plannedRisk : 0
   const dcaQuantity = triggered ? baseQuantity * multiplier : 0
@@ -77,8 +77,8 @@ export function calculateDcaPositionMetrics(
     quantity: totalQuantity,
     rewardAmount: totalQuantity * targetDistance,
     riskReward: riskDistance > 0 ? targetDistance / riskDistance : 0,
-    targetPercent: averageEntry !== 0 ? targetDistance / Math.abs(averageEntry) * 100 : 0,
-    stopPercent: averageEntry !== 0 ? riskDistance / Math.abs(averageEntry) * 100 : 0,
+    targetPercent: averageEntry !== 0 ? (targetDistance / Math.abs(averageEntry)) * 100 : 0,
+    stopPercent: averageEntry !== 0 ? (riskDistance / Math.abs(averageEntry)) * 100 : 0,
     baseQuantity,
     dcaQuantity,
     totalQuantity,

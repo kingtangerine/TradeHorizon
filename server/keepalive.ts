@@ -45,15 +45,25 @@ export interface KeepAlive {
 
 /** Public origin of a request as the visitor used it ("https://example.com"), or undefined for local/odd hosts. */
 export function originOf(headers: RequestHeaders, trustProxy: boolean): string | undefined {
-  const host = String((trustProxy && headers['x-forwarded-host']) || headers.host || '').split(',')[0].trim()
+  const host = String((trustProxy && headers['x-forwarded-host']) || headers.host || '')
+    .split(',')[0]
+    .trim()
   if (!/^[a-z0-9.-]+(:\d+)?$/i.test(host)) return undefined
   if (/^(localhost|127\.|0\.0\.0\.0|\[?::1)/i.test(host)) return undefined
-  const forwarded = String(headers['x-forwarded-proto'] ?? '').split(',')[0].trim()
+  const forwarded = String(headers['x-forwarded-proto'] ?? '')
+    .split(',')[0]
+    .trim()
   const proto = forwarded === 'https' || forwarded === 'http' ? forwarded : 'http'
   return `${proto}://${host}`
 }
 
-export function createKeepAlive({ publicUrl, trustProxy = true, fetchImpl = (url, init) => fetch(url, init), log = console, intervalMs = PING_MS }: KeepAliveOptions): KeepAlive {
+export function createKeepAlive({
+  publicUrl,
+  trustProxy = true,
+  fetchImpl = (url, init) => fetch(url, init),
+  log = console,
+  intervalMs = PING_MS,
+}: KeepAliveOptions): KeepAlive {
   let origin = publicUrl ? publicUrl.replace(/\/+$/, '') : undefined
   let timer: NodeJS.Timeout | undefined
   let lastPing = { atMs: 0, ok: false }
@@ -61,7 +71,10 @@ export function createKeepAlive({ publicUrl, trustProxy = true, fetchImpl = (url
   async function ping() {
     if (!origin) return
     try {
-      const response = await fetchImpl(`${origin}/healthz?keepalive=1`, { headers: { 'User-Agent': 'TradeHorizon keep-alive' }, signal: AbortSignal.timeout(15_000) })
+      const response = await fetchImpl(`${origin}/healthz?keepalive=1`, {
+        headers: { 'User-Agent': 'TradeHorizon keep-alive' },
+        signal: AbortSignal.timeout(15_000),
+      })
       lastPing = { atMs: Date.now(), ok: response.ok }
     } catch (error) {
       if (lastPing.ok || lastPing.atMs === 0) log.warn?.(`[keep-alive] could not reach ${origin}: ${(error as Error).message}`)
@@ -74,13 +87,16 @@ export function createKeepAlive({ publicUrl, trustProxy = true, fetchImpl = (url
     observe(req) {
       if (origin || req.headers['user-agent'] === 'TradeHorizon keep-alive') return
       origin = originOf(req.headers, trustProxy)
-      if (origin) log.log?.(`[keep-alive] pinging ${origin}/healthz every ${Math.round(intervalMs / 60_000)} min so the host does not stop the app`)
+      if (origin)
+        log.log?.(`[keep-alive] pinging ${origin}/healthz every ${Math.round(intervalMs / 60_000)} min so the host does not stop the app`)
     },
     start() {
       timer = setInterval(() => void ping(), intervalMs)
       timer.unref?.()
     },
-    stop() { clearInterval(timer) },
+    stop() {
+      clearInterval(timer)
+    },
     status: () => ({ origin: origin ?? null, lastPingAtMs: lastPing.atMs || null, lastPingOk: lastPing.ok }),
     ping,
   }
@@ -91,13 +107,19 @@ export function recordStart(dataDir: string, now = Date.now()): number[] {
   const file = join(dataDir, 'starts.json')
   let starts: number[] = []
   if (existsSync(file)) {
-    try { starts = (JSON.parse(readFileSync(file, 'utf8')) as unknown[]).filter((value): value is number => typeof value === 'number') } catch { /* start fresh */ }
+    try {
+      starts = (JSON.parse(readFileSync(file, 'utf8')) as unknown[]).filter((value): value is number => typeof value === 'number')
+    } catch {
+      /* start fresh */
+    }
   }
   starts = [...starts, now].slice(-50)
   try {
     writeFileSync(`${file}.tmp`, JSON.stringify(starts))
     renameSync(`${file}.tmp`, file)
-  } catch { /* data folder not writable: health shows that separately */ }
+  } catch {
+    /* data folder not writable: health shows that separately */
+  }
   return starts
 }
 

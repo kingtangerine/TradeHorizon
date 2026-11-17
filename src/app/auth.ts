@@ -39,12 +39,15 @@ function writeSession(session: StoredSession): void {
 }
 
 class AuthRequestError extends Error {
-  constructor(message: string, readonly status: number) {
+  constructor(
+    message: string,
+    readonly status: number,
+  ) {
     super(message)
   }
 }
 
-async function request<T>(path: string, init: { method?: string, body?: unknown, token?: string } = {}): Promise<T> {
+async function request<T>(path: string, init: { method?: string; body?: unknown; token?: string } = {}): Promise<T> {
   let response: Response
   try {
     response = await fetch(path, {
@@ -58,10 +61,11 @@ async function request<T>(path: string, init: { method?: string, body?: unknown,
   } catch {
     throw new AuthRequestError('Cannot reach the TradeHorizon server. Check your connection and that the server is running.', 0)
   }
-  const data = await response.json().catch(() => null) as { error?: string } | null
+  const data = (await response.json().catch(() => null)) as { error?: string } | null
   if (!response.ok) {
     // No JSON error body means the request never reached the auth server (e.g. the dev proxy got ECONNREFUSED).
-    if (!data?.error) throw new AuthRequestError('The TradeHorizon auth server is not running. Start the app with `npm run dev`.', response.status)
+    if (!data?.error)
+      throw new AuthRequestError('The TradeHorizon auth server is not running. Start the app with `npm run dev`.', response.status)
     throw new AuthRequestError(data.error, response.status)
   }
   return data as T

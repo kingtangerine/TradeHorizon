@@ -19,16 +19,24 @@ export function parseIntervalInput(text: string): MarketInterval | undefined {
   else if (unit === 'd' || unit === 'D') candidate = count % 7 === 0 ? `${count / 7}w` : `${count}d`
   else if (unit === 'w' || unit === 'W') candidate = `${count}w`
   else candidate = `${count}M`
-  return (MARKET_INTERVALS as readonly string[]).includes(candidate) ? candidate as MarketInterval : undefined
+  return (MARKET_INTERVALS as readonly string[]).includes(candidate) ? (candidate as MarketInterval) : undefined
 }
 
 /** Characters that may follow the first digit in the timeframe box. */
 export const INTERVAL_INPUT_CHARS = /^[0-9mhdwHDWM]$/
 
 /** A plain key press meant for the chart (no modifier, not typed into a field). */
-export function isChartTypingKey(event: Pick<KeyboardEvent, 'key' | 'ctrlKey' | 'metaKey' | 'altKey'>, target: EventTarget | null): boolean {
+export function isChartTypingKey(
+  event: Pick<KeyboardEvent, 'key' | 'ctrlKey' | 'metaKey' | 'altKey'>,
+  target: EventTarget | null,
+): boolean {
   if (event.ctrlKey || event.metaKey || event.altKey || event.key.length !== 1) return false
-  if (typeof HTMLElement !== 'undefined' && target instanceof HTMLElement && (target.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName))) return false
+  if (
+    typeof HTMLElement !== 'undefined' &&
+    target instanceof HTMLElement &&
+    (target.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName))
+  )
+    return false
   return true
 }
 

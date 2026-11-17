@@ -6,7 +6,9 @@ import { createTelegramService, escapeHtml, explainError, formatAlertMessage, pa
 
 const TOKEN = '123456789:AAHdqTcvCH1vGWJxfSeofSAs0K5PALDsaw'
 const dirs: string[] = []
-afterEach(() => { for (const dir of dirs.splice(0)) rmSync(dir, { recursive: true, force: true }) })
+afterEach(() => {
+  for (const dir of dirs.splice(0)) rmSync(dir, { recursive: true, force: true })
+})
 
 /** A fake Telegram: records every call and answers from `handlers`. */
 type Handler = (body: Record<string, unknown>) => unknown
@@ -17,8 +19,19 @@ function fakeTelegram(handlers: Record<string, Handler> = {}) {
     const method = url.split('/').pop() ?? ''
     const body = JSON.parse(init.body as string) as Record<string, unknown>
     calls.push({ method, body })
-    const result = handlers[method] ? handlers[method](body) : (method === 'getMe' ? { username: 'TradeHorizonBot' } : method === 'getUpdates' ? [] : true)
-    if (result instanceof Error) return { ok: false, status: (result as Error & { status?: number }).status ?? 400, json: async () => ({ ok: false, description: result.message }) }
+    const result = handlers[method]
+      ? handlers[method](body)
+      : method === 'getMe'
+        ? { username: 'TradeHorizonBot' }
+        : method === 'getUpdates'
+          ? []
+          : true
+    if (result instanceof Error)
+      return {
+        ok: false,
+        status: (result as Error & { status?: number }).status ?? 400,
+        json: async () => ({ ok: false, description: result.message }),
+      }
     return { ok: true, status: 200, json: async () => ({ ok: true, result }) }
   }
   return { calls, fetchImpl, sent: () => calls.filter((call) => call.method === 'sendMessage').map((call) => call.body) }
@@ -39,7 +52,11 @@ function make(options: { handlers?: Record<string, Handler>; token?: string; now
   return { service, telegram, dir }
 }
 
-const start = (code: string | null, chatId = 77) => ({ chat: { id: chatId, type: 'private' }, from: { first_name: 'Sam', last_name: 'Lee' }, text: `/start ${code}` })
+const start = (code: string | null, chatId = 77) => ({
+  chat: { id: chatId, type: 'private' },
+  from: { first_name: 'Sam', last_name: 'Lee' },
+  text: `/start ${code}`,
+})
 
 describe('helpers', () => {
   it('parses commands, with or without the bot name and argument', () => {
@@ -51,7 +68,9 @@ describe('helpers', () => {
 
   it('escapes HTML in alert messages so symbols cannot break the formatting', () => {
     expect(escapeHtml('<b>&')).toBe('&lt;b&gt;&amp;')
-    expect(formatAlertMessage({ title: 'A<B price alert', body: 'Price reached 1 & 2' })).toBe('🔔 <b>A&lt;B price alert</b>\nPrice reached 1 &amp; 2')
+    expect(formatAlertMessage({ title: 'A<B price alert', body: 'Price reached 1 & 2' })).toBe(
+      '🔔 <b>A&lt;B price alert</b>\nPrice reached 1 &amp; 2',
+    )
   })
 })
 
@@ -134,7 +153,12 @@ describe('telegram service', () => {
     const code = new URL(first.service.createLink('u1')?.url ?? '').searchParams.get('start')
     await first.service.handleMessage(start(code))
 
-    const restarted = createTelegramService({ dataDir: first.dir, token: TOKEN, fetchImpl: first.telegram.fetchImpl, log: { log() {}, warn() {} } })
+    const restarted = createTelegramService({
+      dataDir: first.dir,
+      token: TOKEN,
+      fetchImpl: first.telegram.fetchImpl,
+      log: { log() {}, warn() {} },
+    })
     expect(restarted.status('u1').linked).toBe(true)
 
     await restarted.handleMessage({ chat: { id: 77, type: 'private' }, text: '/stop' })
@@ -145,7 +169,9 @@ describe('telegram service', () => {
   })
 
   it('advances the update offset so a message is never handled twice', async () => {
-    const { service, telegram } = make({ handlers: { getUpdates: () => [{ update_id: 41, message: { chat: { id: 1, type: 'private' }, text: '/help' } }] } })
+    const { service, telegram } = make({
+      handlers: { getUpdates: () => [{ update_id: 41, message: { chat: { id: 1, type: 'private' }, text: '/help' } }] },
+    })
     await service.pollOnce()
     await service.pollOnce()
     const polls = telegram.calls.filter((call) => call.method === 'getUpdates')
@@ -157,7 +183,10 @@ describe('telegram service', () => {
 describe('diagnostics for /healthz', () => {
   it('says why the bot is off', () => {
     expect(make({ token: undefined }).service.diagnostics()).toMatchObject({ state: 'off', problem: expect.stringContaining('not set') })
-    expect(make({ token: '"123:abc"' }).service.diagnostics()).toMatchObject({ state: 'off', problem: expect.stringContaining('does not look like') })
+    expect(make({ token: '"123:abc"' }).service.diagnostics()).toMatchObject({
+      state: 'off',
+      problem: expect.stringContaining('does not look like'),
+    })
     expect(make().service.diagnostics()).toMatchObject({ state: 'starting' })
   })
 

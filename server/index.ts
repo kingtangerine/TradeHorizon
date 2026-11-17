@@ -75,8 +75,6 @@ const publicUser = (user: User) => ({
   ...(user.passwordTemporary ? { mustChangePassword: true } : {}),
 })
 
-
-
 function startSession(userId: string): string {
   const token = randomBytes(32).toString('hex')
   const now = Date.now()
@@ -106,7 +104,6 @@ const DATA_KEY = /^[a-z0-9:_-]{1,64}$/i
 const MAX_VALUE_BYTES = 5_000_000
 const MAX_KEYS = 50
 
-
 // Services
 const markets = createMarketService({ dataDir })
 const push = createPushService({
@@ -126,12 +123,16 @@ const alerts = createAlertService({
   store: {
     listUserIds: () => store.data.usersWithKey(ALERTS_KEY),
     getAlertsValue: (userId) => store.data.value(userId, ALERTS_KEY),
-    setAlertsValue: (userId, value) => { store.data.store(userId, ALERTS_KEY, value) },
+    setAlertsValue: (userId, value) => {
+      store.data.store(userId, ALERTS_KEY, value)
+    },
   },
   exchangeOf: (symbol) => markets.exchangeOf(symbol),
   apiSymbolOf: (symbol) => markets.apiSymbolOf(symbol),
   // Every channel the user has set up; one failing channel never blocks the others.
-  notify: async (userId, payload) => { await Promise.allSettled([push.send(userId, payload), telegram.send(userId, payload)]) },
+  notify: async (userId, payload) => {
+    await Promise.allSettled([push.send(userId, payload), telegram.send(userId, payload)])
+  },
 })
 
 async function handleData(req: IncomingMessage, res: ServerResponse): Promise<void> {
@@ -163,7 +164,6 @@ async function handleData(req: IncomingMessage, res: ServerResponse): Promise<vo
 }
 
 // --- Admin page (TH_ADMIN_EMAILS) ------------------------------------------------------------------------
-
 
 function adminUserRow(user: User) {
   const now = Date.now()
@@ -242,7 +242,8 @@ async function handleAdmin(req: IncomingMessage, res: ServerResponse, path: stri
   if (!isAdmin(admin)) return send(res, 403, { error: 'Administrators only.' })
 
   if (path === '/api/admin/overview' && req.method === 'GET') return send(res, 200, adminOverview())
-  if (path === '/api/admin/users' && req.method === 'GET') return sendCompressed(req, res, 200, { users: store.users.all().map(adminUserRow) })
+  if (path === '/api/admin/users' && req.method === 'GET')
+    return sendCompressed(req, res, 200, { users: store.users.all().map(adminUserRow) })
   if (path === '/api/admin/backup' && req.method === 'POST') {
     try {
       const copy = backups.run()
@@ -281,7 +282,12 @@ async function handleAdmin(req: IncomingMessage, res: ServerResponse, path: stri
   // delete
   const body = await readBody(req)
   if (target.id === admin.id) return send(res, 400, { error: 'You cannot delete your own account from the admin page.' })
-  if (String(body.confirmEmail ?? '').trim().toLowerCase() !== target.email) return send(res, 400, { error: "Type the account's email address to confirm." })
+  if (
+    String(body.confirmEmail ?? '')
+      .trim()
+      .toLowerCase() !== target.email
+  )
+    return send(res, 400, { error: "Type the account's email address to confirm." })
   deleteAccount(target.id)
   console.log(`[admin] ${admin.email} deleted the account ${target.email}`)
   return send(res, 200, { ok: true })
@@ -294,7 +300,13 @@ async function handleApi(req: IncomingMessage, res: ServerResponse, path: string
   if (path === '/api/sync/status' && req.method === 'GET') {
     const user = sessionUser(req)
     if (!user) return send(res, 401, { error: 'Session expired.' })
-    return send(res, 200, { protocol: SYNC_PROTOCOL, version, serverTimeMs: Date.now(), rev: store.data.latestRev(user.id), items: describeData(store.data.all(user.id)) })
+    return send(res, 200, {
+      protocol: SYNC_PROTOCOL,
+      version,
+      serverTimeMs: Date.now(),
+      rev: store.data.latestRev(user.id),
+      items: describeData(store.data.all(user.id)),
+    })
   }
 
   // Public market data, cached here so browsers do not each download it from the exchanges.
@@ -353,11 +365,17 @@ async function handleApi(req: IncomingMessage, res: ServerResponse, path: string
       const link = telegram.createLink(user.id)
       return link ? send(res, 200, link) : send(res, 503, { error: 'The Telegram bot is still starting. Try again in a few seconds.' })
     }
-    if (path === '/api/telegram/unlink') { telegram.unlink(user.id); return send(res, 200, { ok: true }) }
+    if (path === '/api/telegram/unlink') {
+      telegram.unlink(user.id)
+      return send(res, 200, { ok: true })
+    }
     if (path === '/api/telegram/test') {
       if (telegramThrottled(clientIp(req))) return send(res, 429, { error: 'Too many attempts. Wait a minute and try again.' })
       if (!telegram.status(user.id).linked) return send(res, 409, { error: 'Telegram is not connected.' })
-      const results = await telegram.send(user.id, { title: 'TradeHorizon test alert', body: 'If you can read this, Telegram alerts work.' })
+      const results = await telegram.send(user.id, {
+        title: 'TradeHorizon test alert',
+        body: 'If you can read this, Telegram alerts work.',
+      })
       const failed = results.find((result) => !result.ok)
       return failed ? send(res, 502, { error: `Telegram did not accept the message: ${failed.error}` }) : send(res, 200, { ok: true })
     }
@@ -368,8 +386,13 @@ async function handleApi(req: IncomingMessage, res: ServerResponse, path: string
   if (path === '/api/client-error' && req.method === 'POST') {
     if (errorReportThrottled(clientIp(req))) return send(res, 429, { error: 'Too many reports.' })
     const body = await readBody(req, 4_000)
-    const clip = (value: unknown, max: number) => String(value ?? '').replace(/[\r\n]+/g, ' ').slice(0, max)
-    console.error(`[client-error] ${clip(body.message, 300)} | ${clip(body.source, 200)} | v${clip(body.version, 20)} | ${clip(body.stack, 600)}`)
+    const clip = (value: unknown, max: number) =>
+      String(value ?? '')
+        .replace(/[\r\n]+/g, ' ')
+        .slice(0, max)
+    console.error(
+      `[client-error] ${clip(body.message, 300)} | ${clip(body.source, 200)} | v${clip(body.version, 20)} | ${clip(body.stack, 600)}`,
+    )
     return send(res, 204, {})
   }
 
@@ -405,7 +428,9 @@ async function handleApi(req: IncomingMessage, res: ServerResponse, path: string
   if (throttled(req)) return send(res, 429, { error: 'Too many attempts. Wait a minute and try again.' })
 
   const body = await readBody(req)
-  const email = String(body.email ?? '').trim().toLowerCase()
+  const email = String(body.email ?? '')
+    .trim()
+    .toLowerCase()
   const password = String(body.password ?? '')
 
   if (path === '/api/auth/signup') {
@@ -414,12 +439,22 @@ async function handleApi(req: IncomingMessage, res: ServerResponse, path: string
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return send(res, 400, { error: 'Enter a valid email address.' })
     if (password.length < 8) return send(res, 400, { error: 'Password must contain at least 8 characters.' })
     if (store.users.byEmail(email)) return send(res, 409, { error: 'An account already exists for this email.' })
-    const legacyId = typeof body.legacyId === 'string' && /^[0-9a-f-]{36}$/i.test(body.legacyId) && !store.users.get(body.legacyId) ? body.legacyId : undefined
+    const legacyId =
+      typeof body.legacyId === 'string' && /^[0-9a-f-]{36}$/i.test(body.legacyId) && !store.users.get(body.legacyId)
+        ? body.legacyId
+        : undefined
     const passwordHash = await makeHash(password)
     // Checked again after the slow password hash: another sign-up for the same email may have finished meanwhile.
     if (store.users.byEmail(email)) return send(res, 409, { error: 'An account already exists for this email.' })
     const now = Date.now()
-    const user = store.users.create({ id: legacyId ?? randomUUID(), email, displayName, createdAtMs: now, passwordHash, lastLoginAtMs: now })
+    const user = store.users.create({
+      id: legacyId ?? randomUUID(),
+      email,
+      displayName,
+      createdAtMs: now,
+      passwordHash,
+      lastLoginAtMs: now,
+    })
     const token = startSession(user.id)
     return send(res, 201, { user: publicUser(user), token })
   }
@@ -435,7 +470,13 @@ async function handleApi(req: IncomingMessage, res: ServerResponse, path: string
 
 function databaseStatus() {
   // The -wal file only exists while SQLite has unmerged writes, so a missing file means 0 bytes.
-  const fileSize = (suffix: string) => { try { return statSync(databaseFile + suffix).size } catch { return 0 } }
+  const fileSize = (suffix: string) => {
+    try {
+      return statSync(databaseFile + suffix).size
+    } catch {
+      return 0
+    }
+  }
   return {
     file: databaseFile,
     bytes: fileSize('') + fileSize('-wal'),
@@ -447,7 +488,11 @@ function databaseStatus() {
 
 function health() {
   let dataWritable = true
-  try { accessSync(dataDir, fsConstants.W_OK) } catch { dataWritable = false }
+  try {
+    accessSync(dataDir, fsConstants.W_OK)
+  } catch {
+    dataWritable = false
+  }
   const catalog = markets.getCatalog()
   return {
     ok: dataWritable,
@@ -462,7 +507,14 @@ function health() {
     dataWritable,
     database: (() => {
       const status = databaseStatus()
-      return { users: status.users, items: status.items, bytes: status.bytes, lastBackupAtMs: status.backups.lastBackupAtMs, backups: status.backups.count, backupError: status.backups.lastError }
+      return {
+        users: status.users,
+        items: status.items,
+        bytes: status.bytes,
+        lastBackupAtMs: status.backups.lastBackupAtMs,
+        backups: status.backups.count,
+        backupError: status.backups.lastError,
+      }
     })(),
     alerts: { active: alerts.activeCount(), ...alerts.watchStatus(), feed: priceFeed.status() },
     notificationQueues: { telegram: telegram.queueStatus(), push: push.queueStatus() },
@@ -499,7 +551,9 @@ const server = createServer(async (req, res) => {
 })
 
 server.listen(port, host, () => {
-  console.log(`TradeHorizon ${version} listening on http://${host}:${port}  (database: ${databaseFile}${migration.imported ? `, just moved ${migration.users} accounts in from the JSON files` : ''})`)
+  console.log(
+    `TradeHorizon ${version} listening on http://${host}:${port}  (database: ${databaseFile}${migration.imported ? `, just moved ${migration.users} accounts in from the JSON files` : ''})`,
+  )
   backups.start()
   markets.start()
   alerts.start()
@@ -516,7 +570,10 @@ for (const signal of ['SIGINT', 'SIGTERM']) {
     push.stop()
     keepAlive.stop()
     backups.stop()
-    server.close(() => { store.close(); process.exit(0) })
+    server.close(() => {
+      store.close()
+      process.exit(0)
+    })
     setTimeout(() => process.exit(0), 2000).unref()
   })
 }

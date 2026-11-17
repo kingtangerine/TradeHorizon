@@ -48,4 +48,3 @@ describe('replay speeds', () => {
     expect([...delays].sort((a, b) => b - a)).toEqual(delays)
   })
 })
-

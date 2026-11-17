@@ -1,11 +1,6 @@
 import type { Candle, MarketInterval } from '../market'
 
-export type ChartConnectionState =
-  | 'loading'
-  | 'connecting'
-  | 'live'
-  | 'reconnecting'
-  | 'error'
+export type ChartConnectionState = 'loading' | 'connecting' | 'live' | 'reconnecting' | 'error'
 
 export interface ChartQuote {
   open: number

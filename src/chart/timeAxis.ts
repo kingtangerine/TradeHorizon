@@ -14,7 +14,13 @@ function formatterFor(timeZone: string): Intl.DateTimeFormat {
   let formatter = formatters.get(timeZone)
   if (!formatter) {
     formatter = new Intl.DateTimeFormat('en-US', {
-      timeZone, hourCycle: 'h23', year: 'numeric', month: 'numeric', day: 'numeric', hour: 'numeric', minute: 'numeric',
+      timeZone,
+      hourCycle: 'h23',
+      year: 'numeric',
+      month: 'numeric',
+      day: 'numeric',
+      hour: 'numeric',
+      minute: 'numeric',
     })
     formatters.set(timeZone, formatter)
   }
@@ -75,7 +81,7 @@ export function formatCrosshairTime(timestamp: number, timeZone: string, interva
 }
 
 /** Spacing candidates, smallest first: minutes within a day, then days, months and years. */
-type Step = { readonly unit: 'minute' | 'day' | 'month' | 'year', readonly size: number, readonly approxMs: number }
+type Step = { readonly unit: 'minute' | 'day' | 'month' | 'year'; readonly size: number; readonly approxMs: number }
 const STEPS: readonly Step[] = [
   ...[1, 2, 3, 5, 10, 15, 30, 60, 120, 180, 240, 360, 720].map((size) => ({ unit: 'minute' as const, size, approxMs: size * 60_000 })),
   ...[1, 2, 3, 5, 7, 10, 15].map((size) => ({ unit: 'day' as const, size, approxMs: size * DAY_MS })),
@@ -105,11 +111,17 @@ export interface TickOptions {
  * Labels for the time axis. `bars` are consecutive candles in index order; include the one just left of the visible
  * range so that a boundary at the left edge is still recognised.
  */
-export function buildTimeTicks(bars: ReadonlyArray<{ readonly index: number, readonly timestamp: number }>, options: TickOptions): TimeTick[] {
+export function buildTimeTicks(
+  bars: ReadonlyArray<{ readonly index: number; readonly timestamp: number }>,
+  options: TickOptions,
+): TimeTick[] {
   const minSpacing = options.minSpacingPx ?? 72
   if (bars.length < 2 || options.barSpacePx <= 0) return []
-  const step = STEPS.find((candidate) => candidate.approxMs >= options.intervalMs && (candidate.approxMs / options.intervalMs) * options.barSpacePx >= minSpacing)
-    ?? STEPS[STEPS.length - 1]
+  const step =
+    STEPS.find(
+      (candidate) =>
+        candidate.approxMs >= options.intervalMs && (candidate.approxMs / options.intervalMs) * options.barSpacePx >= minSpacing,
+    ) ?? STEPS[STEPS.length - 1]
 
   const candidates: TimeTick[] = []
   let previous = localTime(bars[0].timestamp, options.timeZone)
@@ -119,9 +131,15 @@ export function buildTimeTicks(bars: ReadonlyArray<{ readonly index: number, rea
     let level = 0
     let text = ''
     if (current.year !== previous.year) {
-      if (step.unit !== 'year' || current.year % step.size === 0) { level = 4; text = String(current.year) }
+      if (step.unit !== 'year' || current.year % step.size === 0) {
+        level = 4
+        text = String(current.year)
+      }
     } else if (current.month !== previous.month) {
-      if (step.unit !== 'year' && (step.unit !== 'month' || current.month % step.size === 0)) { level = 3; text = MONTHS[current.month] }
+      if (step.unit !== 'year' && (step.unit !== 'month' || current.month % step.size === 0)) {
+        level = 3
+        text = MONTHS[current.month]
+      }
     } else if (current.day !== previous.day) {
       if (step.unit === 'minute' || (step.unit === 'day' && (current.day - 1) % step.size === 0 && current.day + step.size / 2 <= 31)) {
         level = 2

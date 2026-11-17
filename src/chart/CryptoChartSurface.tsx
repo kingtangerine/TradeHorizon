@@ -35,7 +35,7 @@ interface CryptoChartSurfaceProps {
   onSelectionChange(selectedId?: string): void
   onAddAlert?(price: number): void
   /** Right-click on the chart (not on a drawing, not while a tool is armed): where, and the price there. */
-  onChartContextMenu?(info: { left: number, top: number, price: number | null }): void
+  onChartContextMenu?(info: { left: number; top: number; price: number | null }): void
   /** Price alerts to draw as draggable lines. */
   alertLines?: readonly AlertLine[]
   onAlertMove?(id: string, price: number): void
@@ -76,7 +76,7 @@ export function CryptoChartSurface({
   displayRef.current = { timeZone, highLowLabels, scaleMode, appearance, drawingModes, syncGroup, syncCrosshair, syncTime }
   themeRef.current = theme
   const [priceViewManual, setPriceViewManual] = useState(false)
-  const [alertHover, setAlertHover] = useState<{ top: number, left: number, price: number } | null>(null)
+  const [alertHover, setAlertHover] = useState<{ top: number; left: number; price: number } | null>(null)
   const hostRef = useRef<HTMLDivElement>(null)
   const countdownRef = useRef<HTMLDivElement>(null)
   const controllerRef = useRef<KLineChartController | null>(null)
@@ -194,7 +194,10 @@ export function CryptoChartSurface({
     if (!countdown || !element || !controller) return
     const update = () => {
       const state = controller.countdownState()
-      if (!state) { element.hidden = true; return }
+      if (!state) {
+        element.hidden = true
+        return
+      }
       element.hidden = false
       const text = formatCountdown(state.remainingMs)
       if (element.textContent !== text) element.textContent = text
@@ -206,10 +209,15 @@ export function CryptoChartSurface({
     let frame = 0
     const schedule = () => {
       if (frame || document.hidden) return
-      frame = requestAnimationFrame(() => { frame = 0; update() })
+      frame = requestAnimationFrame(() => {
+        frame = 0
+        update()
+      })
     }
     const unsubscribe = controller.onViewChange(schedule)
-    const timer = setInterval(() => { if (!document.hidden) update() }, 1000)
+    const timer = setInterval(() => {
+      if (!document.hidden) update()
+    }, 1000)
     update()
     return () => {
       unsubscribe()
@@ -231,7 +239,8 @@ export function CryptoChartSurface({
       if (!controller || !contextMenuRef.current || controller.drawingUnderPointer()) return
       const hostRect = host.getBoundingClientRect()
       const pane = controller.pricePaneBounds()
-      const onPriceChart = !!pane && event.clientX >= pane.left && event.clientX <= pane.right && event.clientY >= pane.top && event.clientY <= pane.bottom
+      const onPriceChart =
+        !!pane && event.clientX >= pane.left && event.clientX <= pane.right && event.clientY >= pane.top && event.clientY <= pane.bottom
       setAlertHover(null)
       contextMenuRef.current({
         left: event.clientX - hostRect.left,
@@ -250,14 +259,23 @@ export function CryptoChartSurface({
     const move = (event: PointerEvent) => {
       const bounds = controllerRef.current?.pricePaneBounds()
       const hostRect = host.getBoundingClientRect()
-      if (!bounds || event.buttons !== 0 || event.pointerType === 'touch' ||
-          event.clientX < bounds.left || event.clientX > bounds.right ||
-          event.clientY < bounds.top || event.clientY > bounds.bottom) {
+      if (
+        !bounds ||
+        event.buttons !== 0 ||
+        event.pointerType === 'touch' ||
+        event.clientX < bounds.left ||
+        event.clientX > bounds.right ||
+        event.clientY < bounds.top ||
+        event.clientY > bounds.bottom
+      ) {
         setAlertHover(null)
         return
       }
       const price = controllerRef.current?.priceAtClientY(event.clientY)
-      if (price === null || price === undefined) { setAlertHover(null); return }
+      if (price === null || price === undefined) {
+        setAlertHover(null)
+        return
+      }
       setAlertHover({ top: event.clientY - hostRect.top, left: bounds.right - hostRect.left, price })
     }
     const leave = (event: PointerEvent) => {
@@ -274,7 +292,9 @@ export function CryptoChartSurface({
   return (
     <>
       <div ref={hostRef} className="chart-host" aria-label={`${market.pair} candlestick chart`} />
-      {countdown && <div ref={countdownRef} className="chart-countdown" hidden aria-hidden="true" title="Time left until this candle closes" />}
+      {countdown && (
+        <div ref={countdownRef} className="chart-countdown" hidden aria-hidden="true" title="Time left until this candle closes" />
+      )}
       {priceViewManual && (
         <button
           type="button"
@@ -293,8 +313,13 @@ export function CryptoChartSurface({
           title={`Add alert at ${alertHover.price}`}
           aria-label={`Add alert at ${alertHover.price}`}
           onPointerLeave={() => setAlertHover(null)}
-          onClick={() => { onAddAlert(alertHover.price); setAlertHover(null) }}
-        >+</button>
+          onClick={() => {
+            onAddAlert(alertHover.price)
+            setAlertHover(null)
+          }}
+        >
+          +
+        </button>
       )}
     </>
   )

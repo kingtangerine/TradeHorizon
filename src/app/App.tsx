@@ -1,12 +1,4 @@
-import {
-  type FormEvent,
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-  useSyncExternalStore,
-} from 'react'
+import { type FormEvent, useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
 import { DISPLAY_INTERVALS } from '../chart/intervals'
 import type { KLineChartController } from '../chart/KLineChartController'
 import { allMarkets, getMarket, refreshMarketCatalog, displaySymbol } from '../chart/markets'
@@ -48,7 +40,17 @@ import { disablePush, enablePush, fetchAlertEvents, getPushStatus, type PushStat
 import { ChartPane } from './ChartPane'
 import { ObjectList } from './ObjectList'
 import { versionDetails, versionLabel } from '../version'
-import { SYNC_KEYS, activePaneIndex, panesOf, withActivePane, withPaneCount, withSplitSync, withSyncedPaneChange, type PaneSpec, type SplitCount } from './panes'
+import {
+  SYNC_KEYS,
+  activePaneIndex,
+  panesOf,
+  withActivePane,
+  withPaneCount,
+  withSplitSync,
+  withSyncedPaneChange,
+  type PaneSpec,
+  type SplitCount,
+} from './panes'
 import { Watchlist } from './Watchlist'
 import { addSymbol, loadWatchlists, saveWatchlists } from './watchlists'
 import { RectangleTemplates } from './RectangleTemplates'
@@ -203,7 +205,7 @@ function styleNumber(value: unknown, fallback: number): number {
 }
 
 /** Sound plus a system notification for alerts that just fired while the app is open. */
-function announceAlerts(items: ReadonlyArray<{ symbol: string, targetPrice: number, price?: number }>): void {
+function announceAlerts(items: ReadonlyArray<{ symbol: string; targetPrice: number; price?: number }>): void {
   try {
     const AudioContextClass = globalThis.AudioContext
     const audio = new AudioContextClass()
@@ -237,14 +239,23 @@ function colorInputValue(value: unknown, fallback: string): string {
 
   const rgba = /^rgba?\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)/i.exec(value)
   if (!rgba) return fallback
-  return `#${rgba.slice(1, 4).map((part) => Math.max(0, Math.min(255, Number(part))).toString(16).padStart(2, '0')).join('')}`
+  return `#${rgba
+    .slice(1, 4)
+    .map((part) =>
+      Math.max(0, Math.min(255, Number(part)))
+        .toString(16)
+        .padStart(2, '0'),
+    )
+    .join('')}`
 }
 
 /** Text field that commits on Enter or blur, so typing does not create one undo step per key. */
-function CommittedTextInput({ value, onCommit, label }: { value: string, onCommit(value: string): void, label: string }) {
+function CommittedTextInput({ value, onCommit, label }: { value: string; onCommit(value: string): void; label: string }) {
   const [draft, setDraft] = useState(value)
   useEffect(() => setDraft(value), [value])
-  const commit = () => { if (draft !== value) onCommit(draft) }
+  const commit = () => {
+    if (draft !== value) onCommit(draft)
+  }
   return (
     <input
       className="toolbar-text-input"
@@ -253,13 +264,21 @@ function CommittedTextInput({ value, onCommit, label }: { value: string, onCommi
       value={draft}
       maxLength={200}
       autoFocus={value === 'Text'}
-      onFocus={(event) => { if (value === 'Text') event.currentTarget.select() }}
+      onFocus={(event) => {
+        if (value === 'Text') event.currentTarget.select()
+      }}
       onChange={(event) => setDraft(event.target.value)}
       onBlur={commit}
       onKeyDown={(event) => {
         event.stopPropagation()
-        if (event.key === 'Enter') { commit(); event.currentTarget.blur() }
-        if (event.key === 'Escape') { setDraft(value); event.currentTarget.blur() }
+        if (event.key === 'Enter') {
+          commit()
+          event.currentTarget.blur()
+        }
+        if (event.key === 'Escape') {
+          setDraft(value)
+          event.currentTarget.blur()
+        }
       }}
     />
   )
@@ -283,17 +302,13 @@ function WorkspaceApp({ user, onLogout, onUserRefresh }: WorkspaceAppProps) {
         historyLimit: 100,
       }),
   )
-  const drawingSnapshot = useSyncExternalStore(
-    drawingStore.subscribe,
-    drawingStore.getSnapshot,
-    drawingStore.getSnapshot,
-  )
+  const drawingSnapshot = useSyncExternalStore(drawingStore.subscribe, drawingStore.getSnapshot, drawingStore.getSnapshot)
   const [controller, setController] = useState<KLineChartController | null>(null)
   const [activeTool, setActiveTool] = useState<'cursor' | DrawingType>('cursor')
   const [selectedDrawingId, setSelectedDrawingId] = useState<string>()
   // Drawing editing: settings window (double-click), right-click menu, Ctrl/Shift+click multi-selection.
-  const [drawingSettings, setDrawingSettings] = useState<{ id: string, tab: DrawingSettingsTab }>()
-  const [drawingMenu, setDrawingMenu] = useState<{ id: string, left: number, top: number }>()
+  const [drawingSettings, setDrawingSettings] = useState<{ id: string; tab: DrawingSettingsTab }>()
+  const [drawingMenu, setDrawingMenu] = useState<{ id: string; left: number; top: number }>()
   const [multiSelection, setMultiSelection] = useState<readonly string[]>([])
   const [objectTreeOpen, setObjectTreeOpen] = useState(false)
   const [groupState, setGroupState] = useState(() => loadGroups(user.id))
@@ -317,7 +332,7 @@ function WorkspaceApp({ user, onLogout, onUserRefresh }: WorkspaceAppProps) {
   const [intervalInput, setIntervalInput] = useState<string | null>(null)
   const [intervalError, setIntervalError] = useState('')
   /** Alt+A: the alert form opens at the current price (the key remounts the panel with it). */
-  const [alertSeed, setAlertSeed] = useState<{ price: string, key: number }>()
+  const [alertSeed, setAlertSeed] = useState<{ price: string; key: number }>()
   const [profileOpen, setProfileOpen] = useState(false)
   const [profileFocus, setProfileFocus] = useState<'chart' | 'password'>()
   const [adminOpen, setAdminOpen] = useState(false)
@@ -345,13 +360,22 @@ function WorkspaceApp({ user, onLogout, onUserRefresh }: WorkspaceAppProps) {
   const market = paneMarkets[activePaneIdx]
   const interval = panes[activePaneIdx].interval
   const chartType: ChartType = workspace.chartType ?? 'candles'
-  const drawingModes = useMemo<DrawingModes>(() => ({
-    stayInDrawingMode: workspace.stayInDrawingMode === true,
-    lockAll: workspace.lockAllDrawings === true,
-    hideAll: workspace.hideAllDrawings === true,
-  }), [workspace.stayInDrawingMode, workspace.lockAllDrawings, workspace.hideAllDrawings])
+  const drawingModes = useMemo<DrawingModes>(
+    () => ({
+      stayInDrawingMode: workspace.stayInDrawingMode === true,
+      lockAll: workspace.lockAllDrawings === true,
+      hideAll: workspace.hideAllDrawings === true,
+    }),
+    [workspace.stayInDrawingMode, workspace.lockAllDrawings, workspace.hideAllDrawings],
+  )
   /** Timeframe buttons in the toolbar: the standard ones, then the user's own. */
-  const toolbarIntervals = useMemo<readonly MarketInterval[]>(() => [...DISPLAY_INTERVALS, ...workspace.customIntervals.filter((value) => !(DISPLAY_INTERVALS as readonly MarketInterval[]).includes(value))], [workspace.customIntervals])
+  const toolbarIntervals = useMemo<readonly MarketInterval[]>(
+    () => [
+      ...DISPLAY_INTERVALS,
+      ...workspace.customIntervals.filter((value) => !(DISPLAY_INTERVALS as readonly MarketInterval[]).includes(value)),
+    ],
+    [workspace.customIntervals],
+  )
   const [layoutNotice, setLayoutNotice] = useState('')
   const [alerts, setAlerts] = useState<PriceAlert[]>(() => loadAlerts(user.id))
   const [pushStatus, setPushStatus] = useState<PushStatus>('off')
@@ -384,20 +408,20 @@ function WorkspaceApp({ user, onLogout, onUserRefresh }: WorkspaceAppProps) {
   const replayActive = replay?.status === 'active'
   const replayPlaying = !!replay?.playing
 
-  const handleControllerChange = useCallback(
-    (next: KLineChartController | null) => setController(next),
-    [],
-  )
+  const handleControllerChange = useCallback((next: KLineChartController | null) => setController(next), [])
   const handleToolSettled = useCallback(() => setActiveTool('cursor'), [])
   const addAlertAtPrice = useCallback((targetPrice: number, symbol: string, last: number | undefined) => {
-    setAlerts((current) => [{
-      id: crypto.randomUUID(),
-      symbol,
-      targetPrice,
-      direction: last !== undefined && targetPrice < last ? 'below' : 'above',
-      enabled: true,
-      createdAtMs: Date.now(),
-    }, ...current])
+    setAlerts((current) => [
+      {
+        id: crypto.randomUUID(),
+        symbol,
+        targetPrice,
+        direction: last !== undefined && targetPrice < last ? 'below' : 'above',
+        enabled: true,
+        createdAtMs: Date.now(),
+      },
+      ...current,
+    ])
     const message = `Alert set at ${targetPrice.toLocaleString('en-US', { maximumFractionDigits: 8 })}. Drag its line to move it, ✕ to delete.`
     setToast(message)
     globalThis.setTimeout(() => setToast((currentToast) => (currentToast === message ? '' : currentToast)), 3600)
@@ -427,12 +451,14 @@ function WorkspaceApp({ user, onLogout, onUserRefresh }: WorkspaceAppProps) {
   }, [])
 
   const toggleAlert = useCallback((id: string) => {
-    setAlerts((current) => current.map((alert) => {
-      if (alert.id !== id) return alert
-      if (alert.enabled) return { ...alert, enabled: false }
-      const { triggeredAtMs: _at, triggeredPrice: _price, ...rearmed } = alert
-      return { ...rearmed, enabled: true }
-    }))
+    setAlerts((current) =>
+      current.map((alert) => {
+        if (alert.id !== id) return alert
+        if (alert.enabled) return { ...alert, enabled: false }
+        const { triggeredAtMs: _at, triggeredPrice: _price, ...rearmed } = alert
+        return { ...rearmed, enabled: true }
+      }),
+    )
   }, [])
 
   const findWatchMarket = useCallback((symbol: string) => markets.find((item) => item.symbol === symbol), [markets])
@@ -451,108 +477,179 @@ function WorkspaceApp({ user, onLogout, onUserRefresh }: WorkspaceAppProps) {
 
   /** Tool rail: the last tool used in each group is the one its button shows. */
   const [groupTools, setGroupTools] = useState<Record<string, DrawingType>>({})
-  const chooseTool = useCallback((type: DrawingType) => {
-    if (!controller?.startTool(type)) return
-    setActiveTool(type)
-    const group = TOOL_GROUPS.find((item) => item.tools.includes(type))
-    if (group) setGroupTools((current) => (current[group.id] === type ? current : { ...current, [group.id]: type }))
-  }, [controller])
+  const chooseTool = useCallback(
+    (type: DrawingType) => {
+      if (!controller?.startTool(type)) return
+      setActiveTool(type)
+      const group = TOOL_GROUPS.find((item) => item.tools.includes(type))
+      if (group) setGroupTools((current) => (current[group.id] === type ? current : { ...current, [group.id]: type }))
+    },
+    [controller],
+  )
 
   const updateIndicators = useCallback((update: (current: IndicatorSettings) => IndicatorSettings) => {
     setWorkspace((current) => ({ ...current, indicators: update(current.indicators ?? DEFAULT_INDICATORS) }))
   }, [])
 
+  const toggleVwap = useCallback(
+    (kind: VwapKind) => {
+      updateIndicators((current) =>
+        kind === 'vwap'
+          ? { ...current, vwap: { ...current.vwap, visible: !current.vwap.visible } }
+          : { ...current, qvwap: { visible: !current.qvwap.visible } },
+      )
+    },
+    [updateIndicators],
+  )
 
-  const toggleVwap = useCallback((kind: VwapKind) => {
-    updateIndicators((current) => (
-      kind === 'vwap'
-        ? { ...current, vwap: { ...current.vwap, visible: !current.vwap.visible } }
-        : { ...current, qvwap: { visible: !current.qvwap.visible } }
-    ))
-  }, [updateIndicators])
-
-
-  const toggleMovingAverage = useCallback((kind: MovingAverageKind) => {
-    updateIndicators((current) => ({
-      ...current,
-      [kind]: { ...current[kind], visible: !current[kind].visible && current[kind].periods.length > 0 },
-    }))
-  }, [updateIndicators])
+  const toggleMovingAverage = useCallback(
+    (kind: MovingAverageKind) => {
+      updateIndicators((current) => ({
+        ...current,
+        [kind]: { ...current[kind], visible: !current[kind].visible && current[kind].periods.length > 0 },
+      }))
+    },
+    [updateIndicators],
+  )
 
   const [studySettingsId, setStudySettingsId] = useState<string>()
   /** Compare: the first compared symbol switches the chart to the percent scale, as in TradingView. */
-  const addCompare = useCallback((symbol: string) => {
-    updateIndicators((current) => (current.compare.includes(symbol) || current.compare.length >= MAX_COMPARE ? current : { ...current, compare: [...current.compare, symbol] }))
-    setWorkspace((current) => (current.scaleMode ? current : { ...current, scaleMode: 'percent' }))
-  }, [updateIndicators])
-  const removeCompare = useCallback((symbol: string) => {
-    updateIndicators((current) => ({ ...current, compare: current.compare.filter((item) => item !== symbol) }))
-  }, [updateIndicators])
+  const addCompare = useCallback(
+    (symbol: string) => {
+      updateIndicators((current) =>
+        current.compare.includes(symbol) || current.compare.length >= MAX_COMPARE
+          ? current
+          : { ...current, compare: [...current.compare, symbol] },
+      )
+      setWorkspace((current) => (current.scaleMode ? current : { ...current, scaleMode: 'percent' }))
+    },
+    [updateIndicators],
+  )
+  const removeCompare = useCallback(
+    (symbol: string) => {
+      updateIndicators((current) => ({ ...current, compare: current.compare.filter((item) => item !== symbol) }))
+    },
+    [updateIndicators],
+  )
   const [indicatorsOpen, setIndicatorsOpen] = useState(false)
   // "My scripts": the user's scripts, the editor, and the settings of a script on the chart.
   const [scripts, setScripts] = useState<UserScript[]>(() => loadScripts(user.id))
   const [scriptEditor, setScriptEditor] = useState<{ script?: UserScript }>()
   const [scriptSettingsId, setScriptSettingsId] = useState<string>()
-  const addScriptInstance = useCallback((script: UserScript) => {
-    updateIndicators((current) => (current.scripts.length >= MAX_SCRIPT_INSTANCES ? current : {
-      ...current,
-      scripts: [...current.scripts, { id: `script-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`, scriptId: script.id, name: script.name, source: script.source, inputs: [], visible: true }],
-    }))
-  }, [updateIndicators])
+  const addScriptInstance = useCallback(
+    (script: UserScript) => {
+      updateIndicators((current) =>
+        current.scripts.length >= MAX_SCRIPT_INSTANCES
+          ? current
+          : {
+              ...current,
+              scripts: [
+                ...current.scripts,
+                {
+                  id: `script-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`,
+                  scriptId: script.id,
+                  name: script.name,
+                  source: script.source,
+                  inputs: [],
+                  visible: true,
+                },
+              ],
+            },
+      )
+    },
+    [updateIndicators],
+  )
   /** Saving a script updates its copies on the chart (their inputs are kept when the script still has them). */
-  const saveScript = useCallback((script: UserScript, addToChart: boolean) => {
-    setScripts((current) => (current.some((item) => item.id === script.id) ? current.map((item) => (item.id === script.id ? script : item)) : [...current, script]))
-    updateIndicators((current) => ({ ...current, scripts: current.scripts.map((item) => (item.scriptId === script.id ? { ...item, name: script.name, source: script.source } : item)) }))
-    if (addToChart) addScriptInstance(script)
-    setScriptEditor(undefined)
-  }, [addScriptInstance, updateIndicators])
-  const deleteScript = useCallback((id: string) => {
-    setScripts((current) => current.filter((item) => item.id !== id))
-    updateIndicators((current) => ({ ...current, scripts: current.scripts.filter((item) => item.scriptId !== id) }))
-  }, [updateIndicators])
-  const changeScriptInstance = useCallback((instance: ScriptInstance) => {
-    updateIndicators((current) => ({ ...current, scripts: current.scripts.map((item) => (item.id === instance.id ? instance : item)) }))
-  }, [updateIndicators])
-  const removeScriptInstance = useCallback((id: string) => {
-    updateIndicators((current) => ({ ...current, scripts: current.scripts.filter((item) => item.id !== id) }))
-    setScriptSettingsId((current) => (current === id ? undefined : current))
-  }, [updateIndicators])
+  const saveScript = useCallback(
+    (script: UserScript, addToChart: boolean) => {
+      setScripts((current) =>
+        current.some((item) => item.id === script.id)
+          ? current.map((item) => (item.id === script.id ? script : item))
+          : [...current, script],
+      )
+      updateIndicators((current) => ({
+        ...current,
+        scripts: current.scripts.map((item) =>
+          item.scriptId === script.id ? { ...item, name: script.name, source: script.source } : item,
+        ),
+      }))
+      if (addToChart) addScriptInstance(script)
+      setScriptEditor(undefined)
+    },
+    [addScriptInstance, updateIndicators],
+  )
+  const deleteScript = useCallback(
+    (id: string) => {
+      setScripts((current) => current.filter((item) => item.id !== id))
+      updateIndicators((current) => ({ ...current, scripts: current.scripts.filter((item) => item.scriptId !== id) }))
+    },
+    [updateIndicators],
+  )
+  const changeScriptInstance = useCallback(
+    (instance: ScriptInstance) => {
+      updateIndicators((current) => ({ ...current, scripts: current.scripts.map((item) => (item.id === instance.id ? instance : item)) }))
+    },
+    [updateIndicators],
+  )
+  const removeScriptInstance = useCallback(
+    (id: string) => {
+      updateIndicators((current) => ({ ...current, scripts: current.scripts.filter((item) => item.id !== id) }))
+      setScriptSettingsId((current) => (current === id ? undefined : current))
+    },
+    [updateIndicators],
+  )
   const toggleFavoriteIndicator = useCallback((id: string) => {
     setPreferences((current) => ({
       ...current,
-      favoriteIndicators: current.favoriteIndicators.includes(id) ? current.favoriteIndicators.filter((item) => item !== id) : [...current.favoriteIndicators, id],
+      favoriteIndicators: current.favoriteIndicators.includes(id)
+        ? current.favoriteIndicators.filter((item) => item !== id)
+        : [...current.favoriteIndicators, id],
     }))
   }, [])
-  const addStudy = useCallback((type: StudyType) => {
-    const id = `study-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`
-    updateIndicators((current) => (current.studies.length >= MAX_STUDIES ? current : { ...current, studies: [...current.studies, newStudy(type, id)] }))
-  }, [updateIndicators])
-  const changeStudy = useCallback((study: Study) => {
-    updateIndicators((current) => ({ ...current, studies: current.studies.map((item) => (item.id === study.id ? study : item)) }))
-  }, [updateIndicators])
-  const removeStudy = useCallback((id: string) => {
-    updateIndicators((current) => ({ ...current, studies: current.studies.filter((item) => item.id !== id) }))
-    setStudySettingsId((current) => (current === id ? undefined : current))
-  }, [updateIndicators])
-
+  const addStudy = useCallback(
+    (type: StudyType) => {
+      const id = `study-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`
+      updateIndicators((current) =>
+        current.studies.length >= MAX_STUDIES ? current : { ...current, studies: [...current.studies, newStudy(type, id)] },
+      )
+    },
+    [updateIndicators],
+  )
+  const changeStudy = useCallback(
+    (study: Study) => {
+      updateIndicators((current) => ({ ...current, studies: current.studies.map((item) => (item.id === study.id ? study : item)) }))
+    },
+    [updateIndicators],
+  )
+  const removeStudy = useCallback(
+    (id: string) => {
+      updateIndicators((current) => ({ ...current, studies: current.studies.filter((item) => item.id !== id) }))
+      setStudySettingsId((current) => (current === id ? undefined : current))
+    },
+    [updateIndicators],
+  )
 
   /** Changes the symbol or timeframe of the active chart (the main chart of the tab, or one of its split panes). */
   const updateActivePane = useCallback((changes: Partial<PaneSpec>) => {
     setWorkspace((current) => ({
       ...current,
-      tabs: current.tabs.map((tab) => (
-        tab.id === current.activeTabId ? withSyncedPaneChange(tab, activePaneIndex(tab), changes) : tab
-      )),
+      tabs: current.tabs.map((tab) => (tab.id === current.activeTabId ? withSyncedPaneChange(tab, activePaneIndex(tab), changes) : tab)),
     }))
   }, [])
 
-  const changeMarket = useCallback((nextMarket: typeof market) => {
-    updateActivePane({ symbol: nextMarket.symbol })
-  }, [updateActivePane])
+  const changeMarket = useCallback(
+    (nextMarket: typeof market) => {
+      updateActivePane({ symbol: nextMarket.symbol })
+    },
+    [updateActivePane],
+  )
 
-  const changeInterval = useCallback((nextInterval: MarketInterval) => {
-    updateActivePane({ interval: nextInterval })
-  }, [updateActivePane])
+  const changeInterval = useCallback(
+    (nextInterval: MarketInterval) => {
+      updateActivePane({ interval: nextInterval })
+    },
+    [updateActivePane],
+  )
 
   const activateTab = useCallback((tab: ChartTab) => {
     setWorkspace((current) => ({ ...current, activeTabId: tab.id }))
@@ -586,7 +683,15 @@ function WorkspaceApp({ user, onLogout, onUserRefresh }: WorkspaceAppProps) {
   // Keyboard: Alt+Shift+Left or Right on a focused tab.
   const tabStripRef = useRef<HTMLDivElement>(null)
   const tabElements = useRef(new Map<string, HTMLDivElement>())
-  const tabDrag = useRef<{ id: string; pointerId: number; startX: number; grab: number; active: boolean; touch: boolean; timer?: ReturnType<typeof globalThis.setTimeout> } | null>(null)
+  const tabDrag = useRef<{
+    id: string
+    pointerId: number
+    startX: number
+    grab: number
+    active: boolean
+    touch: boolean
+    timer?: ReturnType<typeof globalThis.setTimeout>
+  } | null>(null)
   const justDraggedTab = useRef(false)
   const [draggingTabId, setDraggingTabId] = useState<string>()
 
@@ -620,27 +725,39 @@ function WorkspaceApp({ user, onLogout, onUserRefresh }: WorkspaceAppProps) {
       const element = tabElements.current.get(drag.id)
       if (element) element.style.transform = ''
       justDraggedTab.current = true
-      globalThis.setTimeout(() => { justDraggedTab.current = false }, 80)
+      globalThis.setTimeout(() => {
+        justDraggedTab.current = false
+      }, 80)
     }
     tabDrag.current = null
     setDraggingTabId(undefined)
   }, [])
 
   useEffect(() => {
-    const preventScroll = (event: TouchEvent) => { if (tabDrag.current?.active) event.preventDefault() }
+    const preventScroll = (event: TouchEvent) => {
+      if (tabDrag.current?.active) event.preventDefault()
+    }
     const onMove = (event: PointerEvent) => {
       const drag = tabDrag.current
       if (!drag || event.pointerId !== drag.pointerId) return
       if (!drag.active) {
         const moved = Math.abs(event.clientX - drag.startX)
-        if (drag.touch) { if (moved > 8) { globalThis.clearTimeout(drag.timer); tabDrag.current = null } return }
+        if (drag.touch) {
+          if (moved > 8) {
+            globalThis.clearTimeout(drag.timer)
+            tabDrag.current = null
+          }
+          return
+        }
         if (moved < 5) return
         drag.active = true
         setDraggingTabId(drag.id)
       }
       placeDraggedTab(event.clientX)
     }
-    const onUp = (event: PointerEvent) => { if (tabDrag.current?.pointerId === event.pointerId) endTabDrag() }
+    const onUp = (event: PointerEvent) => {
+      if (tabDrag.current?.pointerId === event.pointerId) endTabDrag()
+    }
     globalThis.addEventListener('pointermove', onMove)
     globalThis.addEventListener('pointerup', onUp)
     globalThis.addEventListener('pointercancel', onUp)
@@ -658,7 +775,14 @@ function WorkspaceApp({ user, onLogout, onUserRefresh }: WorkspaceAppProps) {
     const element = tabElements.current.get(id)
     if (!element) return
     const touch = event.pointerType === 'touch'
-    const drag = { id, pointerId: event.pointerId, startX: event.clientX, grab: event.clientX - element.getBoundingClientRect().left, active: false, touch } as NonNullable<typeof tabDrag.current>
+    const drag = {
+      id,
+      pointerId: event.pointerId,
+      startX: event.clientX,
+      grab: event.clientX - element.getBoundingClientRect().left,
+      active: false,
+      touch,
+    } as NonNullable<typeof tabDrag.current>
     tabDrag.current = drag
     if (touch) {
       drag.timer = globalThis.setTimeout(() => {
@@ -685,40 +809,59 @@ function WorkspaceApp({ user, onLogout, onUserRefresh }: WorkspaceAppProps) {
   }, [])
 
   /** Opens 2 to 4 saved layouts together: one tab, one chart per layout (the chart each was saved with). */
-  const openLayoutsTogether = useCallback((selected: SavedLayout[], options: { name: string, save: boolean }) => {
-    if (selected.length < 2) return
-    const now = Date.now()
-    const tab = splitTabFromPanes(combinedPanes(selected), crypto.randomUUID(), now)
-    const layout = options.save
-      ? createSplitLayout(options.name, tab, { volumeVisible: workspace.volumeVisible, customIntervals: workspace.customIntervals, indicators: workspace.indicators }, now)
-      : undefined
-    const openedTab: ChartTab = layout ? { ...tab, layoutId: layout.id } : tab
-    if (layout) setSavedLayouts((current) => [layout, ...current])
-    setWorkspace((current) => ({ ...current, tabs: [...current.tabs, openedTab], activeTabId: openedTab.id }))
-    setSuperchartOpen(false)
-    showToast(layout ? `Opened and saved “${layout.name}” to your layouts` : `Opened ${selected.length} layouts in a split view`)
-  }, [showToast, workspace.volumeVisible, workspace.customIntervals, workspace.indicators])
+  const openLayoutsTogether = useCallback(
+    (selected: SavedLayout[], options: { name: string; save: boolean }) => {
+      if (selected.length < 2) return
+      const now = Date.now()
+      const tab = splitTabFromPanes(combinedPanes(selected), crypto.randomUUID(), now)
+      const layout = options.save
+        ? createSplitLayout(
+            options.name,
+            tab,
+            { volumeVisible: workspace.volumeVisible, customIntervals: workspace.customIntervals, indicators: workspace.indicators },
+            now,
+          )
+        : undefined
+      const openedTab: ChartTab = layout ? { ...tab, layoutId: layout.id } : tab
+      if (layout) setSavedLayouts((current) => [layout, ...current])
+      setWorkspace((current) => ({ ...current, tabs: [...current.tabs, openedTab], activeTabId: openedTab.id }))
+      setSuperchartOpen(false)
+      showToast(layout ? `Opened and saved “${layout.name}” to your layouts` : `Opened ${selected.length} layouts in a split view`)
+    },
+    [showToast, workspace.volumeVisible, workspace.customIntervals, workspace.indicators],
+  )
 
   /** Keeps the split on screen as a layout of its own, so it can be reopened later from the layouts page. */
-  const saveSplitAsLayout = useCallback((name: string) => {
-    const layout = createSplitLayout(name, activeTab, { volumeVisible: workspace.volumeVisible, customIntervals: workspace.customIntervals, indicators: workspace.indicators }, Date.now())
-    setSavedLayouts((current) => [layout, ...current])
-    setSplitMenuOpen(false)
-    setSplitSaveName('')
-    showToast(`Saved “${layout.name}” to your layouts`)
-  }, [activeTab, showToast, workspace.volumeVisible, workspace.customIntervals, workspace.indicators])
+  const saveSplitAsLayout = useCallback(
+    (name: string) => {
+      const layout = createSplitLayout(
+        name,
+        activeTab,
+        { volumeVisible: workspace.volumeVisible, customIntervals: workspace.customIntervals, indicators: workspace.indicators },
+        Date.now(),
+      )
+      setSavedLayouts((current) => [layout, ...current])
+      setSplitMenuOpen(false)
+      setSplitSaveName('')
+      showToast(`Saved “${layout.name}” to your layouts`)
+    },
+    [activeTab, showToast, workspace.volumeVisible, workspace.customIntervals, workspace.indicators],
+  )
 
   /** Clicking another chart in a split view makes it the one the toolbar and tools act on. */
-  const handleActivatePane = useCallback((index: number) => {
-    controller?.cancelActiveTool()
-    controller?.clearDrawingSelection()
-    setActiveTool('cursor')
-    setSelectedDrawingId(undefined)
-    setWorkspace((current) => ({
-      ...current,
-      tabs: current.tabs.map((tab) => (tab.id === current.activeTabId ? withActivePane(tab, index) : tab)),
-    }))
-  }, [controller])
+  const handleActivatePane = useCallback(
+    (index: number) => {
+      controller?.cancelActiveTool()
+      controller?.clearDrawingSelection()
+      setActiveTool('cursor')
+      setSelectedDrawingId(undefined)
+      setWorkspace((current) => ({
+        ...current,
+        tabs: current.tabs.map((tab) => (tab.id === current.activeTabId ? withActivePane(tab, index) : tab)),
+      }))
+    },
+    [controller],
+  )
 
   const setPaneCount = useCallback((count: 1 | SplitCount) => {
     setWorkspace((current) => ({
@@ -728,75 +871,90 @@ function WorkspaceApp({ user, onLogout, onUserRefresh }: WorkspaceAppProps) {
     setSplitMenuOpen(false)
   }, [])
 
-  const saveCurrentLayout = useCallback((name = layoutDraftName, forceNew = false) => {
-    const normalizedName = name.trim() || DEFAULT_LAYOUT_NAME
-    const now = Date.now()
-    const existing = !forceNew && currentLayout ? currentLayout : undefined
-    const id = existing?.id ?? crypto.randomUUID()
-    const groupTabs = workspace.tabs.filter((tab) => tab.layoutId === activeTab.layoutId)
-    const nextLayout: SavedLayout = {
-      id,
-      name: normalizedName,
-      tabs: groupTabs.map(({ layoutId: _layoutId, ...tab }) => tab),
-      activeTabId: workspace.activeTabId,
-      volumeVisible: workspace.volumeVisible,
-      customIntervals: workspace.customIntervals,
-      ...(workspace.indicators ? { indicators: workspace.indicators } : {}),
-      createdAtMs: existing?.createdAtMs ?? now,
-      updatedAtMs: now,
-      ...(existing?.favorite ? { favorite: true } : {}),
-    }
-    setSavedLayouts((current) => existing
-      ? current.map((layout) => layout.id === id ? nextLayout : layout)
-      : [nextLayout, ...current])
-    setWorkspace((current) => ({
-      ...current,
-      tabs: current.tabs.map((tab) => groupTabs.some((item) => item.id === tab.id) ? { ...tab, layoutId: id } : tab),
-      layoutName: normalizedName,
-      activeLayoutId: id,
-    }))
-    setLayoutDraftName(normalizedName)
-    setLayoutNotice('Saved')
-    globalThis.setTimeout(() => setLayoutNotice(''), 1600)
-  }, [activeTab.layoutId, currentLayout, layoutDraftName, workspace])
+  const saveCurrentLayout = useCallback(
+    (name = layoutDraftName, forceNew = false) => {
+      const normalizedName = name.trim() || DEFAULT_LAYOUT_NAME
+      const now = Date.now()
+      const existing = !forceNew && currentLayout ? currentLayout : undefined
+      const id = existing?.id ?? crypto.randomUUID()
+      const groupTabs = workspace.tabs.filter((tab) => tab.layoutId === activeTab.layoutId)
+      const nextLayout: SavedLayout = {
+        id,
+        name: normalizedName,
+        tabs: groupTabs.map(({ layoutId: _layoutId, ...tab }) => tab),
+        activeTabId: workspace.activeTabId,
+        volumeVisible: workspace.volumeVisible,
+        customIntervals: workspace.customIntervals,
+        ...(workspace.indicators ? { indicators: workspace.indicators } : {}),
+        createdAtMs: existing?.createdAtMs ?? now,
+        updatedAtMs: now,
+        ...(existing?.favorite ? { favorite: true } : {}),
+      }
+      setSavedLayouts((current) =>
+        existing ? current.map((layout) => (layout.id === id ? nextLayout : layout)) : [nextLayout, ...current],
+      )
+      setWorkspace((current) => ({
+        ...current,
+        tabs: current.tabs.map((tab) => (groupTabs.some((item) => item.id === tab.id) ? { ...tab, layoutId: id } : tab)),
+        layoutName: normalizedName,
+        activeLayoutId: id,
+      }))
+      setLayoutDraftName(normalizedName)
+      setLayoutNotice('Saved')
+      globalThis.setTimeout(() => setLayoutNotice(''), 1600)
+    },
+    [activeTab.layoutId, currentLayout, layoutDraftName, workspace],
+  )
 
-  const openSavedLayout = useCallback((layout: SavedLayout) => {
-    // A layout that is already open in the tab bar is switched to, not opened a second time.
-    const alreadyOpen = workspace.tabs.filter((tab) => tab.layoutId === layout.id)
-    if (alreadyOpen.length > 0) {
-      const savedIndex = Math.max(0, layout.tabs.findIndex((tab) => tab.id === layout.activeTabId))
-      activateTab(alreadyOpen[Math.min(savedIndex, alreadyOpen.length - 1)])
+  const openSavedLayout = useCallback(
+    (layout: SavedLayout) => {
+      // A layout that is already open in the tab bar is switched to, not opened a second time.
+      const alreadyOpen = workspace.tabs.filter((tab) => tab.layoutId === layout.id)
+      if (alreadyOpen.length > 0) {
+        const savedIndex = Math.max(
+          0,
+          layout.tabs.findIndex((tab) => tab.id === layout.activeTabId),
+        )
+        activateTab(alreadyOpen[Math.min(savedIndex, alreadyOpen.length - 1)])
+        setLayoutDraftName(layout.name)
+        setLayoutMenuOpen(false)
+        return
+      }
+      const openedTabs: ChartTab[] = layout.tabs.map((tab) => ({ ...tab, id: crypto.randomUUID(), layoutId: layout.id }))
+      const index = Math.max(
+        0,
+        layout.tabs.findIndex((tab) => tab.id === layout.activeTabId),
+      )
+      const focused = openedTabs[index]
+      setWorkspace((current) => ({
+        ...current,
+        tabs: [...current.tabs, ...openedTabs],
+        activeTabId: focused.id,
+        volumeVisible: layout.volumeVisible,
+        indicators: layout.indicators ?? DEFAULT_INDICATORS,
+        customIntervals: [...new Set([...current.customIntervals, ...layout.customIntervals])],
+      }))
       setLayoutDraftName(layout.name)
+      setSuperchartOpen(false)
       setLayoutMenuOpen(false)
-      return
-    }
-    const openedTabs: ChartTab[] = layout.tabs.map((tab) => ({ ...tab, id: crypto.randomUUID(), layoutId: layout.id }))
-    const index = Math.max(0, layout.tabs.findIndex((tab) => tab.id === layout.activeTabId))
-    const focused = openedTabs[index]
-    setWorkspace((current) => ({
-      ...current,
-      tabs: [...current.tabs, ...openedTabs],
-      activeTabId: focused.id,
-      volumeVisible: layout.volumeVisible,
-      indicators: layout.indicators ?? DEFAULT_INDICATORS,
-      customIntervals: [...new Set([...current.customIntervals, ...layout.customIntervals])],
-    }))
-    setLayoutDraftName(layout.name)
-    setSuperchartOpen(false)
-    setLayoutMenuOpen(false)
-  }, [workspace.tabs, activateTab])
+    },
+    [workspace.tabs, activateTab],
+  )
 
   /** Middle-click on a layout card: add its tabs to the tab bar and stay where we are. */
-  const openSavedLayoutInBackground = useCallback((layout: SavedLayout, forceCopy = false) => {
-    // Middle-click on a layout that is already open does nothing; the menu's "Open in new tab" always makes a copy.
-    if (!forceCopy && workspace.tabs.some((tab) => tab.layoutId === layout.id)) return
-    const openedTabs: ChartTab[] = layout.tabs.map((tab) => ({ ...tab, id: crypto.randomUUID(), layoutId: layout.id }))
-    setWorkspace((current) => ({
-      ...current,
-      tabs: [...current.tabs, ...openedTabs],
-      customIntervals: [...new Set([...current.customIntervals, ...layout.customIntervals])],
-    }))
-  }, [workspace.tabs])
+  const openSavedLayoutInBackground = useCallback(
+    (layout: SavedLayout, forceCopy = false) => {
+      // Middle-click on a layout that is already open does nothing; the menu's "Open in new tab" always makes a copy.
+      if (!forceCopy && workspace.tabs.some((tab) => tab.layoutId === layout.id)) return
+      const openedTabs: ChartTab[] = layout.tabs.map((tab) => ({ ...tab, id: crypto.randomUUID(), layoutId: layout.id }))
+      setWorkspace((current) => ({
+        ...current,
+        tabs: [...current.tabs, ...openedTabs],
+        customIntervals: [...new Set([...current.customIntervals, ...layout.customIntervals])],
+      }))
+    },
+    [workspace.tabs],
+  )
 
   const createNewLayout = useCallback(() => {
     const layout = createLayout(DEFAULT_LAYOUT_NAME, Date.now())
@@ -805,27 +963,35 @@ function WorkspaceApp({ user, onLogout, onUserRefresh }: WorkspaceAppProps) {
   }, [openSavedLayout])
 
   const toggleLayoutFavorite = useCallback((id: string) => {
-    setSavedLayouts((current) => current.map((layout) => {
-      if (layout.id !== id) return layout
-      const { favorite, ...rest } = layout
-      return favorite ? rest : { ...rest, favorite: true }
-    }))
+    setSavedLayouts((current) =>
+      current.map((layout) => {
+        if (layout.id !== id) return layout
+        const { favorite, ...rest } = layout
+        return favorite ? rest : { ...rest, favorite: true }
+      }),
+    )
   }, [])
 
-  const renameLayout = useCallback((id: string, name: string) => {
-    const nextName = name.trim().slice(0, 48)
-    if (!nextName) return
-    setSavedLayouts((current) => current.map((layout) => (
-      layout.id === id ? { ...layout, name: nextName, updatedAtMs: Date.now() } : layout
-    )))
-    if (currentLayout?.id === id) setLayoutDraftName(nextName)
-  }, [currentLayout?.id])
+  const renameLayout = useCallback(
+    (id: string, name: string) => {
+      const nextName = name.trim().slice(0, 48)
+      if (!nextName) return
+      setSavedLayouts((current) =>
+        current.map((layout) => (layout.id === id ? { ...layout, name: nextName, updatedAtMs: Date.now() } : layout)),
+      )
+      if (currentLayout?.id === id) setLayoutDraftName(nextName)
+    },
+    [currentLayout?.id],
+  )
 
-  const duplicateSavedLayout = useCallback((id: string) => {
-    const source = savedLayouts.find((layout) => layout.id === id)
-    if (!source) return
-    setSavedLayouts((current) => [duplicateLayout(source, Date.now()), ...current])
-  }, [savedLayouts])
+  const duplicateSavedLayout = useCallback(
+    (id: string) => {
+      const source = savedLayouts.find((layout) => layout.id === id)
+      if (!source) return
+      setSavedLayouts((current) => [duplicateLayout(source, Date.now()), ...current])
+    },
+    [savedLayouts],
+  )
 
   const deleteSavedLayout = useCallback((id: string) => {
     setSavedLayouts((current) => current.filter((layout) => layout.id !== id))
@@ -849,9 +1015,7 @@ function WorkspaceApp({ user, onLogout, onUserRefresh }: WorkspaceAppProps) {
     if (!(DISPLAY_INTERVALS as readonly MarketInterval[]).includes(next)) {
       setWorkspace((current) => ({
         ...current,
-        customIntervals: current.customIntervals.includes(next)
-          ? current.customIntervals
-          : [...current.customIntervals, next],
+        customIntervals: current.customIntervals.includes(next) ? current.customIntervals : [...current.customIntervals, next],
       }))
     }
     changeInterval(next)
@@ -873,32 +1037,46 @@ function WorkspaceApp({ user, onLogout, onUserRefresh }: WorkspaceAppProps) {
   }, [controller, drawingStore])
 
   /** Camera button (TradingView): the active chart as a PNG with a header naming the symbol, timeframe and prices. */
-  const takeSnapshot = useCallback((mode: 'download' | 'copy') => {
-    setSnapshotMenuOpen(false)
-    if (!controller) return
-    const now = Date.now()
-    const candle = controller.latestCandle()
-    const fileName = snapshotFileName(market.symbol, interval, now, chartTimeZone)
-    const image = (async () => {
-      const chart = await controller.snapshot()
-      if (!chart) throw new Error('The chart is not ready yet')
-      return composeSnapshot({
-        chart,
-        title: `${market.pair} · ${MARKET_INTERVAL_SPECS[interval].label} · ${market.venue}`,
-        values: candle ? snapshotValues(candle, market.pricePrecision) : [],
-        stamp: `TradeHorizon · ${formatCrosshairTime(now, chartTimeZone, 60_000)} (${offsetLabel(chartTimeZone)})`,
-        dark: theme === 'dark',
-      })
-    })()
-    if (mode === 'copy') {
-      copyImage(image).then(
-        () => showToast('Chart image copied'),
-        (error: unknown) => showToast(error instanceof Error && error.message.startsWith('This browser') ? 'This browser cannot copy images. Use Download image.' : 'Could not copy the image'),
-      )
-    } else {
-      image.then((blob) => { downloadBlob(blob, fileName); showToast('Chart image saved') }, () => showToast('Could not create the image'))
-    }
-  }, [chartTimeZone, controller, interval, market, showToast, theme])
+  const takeSnapshot = useCallback(
+    (mode: 'download' | 'copy') => {
+      setSnapshotMenuOpen(false)
+      if (!controller) return
+      const now = Date.now()
+      const candle = controller.latestCandle()
+      const fileName = snapshotFileName(market.symbol, interval, now, chartTimeZone)
+      const image = (async () => {
+        const chart = await controller.snapshot()
+        if (!chart) throw new Error('The chart is not ready yet')
+        return composeSnapshot({
+          chart,
+          title: `${market.pair} · ${MARKET_INTERVAL_SPECS[interval].label} · ${market.venue}`,
+          values: candle ? snapshotValues(candle, market.pricePrecision) : [],
+          stamp: `TradeHorizon · ${formatCrosshairTime(now, chartTimeZone, 60_000)} (${offsetLabel(chartTimeZone)})`,
+          dark: theme === 'dark',
+        })
+      })()
+      if (mode === 'copy') {
+        copyImage(image).then(
+          () => showToast('Chart image copied'),
+          (error: unknown) =>
+            showToast(
+              error instanceof Error && error.message.startsWith('This browser')
+                ? 'This browser cannot copy images. Use Download image.'
+                : 'Could not copy the image',
+            ),
+        )
+      } else {
+        image.then(
+          (blob) => {
+            downloadBlob(blob, fileName)
+            showToast('Chart image saved')
+          },
+          () => showToast('Could not create the image'),
+        )
+      }
+    },
+    [chartTimeZone, controller, interval, market, showToast, theme],
+  )
 
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
@@ -907,15 +1085,32 @@ function WorkspaceApp({ user, onLogout, onUserRefresh }: WorkspaceAppProps) {
 
       // The timeframe box takes the keys while it is open.
       if (intervalInput !== null) {
-        if (event.key === 'Escape') { setIntervalInput(null); event.preventDefault(); return }
-        if (event.key === 'Backspace') { event.preventDefault(); setIntervalError(''); setIntervalInput((value) => (value && value.length > 1 ? value.slice(0, -1) : null)); return }
+        if (event.key === 'Escape') {
+          setIntervalInput(null)
+          event.preventDefault()
+          return
+        }
+        if (event.key === 'Backspace') {
+          event.preventDefault()
+          setIntervalError('')
+          setIntervalInput((value) => (value && value.length > 1 ? value.slice(0, -1) : null))
+          return
+        }
         if (event.key === 'Enter') {
           event.preventDefault()
           const next = parseIntervalInput(intervalInput)
-          if (next) { changeInterval(next); setIntervalInput(null) } else setIntervalError(`"${intervalInput}" is not a timeframe the exchange offers`)
+          if (next) {
+            changeInterval(next)
+            setIntervalInput(null)
+          } else setIntervalError(`"${intervalInput}" is not a timeframe the exchange offers`)
           return
         }
-        if (isChartTypingKey(event, target) && INTERVAL_INPUT_CHARS.test(event.key)) { event.preventDefault(); setIntervalError(''); setIntervalInput((value) => `${value ?? ''}${event.key}`.slice(0, 6)); return }
+        if (isChartTypingKey(event, target) && INTERVAL_INPUT_CHARS.test(event.key)) {
+          event.preventDefault()
+          setIntervalError('')
+          setIntervalInput((value) => `${value ?? ''}${event.key}`.slice(0, 6))
+          return
+        }
         if (!event.ctrlKey && !event.metaKey && !event.altKey) return
       }
       if ((event.ctrlKey || event.metaKey) && event.code === 'KeyS' && (event.altKey || event.shiftKey)) {
@@ -935,10 +1130,30 @@ function WorkspaceApp({ user, onLogout, onUserRefresh }: WorkspaceAppProps) {
         setAlertsOpen(true)
         return
       }
-      const otherWindowOpen = symbolSearch !== null || indicatorsOpen || scriptEditor !== undefined || profileOpen || adminOpen || superchartOpen || chartSettingsOpen || studySettingsId !== undefined || drawingSettings !== undefined || document.querySelector('[role="dialog"], [role="menu"]') !== null
+      const otherWindowOpen =
+        symbolSearch !== null ||
+        indicatorsOpen ||
+        scriptEditor !== undefined ||
+        profileOpen ||
+        adminOpen ||
+        superchartOpen ||
+        chartSettingsOpen ||
+        studySettingsId !== undefined ||
+        drawingSettings !== undefined ||
+        document.querySelector('[role="dialog"], [role="menu"]') !== null
       if (!otherWindowOpen && isChartTypingKey(event, target)) {
-        if (/^[0-9]$/.test(event.key)) { event.preventDefault(); setIntervalError(''); setIntervalInput(event.key); return }
-        if (/^[a-zA-Z]$/.test(event.key)) { event.preventDefault(); setSearchSeed(event.key.toUpperCase()); setSymbolSearch('change'); return }
+        if (/^[0-9]$/.test(event.key)) {
+          event.preventDefault()
+          setIntervalError('')
+          setIntervalInput(event.key)
+          return
+        }
+        if (/^[a-zA-Z]$/.test(event.key)) {
+          event.preventDefault()
+          setSearchSeed(event.key.toUpperCase())
+          setSymbolSearch('change')
+          return
+        }
       }
 
       if (event.key === 'Escape') chooseCursor()
@@ -978,7 +1193,28 @@ function WorkspaceApp({ user, onLogout, onUserRefresh }: WorkspaceAppProps) {
 
     globalThis.addEventListener('keydown', handleKeyDown)
     return () => globalThis.removeEventListener('keydown', handleKeyDown)
-  }, [adminOpen, indicatorsOpen, scriptEditor, chartSettingsOpen, studySettingsId, drawingSettings, changeInterval, chooseCursor, chooseTool, controller, drawingStore, intervalInput, market.pricePrecision, profileOpen, replayActive, replayPlaying, selectedDrawingId, superchartOpen, symbolSearch, takeSnapshot])
+  }, [
+    adminOpen,
+    indicatorsOpen,
+    scriptEditor,
+    chartSettingsOpen,
+    studySettingsId,
+    drawingSettings,
+    changeInterval,
+    chooseCursor,
+    chooseTool,
+    controller,
+    drawingStore,
+    intervalInput,
+    market.pricePrecision,
+    profileOpen,
+    replayActive,
+    replayPlaying,
+    selectedDrawingId,
+    superchartOpen,
+    symbolSearch,
+    takeSnapshot,
+  ])
 
   // A click anywhere closes the timeframe box, as in TradingView.
   useEffect(() => {
@@ -1002,7 +1238,9 @@ function WorkspaceApp({ user, onLogout, onUserRefresh }: WorkspaceAppProps) {
   useEffect(() => {
     const controller = new AbortController()
     refreshMarketCatalog(undefined, controller.signal)
-      .then((changed) => { if (changed) setMarkets(allMarkets()) })
+      .then((changed) => {
+        if (changed) setMarkets(allMarkets())
+      })
       .catch(() => {
         // Offline or blocked: the curated and cached markets stay available.
       })
@@ -1017,7 +1255,10 @@ function WorkspaceApp({ user, onLogout, onUserRefresh }: WorkspaceAppProps) {
   useEffect(() => saveSavedLayouts(user.id, savedLayouts), [savedLayouts, user.id])
   // Layouts save themselves as you work, like TradingView: shortly after the open tabs change, each open layout follows.
   useEffect(() => {
-    const timer = globalThis.setTimeout(() => setSavedLayouts((current) => autosaveLayouts(current, workspace, Date.now()) as SavedLayout[]), 1200)
+    const timer = globalThis.setTimeout(
+      () => setSavedLayouts((current) => autosaveLayouts(current, workspace, Date.now()) as SavedLayout[]),
+      1200,
+    )
     return () => globalThis.clearTimeout(timer)
   }, [workspace])
   useEffect(() => saveAlerts(user.id, alerts), [alerts, user.id])
@@ -1039,13 +1280,20 @@ function WorkspaceApp({ user, onLogout, onUserRefresh }: WorkspaceAppProps) {
       'prefs:v1': () => setPreferences(loadPreferences(user.id)),
       'theme:v1': () => setTheme(loadUserTheme(user.id)),
     }
-    return subscribeRemoteData((keys) => { for (const key of keys) reloaders[key]?.() })
+    return subscribeRemoteData((keys) => {
+      for (const key of keys) reloaders[key]?.()
+    })
   }, [drawingStore, user.id])
   useEffect(() => savePreferences(user.id, preferences), [preferences, user.id])
   useEffect(() => saveLayoutFolders(user.id, layoutFolders), [layoutFolders, user.id])
   // A deleted layout leaves its folder.
   useEffect(() => {
-    setLayoutFolders((current) => pruneFolderAssignments(current, savedLayouts.map((layout) => layout.id)))
+    setLayoutFolders((current) =>
+      pruneFolderAssignments(
+        current,
+        savedLayouts.map((layout) => layout.id),
+      ),
+    )
   }, [savedLayouts])
   useEffect(() => saveTemplates(user.id, templateState), [templateState, user.id])
   useEffect(() => saveWatchlists(user.id, watchlistState), [watchlistState, user.id])
@@ -1091,12 +1339,14 @@ function WorkspaceApp({ user, onLogout, onUserRefresh }: WorkspaceAppProps) {
     })
     if (triggered.length === 0) return
 
-    setAlerts((current) => current.map((alert) => {
-      if (!triggered.some((item) => item.id === alert.id)) return alert
-      return alert.frequency === 'everyTime'
-        ? { ...alert, lastTriggeredAtMs: now, lastTriggeredPrice: price, triggerCount: (alert.triggerCount ?? 0) + 1 }
-        : { ...alert, triggeredAtMs: now, triggeredPrice: price, enabled: false }
-    }))
+    setAlerts((current) =>
+      current.map((alert) => {
+        if (!triggered.some((item) => item.id === alert.id)) return alert
+        return alert.frequency === 'everyTime'
+          ? { ...alert, lastTriggeredAtMs: now, lastTriggeredPrice: price, triggerCount: (alert.triggerCount ?? 0) + 1 }
+          : { ...alert, triggeredAtMs: now, triggeredPrice: price, enabled: false }
+      }),
+    )
 
     announceAlerts(triggered.map((alert) => ({ symbol: alert.symbol, targetPrice: alert.targetPrice, price })))
   }, [alerts, market.symbol, runtime.quote?.close, runtime.replay])
@@ -1113,30 +1363,39 @@ function WorkspaceApp({ user, onLogout, onUserRefresh }: WorkspaceAppProps) {
       const events = await fetchAlertEvents(since)
       if (!live || events.length === 0) return
       since = Math.max(since, ...events.map((event) => event.triggeredAtMs))
-      const isNew = (alert: PriceAlert, event: { triggeredAtMs: number, everyTime?: boolean }) => (
+      const isNew = (alert: PriceAlert, event: { triggeredAtMs: number; everyTime?: boolean }) =>
         event.everyTime ? (alert.lastTriggeredAtMs ?? 0) < event.triggeredAtMs : !alert.triggeredAtMs
-      )
       const fresh = events.filter((event) => alertsRef.current.some((alert) => alert.id === event.id && isNew(alert, event)))
       if (fresh.length === 0) return
-      setAlerts((current) => current.map((alert) => {
-        const event = fresh.find((item) => item.id === alert.id)
-        if (!event || !isNew(alert, event)) return alert
-        return event.everyTime
-          ? { ...alert, lastTriggeredAtMs: event.triggeredAtMs, lastTriggeredPrice: event.triggeredPrice }
-          : { ...alert, enabled: false, triggeredAtMs: event.triggeredAtMs, triggeredPrice: event.triggeredPrice }
-      }))
+      setAlerts((current) =>
+        current.map((alert) => {
+          const event = fresh.find((item) => item.id === alert.id)
+          if (!event || !isNew(alert, event)) return alert
+          return event.everyTime
+            ? { ...alert, lastTriggeredAtMs: event.triggeredAtMs, lastTriggeredPrice: event.triggeredPrice }
+            : { ...alert, enabled: false, triggeredAtMs: event.triggeredAtMs, triggeredPrice: event.triggeredPrice }
+        }),
+      )
       // Alerts that fired while this tab was hidden were already announced by the push notification.
       const announce = fresh.filter((event) => hiddenAtMs === undefined || event.triggeredAtMs >= hiddenAtMs)
-      if (announce.length > 0) announceAlerts(announce.map((event) => ({ symbol: event.symbol, targetPrice: event.targetPrice, price: event.triggeredPrice })))
+      if (announce.length > 0)
+        announceAlerts(announce.map((event) => ({ symbol: event.symbol, targetPrice: event.targetPrice, price: event.triggeredPrice })))
     }
     const onVisibility = () => {
       if (document.visibilityState === 'hidden') hiddenAtMs = Date.now()
-      else { void poll(); hiddenAtMs = undefined }
+      else {
+        void poll()
+        hiddenAtMs = undefined
+      }
     }
     document.addEventListener('visibilitychange', onVisibility)
     const timer = globalThis.setInterval(() => void poll(), 15_000)
     void poll()
-    return () => { live = false; document.removeEventListener('visibilitychange', onVisibility); globalThis.clearInterval(timer) }
+    return () => {
+      live = false
+      document.removeEventListener('visibilitychange', onVisibility)
+      globalThis.clearInterval(timer)
+    }
   }, [])
 
   useEffect(() => {
@@ -1154,8 +1413,10 @@ function WorkspaceApp({ user, onLogout, onUserRefresh }: WorkspaceAppProps) {
     const timer = globalThis.setInterval(() => {
       void getTelegramStatus().then((status) => {
         setTelegram(status)
-        if (status?.linked) { setTelegramPending(false); setTelegramMessage('') }
-        else if (Date.now() > deadline) setTelegramPending(false)
+        if (status?.linked) {
+          setTelegramPending(false)
+          setTelegramMessage('')
+        } else if (Date.now() > deadline) setTelegramPending(false)
       })
     }, 3000)
     return () => globalThis.clearInterval(timer)
@@ -1174,13 +1435,14 @@ function WorkspaceApp({ user, onLogout, onUserRefresh }: WorkspaceAppProps) {
     }
   }
 
-  const connectTelegram = () => runTelegram(async () => {
-    const url = await startTelegramLink()
-    // Opens the Telegram app (or web.telegram.org) at the bot with the one-time code attached.
-    window.open(url, '_blank', 'noopener')
-    setTelegramPending(true)
-    return 'Press Start in Telegram to finish. This page updates by itself.'
-  })
+  const connectTelegram = () =>
+    runTelegram(async () => {
+      const url = await startTelegramLink()
+      // Opens the Telegram app (or web.telegram.org) at the bot with the one-time code attached.
+      window.open(url, '_blank', 'noopener')
+      setTelegramPending(true)
+      return 'Press Start in Telegram to finish. This page updates by itself.'
+    })
 
   const togglePush = async () => {
     setPushBusy(true)
@@ -1213,18 +1475,25 @@ function WorkspaceApp({ user, onLogout, onUserRefresh }: WorkspaceAppProps) {
     if (!selectedDrawing || !isPositionTool(selectedDrawing.type)) return
     const [entry, target, stop] = selectedDrawing.anchors
     if (selectedDrawing.anchors.length > 3) {
-      drawingStore.execute(updateDrawing(selectedDrawing.id, {
-        anchors: selectedDrawing.anchors.slice(0, 3),
-        style: { ...selectedDrawing.style, dcaTriggered: false },
-      }))
+      drawingStore.execute(
+        updateDrawing(selectedDrawing.id, {
+          anchors: selectedDrawing.anchors.slice(0, 3),
+          style: { ...selectedDrawing.style, dcaTriggered: false },
+        }),
+      )
       return
     }
-    drawingStore.execute(updateDrawing(selectedDrawing.id, {
-      anchors: [...selectedDrawing.anchors, {
-        timeMs: Math.round(entry.timeMs + (target.timeMs - entry.timeMs) / 2),
-        price: decimalString(clampDcaPrice(Number(entry.price), Number(stop.price))),
-      }],
-    }))
+    drawingStore.execute(
+      updateDrawing(selectedDrawing.id, {
+        anchors: [
+          ...selectedDrawing.anchors,
+          {
+            timeMs: Math.round(entry.timeMs + (target.timeMs - entry.timeMs) / 2),
+            price: decimalString(clampDcaPrice(Number(entry.price), Number(stop.price))),
+          },
+        ],
+      }),
+    )
   }
 
   /** Lock or hide every drawing of the multi-selection (locking unlocks all when all were locked). */
@@ -1236,9 +1505,11 @@ function WorkspaceApp({ user, onLogout, onUserRefresh }: WorkspaceAppProps) {
 
   const updateSelectedStyle = (changes: Record<string, string | number | boolean>) => {
     if (!selectedDrawing) return
-    drawingStore.execute(updateDrawing(selectedDrawing.id, {
-      style: { ...selectedDrawing.style, ...changes },
-    }))
+    drawingStore.execute(
+      updateDrawing(selectedDrawing.id, {
+        style: { ...selectedDrawing.style, ...changes },
+      }),
+    )
   }
 
   return (
@@ -1246,7 +1517,15 @@ function WorkspaceApp({ user, onLogout, onUserRefresh }: WorkspaceAppProps) {
       {user.mustChangePassword && (
         <div className="temp-password-banner" role="alert">
           <span>You signed in with a temporary password. Choose your own now so only you know it.</span>
-          <button type="button" onClick={() => { setProfileFocus('password'); setProfileOpen(true) }}>Choose a new password</button>
+          <button
+            type="button"
+            onClick={() => {
+              setProfileFocus('password')
+              setProfileOpen(true)
+            }}
+          >
+            Choose a new password
+          </button>
         </div>
       )}
       <nav className="chart-tabs" aria-label="Open charts">
@@ -1254,7 +1533,9 @@ function WorkspaceApp({ user, onLogout, onUserRefresh }: WorkspaceAppProps) {
           <HorizonLogo />
           <span className="brand-name">TradeHorizon</span>
           <span className="preview-pill">ALPHA</span>
-          <span className="brand-version" title={versionDetails()}>{versionLabel()}</span>
+          <span className="brand-version" title={versionDetails()}>
+            {versionLabel()}
+          </span>
         </div>
         <div className="chart-tabs-scroll" ref={tabStripRef}>
           {workspace.tabs.map((tab) => {
@@ -1264,20 +1545,29 @@ function WorkspaceApp({ user, onLogout, onUserRefresh }: WorkspaceAppProps) {
               <div
                 className={['chart-tab', active ? 'active' : '', draggingTabId === tab.id ? 'dragging' : ''].filter(Boolean).join(' ')}
                 key={tab.id}
-                ref={(element) => { if (element) tabElements.current.set(tab.id, element); else tabElements.current.delete(tab.id) }}
+                ref={(element) => {
+                  if (element) tabElements.current.set(tab.id, element)
+                  else tabElements.current.delete(tab.id)
+                }}
                 onPointerDown={(event) => startTabDrag(event, tab.id)}
               >
                 <button
                   type="button"
                   className="chart-tab-main"
                   title="Drag to reorder (Alt+Shift+arrows with the keyboard)"
-                  onClick={() => { if (!justDraggedTab.current) activateTab(tab) }}
+                  onClick={() => {
+                    if (!justDraggedTab.current) activateTab(tab)
+                  }}
                   onKeyDown={(event) => moveTabByKey(event, tab.id)}
                 >
                   <span className="chart-tab-mark">{tabMarket.mark}</span>
                   <span>{tabMarket.pair}</span>
                   <small>{tab.interval}</small>
-                  {tab.split && <small className="chart-tab-split" title={`${tab.split.count} charts`}>▦{tab.split.count}</small>}
+                  {tab.split && (
+                    <small className="chart-tab-split" title={`${tab.split.count} charts`}>
+                      ▦{tab.split.count}
+                    </small>
+                  )}
                 </button>
                 <button
                   type="button"
@@ -1297,12 +1587,7 @@ function WorkspaceApp({ user, onLogout, onUserRefresh }: WorkspaceAppProps) {
                 <LayersIcon />
                 <span>New tab</span>
               </span>
-              <button
-                type="button"
-                className="chart-tab-close"
-                aria-label="Close new tab"
-                onClick={() => setSuperchartOpen(false)}
-              >
+              <button type="button" className="chart-tab-close" aria-label="Close new tab" onClick={() => setSuperchartOpen(false)}>
                 <CloseIcon />
               </button>
             </div>
@@ -1344,8 +1629,19 @@ function WorkspaceApp({ user, onLogout, onUserRefresh }: WorkspaceAppProps) {
               onLogout={onLogout}
               focusSection={profileFocus}
               onPasswordChanged={onUserRefresh}
-              onOpenAdmin={user.isAdmin ? () => { setProfileOpen(false); setProfileFocus(undefined); setAdminOpen(true) } : undefined}
-              onClose={() => { setProfileOpen(false); setProfileFocus(undefined) }}
+              onOpenAdmin={
+                user.isAdmin
+                  ? () => {
+                      setProfileOpen(false)
+                      setProfileFocus(undefined)
+                      setAdminOpen(true)
+                    }
+                  : undefined
+              }
+              onClose={() => {
+                setProfileOpen(false)
+                setProfileFocus(undefined)
+              }}
             />
           )}
         </div>
@@ -1361,7 +1657,9 @@ function WorkspaceApp({ user, onLogout, onUserRefresh }: WorkspaceAppProps) {
         >
           <span className="asset-badge">{market.mark}</span>
           <strong>{displaySymbol(market.symbol)}</strong>
-          {market.kind !== 'dominance' && market.exchange !== 'binance' && market.exchange !== 'binance-futures' && <small className="symbol-button-venue">{market.venue.replace(' Futures', '')}</small>}
+          {market.kind !== 'dominance' && market.exchange !== 'binance' && market.exchange !== 'binance-futures' && (
+            <small className="symbol-button-venue">{market.venue.replace(' Futures', '')}</small>
+          )}
         </button>
         <button
           type="button"
@@ -1398,7 +1696,11 @@ function WorkspaceApp({ user, onLogout, onUserRefresh }: WorkspaceAppProps) {
             aria-expanded={timeframeMenuOpen}
             onClick={() => setTimeframeMenuOpen((open) => !open)}
           >
-            {toolbarIntervals.includes(interval) ? 'More' : <span className="current-timeframe">{MARKET_INTERVAL_SPECS[interval].label}</span>}
+            {toolbarIntervals.includes(interval) ? (
+              'More'
+            ) : (
+              <span className="current-timeframe">{MARKET_INTERVAL_SPECS[interval].label}</span>
+            )}
           </button>
           {timeframeMenuOpen && (
             <div className="top-menu timeframe-menu">
@@ -1409,13 +1711,21 @@ function WorkspaceApp({ user, onLogout, onUserRefresh }: WorkspaceAppProps) {
                     type="button"
                     className={interval === value ? 'active' : ''}
                     key={value}
-                    onClick={() => { changeInterval(value); setTimeframeMenuOpen(false) }}
+                    onClick={() => {
+                      changeInterval(value)
+                      setTimeframeMenuOpen(false)
+                    }}
                   >
                     {MARKET_INTERVAL_SPECS[value].label}
                   </button>
                 ))}
               </div>
-              <form onSubmit={(event) => { event.preventDefault(); addCustomInterval() }}>
+              <form
+                onSubmit={(event) => {
+                  event.preventDefault()
+                  addCustomInterval()
+                }}
+              >
                 <span>Add a custom shortcut</span>
                 <div>
                   <input
@@ -1475,7 +1785,10 @@ function WorkspaceApp({ user, onLogout, onUserRefresh }: WorkspaceAppProps) {
                     })
                   }}
                 >
-                  <span className="chart-type-option"><ChartTypeIcon type={type} />{CHART_TYPE_LABELS[type]}</span>
+                  <span className="chart-type-option">
+                    <ChartTypeIcon type={type} />
+                    {CHART_TYPE_LABELS[type]}
+                  </span>
                 </button>
               ))}
             </div>
@@ -1512,7 +1825,9 @@ function WorkspaceApp({ user, onLogout, onUserRefresh }: WorkspaceAppProps) {
                   </button>
                 ))}
               </div>
-              {paneTotal > 1 && <small>Click a chart to make it active. The toolbar, drawing tools and panels act on the active chart.</small>}
+              {paneTotal > 1 && (
+                <small>Click a chart to make it active. The toolbar, drawing tools and panels act on the active chart.</small>
+              )}
               {paneTotal > 1 && (
                 <div className="split-sync" role="group" aria-label="Sync charts">
                   <b>Sync in this tab</b>
@@ -1521,12 +1836,24 @@ function WorkspaceApp({ user, onLogout, onUserRefresh }: WorkspaceAppProps) {
                       <input
                         type="checkbox"
                         checked={activeTab.split?.sync?.[key] === true}
-                        onChange={(event) => setWorkspace((current) => ({
-                          ...current,
-                          tabs: current.tabs.map((tab) => (tab.id === current.activeTabId ? withSplitSync(tab, key, event.target.checked) : tab)),
-                        }))}
+                        onChange={(event) =>
+                          setWorkspace((current) => ({
+                            ...current,
+                            tabs: current.tabs.map((tab) =>
+                              tab.id === current.activeTabId ? withSplitSync(tab, key, event.target.checked) : tab,
+                            ),
+                          }))
+                        }
                       />
-                      <span>{key === 'symbol' ? 'Symbol' : key === 'interval' ? 'Timeframe' : key === 'crosshair' ? 'Crosshair' : 'Time (scroll and zoom)'}</span>
+                      <span>
+                        {key === 'symbol'
+                          ? 'Symbol'
+                          : key === 'interval'
+                            ? 'Timeframe'
+                            : key === 'crosshair'
+                              ? 'Crosshair'
+                              : 'Time (scroll and zoom)'}
+                      </span>
                     </label>
                   ))}
                 </div>
@@ -1534,7 +1861,10 @@ function WorkspaceApp({ user, onLogout, onUserRefresh }: WorkspaceAppProps) {
               {paneTotal > 1 && (
                 <form
                   className="split-save"
-                  onSubmit={(event) => { event.preventDefault(); saveSplitAsLayout(splitSaveName) }}
+                  onSubmit={(event) => {
+                    event.preventDefault()
+                    saveSplitAsLayout(splitSaveName)
+                  }}
                 >
                   <input
                     value={splitSaveName}
@@ -1544,7 +1874,9 @@ function WorkspaceApp({ user, onLogout, onUserRefresh }: WorkspaceAppProps) {
                     onChange={(event) => setSplitSaveName(event.target.value)}
                     onKeyDown={(event) => event.stopPropagation()}
                   />
-                  <button type="submit" title="Save this split view to your layouts so you can open it again later">Save split</button>
+                  <button type="submit" title="Save this split view to your layouts so you can open it again later">
+                    Save split
+                  </button>
                 </form>
               )}
             </div>
@@ -1608,7 +1940,7 @@ function WorkspaceApp({ user, onLogout, onUserRefresh }: WorkspaceAppProps) {
 
         <div
           className={`connection-chip connection-${replayActive ? 'loading' : runtime.connection}`}
-          title={replayActive ? 'Replaying history; live updates are paused' : runtime.error ?? connectionLabel}
+          title={replayActive ? 'Replaying history; live updates are paused' : (runtime.error ?? connectionLabel)}
         >
           <span className="connection-dot" />
           <span>{replayActive ? 'Replay' : connectionLabel}</span>
@@ -1623,7 +1955,15 @@ function WorkspaceApp({ user, onLogout, onUserRefresh }: WorkspaceAppProps) {
           >
             <LayersIcon />
             <span>{currentLayout?.name ?? workspace.layoutName}</span>
-            <small title={currentLayout ? 'Changes to this layout are saved automatically' : 'Your open tabs are kept, but they are not part of a saved layout yet'}>{layoutNotice || (currentLayout ? 'Autosaved' : 'Not saved as layout')}</small>
+            <small
+              title={
+                currentLayout
+                  ? 'Changes to this layout are saved automatically'
+                  : 'Your open tabs are kept, but they are not part of a saved layout yet'
+              }
+            >
+              {layoutNotice || (currentLayout ? 'Autosaved' : 'Not saved as layout')}
+            </small>
           </button>
           {layoutMenuOpen && (
             <div className="top-menu layout-menu" role="menu">
@@ -1638,9 +1978,31 @@ function WorkspaceApp({ user, onLogout, onUserRefresh }: WorkspaceAppProps) {
                   }}
                 />
               </label>
-              <button type="button" onClick={() => { saveCurrentLayout(layoutDraftName); setLayoutMenuOpen(false) }}>Save layout</button>
-              <button type="button" onClick={() => { setSaveAsOpen(true); setLayoutMenuOpen(false) }}>Save as…</button>
-              <button type="button" onClick={() => { setSuperchartOpen(true); setLayoutMenuOpen(false) }}>
+              <button
+                type="button"
+                onClick={() => {
+                  saveCurrentLayout(layoutDraftName)
+                  setLayoutMenuOpen(false)
+                }}
+              >
+                Save layout
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setSaveAsOpen(true)
+                  setLayoutMenuOpen(false)
+                }}
+              >
+                Save as…
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setSuperchartOpen(true)
+                  setLayoutMenuOpen(false)
+                }}
+              >
                 Manage layouts <span>{savedLayouts.length}</span>
               </button>
             </div>
@@ -1662,8 +2024,12 @@ function WorkspaceApp({ user, onLogout, onUserRefresh }: WorkspaceAppProps) {
           </button>
           {snapshotMenuOpen && (
             <div className="top-menu layout-menu snapshot-menu" role="menu">
-              <button type="button" role="menuitem" onClick={() => takeSnapshot('download')}>Download image <span>Ctrl+Alt+S</span></button>
-              <button type="button" role="menuitem" onClick={() => takeSnapshot('copy')}>Copy image <span>Ctrl+Shift+S</span></button>
+              <button type="button" role="menuitem" onClick={() => takeSnapshot('download')}>
+                Download image <span>Ctrl+Alt+S</span>
+              </button>
+              <button type="button" role="menuitem" onClick={() => takeSnapshot('copy')}>
+                Copy image <span>Ctrl+Shift+S</span>
+              </button>
             </div>
           )}
         </div>
@@ -1685,7 +2051,9 @@ function WorkspaceApp({ user, onLogout, onUserRefresh }: WorkspaceAppProps) {
               key={group.id}
               label={group.label}
               tools={group.tools}
-              shown={group.tools.includes(activeTool as DrawingType) ? activeTool as DrawingType : groupTools[group.id] ?? group.tools[0]}
+              shown={
+                group.tools.includes(activeTool as DrawingType) ? (activeTool as DrawingType) : (groupTools[group.id] ?? group.tools[0])
+              }
               activeTool={activeTool}
               icons={TOOL_ICONS}
               disabled={!controller || runtime.connection === 'error'}
@@ -1702,10 +2070,12 @@ function WorkspaceApp({ user, onLogout, onUserRefresh }: WorkspaceAppProps) {
             aria-label="Magnet: snap to candle open, high, low, close"
             aria-pressed={!!workspace.magnet}
             title={workspace.magnet ? 'Magnet on: points snap to OHLC' : 'Magnet off: free placement'}
-            onClick={() => setWorkspace((current) => {
-              const { magnet, ...rest } = current
-              return magnet ? rest : { ...rest, magnet: true }
-            })}
+            onClick={() =>
+              setWorkspace((current) => {
+                const { magnet, ...rest } = current
+                return magnet ? rest : { ...rest, magnet: true }
+              })
+            }
           >
             <MagnetIcon />
           </button>
@@ -1714,11 +2084,17 @@ function WorkspaceApp({ user, onLogout, onUserRefresh }: WorkspaceAppProps) {
             className={workspace.stayInDrawingMode ? 'tool-button active' : 'tool-button'}
             aria-label="Stay in drawing mode"
             aria-pressed={!!workspace.stayInDrawingMode}
-            title={workspace.stayInDrawingMode ? 'Stay in drawing mode: on (the tool stays selected after each drawing)' : 'Stay in drawing mode: off'}
-            onClick={() => setWorkspace((current) => {
-              const { stayInDrawingMode, ...rest } = current
-              return stayInDrawingMode ? rest : { ...rest, stayInDrawingMode: true }
-            })}
+            title={
+              workspace.stayInDrawingMode
+                ? 'Stay in drawing mode: on (the tool stays selected after each drawing)'
+                : 'Stay in drawing mode: off'
+            }
+            onClick={() =>
+              setWorkspace((current) => {
+                const { stayInDrawingMode, ...rest } = current
+                return stayInDrawingMode ? rest : { ...rest, stayInDrawingMode: true }
+              })
+            }
           >
             <PencilLockIcon />
           </button>
@@ -1728,10 +2104,12 @@ function WorkspaceApp({ user, onLogout, onUserRefresh }: WorkspaceAppProps) {
             aria-label="Lock all drawings"
             aria-pressed={!!workspace.lockAllDrawings}
             title={workspace.lockAllDrawings ? 'All drawings locked' : 'Lock all drawings'}
-            onClick={() => setWorkspace((current) => {
-              const { lockAllDrawings, ...rest } = current
-              return lockAllDrawings ? rest : { ...rest, lockAllDrawings: true }
-            })}
+            onClick={() =>
+              setWorkspace((current) => {
+                const { lockAllDrawings, ...rest } = current
+                return lockAllDrawings ? rest : { ...rest, lockAllDrawings: true }
+              })
+            }
           >
             {workspace.lockAllDrawings ? <LockIcon /> : <UnlockIcon />}
           </button>
@@ -1741,10 +2119,12 @@ function WorkspaceApp({ user, onLogout, onUserRefresh }: WorkspaceAppProps) {
             aria-label="Hide all drawings"
             aria-pressed={!!workspace.hideAllDrawings}
             title={workspace.hideAllDrawings ? 'Show all drawings' : 'Hide all drawings'}
-            onClick={() => setWorkspace((current) => {
-              const { hideAllDrawings, ...rest } = current
-              return hideAllDrawings ? rest : { ...rest, hideAllDrawings: true }
-            })}
+            onClick={() =>
+              setWorkspace((current) => {
+                const { hideAllDrawings, ...rest } = current
+                return hideAllDrawings ? rest : { ...rest, hideAllDrawings: true }
+              })
+            }
           >
             {workspace.hideAllDrawings ? <EyeOffIcon /> : <EyeIcon />}
           </button>
@@ -1868,7 +2248,11 @@ function WorkspaceApp({ user, onLogout, onUserRefresh }: WorkspaceAppProps) {
                 value={replay.speedMs}
                 onChange={(event) => controller?.setReplaySpeed(Number(event.target.value))}
               >
-                {REPLAY_SPEEDS.map((speed) => <option value={speed.ms} key={speed.ms}>{speed.label}</option>)}
+                {REPLAY_SPEEDS.map((speed) => (
+                  <option value={speed.ms} key={speed.ms}>
+                    {speed.label}
+                  </option>
+                ))}
               </select>
               <span className="replay-time">{replay.atEnd ? 'Reached the latest bar' : formatReplayTime(replay.timeMs)}</span>
               <button type="button" title="Choose a different starting bar" onClick={() => controller?.startReplaySelection()}>
@@ -1880,27 +2264,73 @@ function WorkspaceApp({ user, onLogout, onUserRefresh }: WorkspaceAppProps) {
             </div>
           )}
 
-          {activeTool !== 'cursor' && (() => {
-            const Icon = TOOL_ICONS[activeTool]
-            return (
-              <div className="drawing-hint" role="status">
-                <Icon />
-                {DRAWING_TOOLS[activeTool].hint}
-                <kbd>Esc</kbd>
-              </div>
-            )
-          })()}
+          {activeTool !== 'cursor' &&
+            (() => {
+              const Icon = TOOL_ICONS[activeTool]
+              return (
+                <div className="drawing-hint" role="status">
+                  <Icon />
+                  {DRAWING_TOOLS[activeTool].hint}
+                  <kbd>Esc</kbd>
+                </div>
+              )
+            })()}
 
           {multiSelection.length > 1 && (
             <div className="floating-object-toolbar" role="toolbar" aria-label="Selected drawings">
               <span className="toolbar-grip" aria-hidden="true" />
               <strong className="toolbar-count">{multiSelection.length} drawings</strong>
               <span className="toolbar-separator" />
-              <button type="button" className="toolbar-action" aria-label="Clone selected drawings" title="Clone" onClick={() => { for (const id of multiSelection) controller?.cloneDrawing(id) }}><CopyIcon /></button>
-              <button type="button" className="toolbar-action" aria-label="Lock selected drawings" title="Lock or unlock all" onClick={() => setGroupFlag('locked')}><LockIcon /></button>
-              <button type="button" className="toolbar-action" aria-label="Hide selected drawings" title="Hide" onClick={() => setGroupFlag('hidden')}><EyeOffIcon /></button>
-              <button type="button" className="toolbar-action delete" aria-label="Delete selected drawings" title="Delete (Del)" onClick={() => controller?.deleteSelected()}><TrashIcon /></button>
-              <button type="button" className="toolbar-action" aria-label="Clear selection" title="Clear selection" onClick={() => { controller?.clearSelection(); controller?.clearDrawingSelection() }}><CloseIcon /></button>
+              <button
+                type="button"
+                className="toolbar-action"
+                aria-label="Clone selected drawings"
+                title="Clone"
+                onClick={() => {
+                  for (const id of multiSelection) controller?.cloneDrawing(id)
+                }}
+              >
+                <CopyIcon />
+              </button>
+              <button
+                type="button"
+                className="toolbar-action"
+                aria-label="Lock selected drawings"
+                title="Lock or unlock all"
+                onClick={() => setGroupFlag('locked')}
+              >
+                <LockIcon />
+              </button>
+              <button
+                type="button"
+                className="toolbar-action"
+                aria-label="Hide selected drawings"
+                title="Hide"
+                onClick={() => setGroupFlag('hidden')}
+              >
+                <EyeOffIcon />
+              </button>
+              <button
+                type="button"
+                className="toolbar-action delete"
+                aria-label="Delete selected drawings"
+                title="Delete (Del)"
+                onClick={() => controller?.deleteSelected()}
+              >
+                <TrashIcon />
+              </button>
+              <button
+                type="button"
+                className="toolbar-action"
+                aria-label="Clear selection"
+                title="Clear selection"
+                onClick={() => {
+                  controller?.clearSelection()
+                  controller?.clearDrawingSelection()
+                }}
+              >
+                <CloseIcon />
+              </button>
             </div>
           )}
 
@@ -1918,10 +2348,18 @@ function WorkspaceApp({ user, onLogout, onUserRefresh }: WorkspaceAppProps) {
               {isPositionTool(selectedDrawing.type) ? (
                 <>
                   <label className="toolbar-color-control" title="Target color">
-                    <ColorPicker label="Target color" value={colorInputValue(selectedDrawing.style.targetColor, '#16a085')} onChange={(color) => updateSelectedStyle({ targetColor: color })} />
+                    <ColorPicker
+                      label="Target color"
+                      value={colorInputValue(selectedDrawing.style.targetColor, '#16a085')}
+                      onChange={(color) => updateSelectedStyle({ targetColor: color })}
+                    />
                   </label>
                   <label className="toolbar-color-control" title="Stop color">
-                    <ColorPicker label="Stop color" value={colorInputValue(selectedDrawing.style.stopColor, '#f0445e')} onChange={(color) => updateSelectedStyle({ stopColor: color })} />
+                    <ColorPicker
+                      label="Stop color"
+                      value={colorInputValue(selectedDrawing.style.stopColor, '#f0445e')}
+                      onChange={(color) => updateSelectedStyle({ stopColor: color })}
+                    />
                   </label>
                   <select
                     className="toolbar-select thickness-select"
@@ -1930,7 +2368,11 @@ function WorkspaceApp({ user, onLogout, onUserRefresh }: WorkspaceAppProps) {
                     value={styleNumber(selectedDrawing.style.lineWidth, 1)}
                     onChange={(event) => updateSelectedStyle({ lineWidth: Number(event.target.value) })}
                   >
-                    {[1, 2, 3, 4, 5].map((width) => <option value={width} key={width}>{width}px</option>)}
+                    {[1, 2, 3, 4, 5].map((width) => (
+                      <option value={width} key={width}>
+                        {width}px
+                      </option>
+                    ))}
                   </select>
                   <button
                     type="button"
@@ -1968,7 +2410,11 @@ function WorkspaceApp({ user, onLogout, onUserRefresh }: WorkspaceAppProps) {
                     value={typeof selectedDrawing.style.text === 'string' ? selectedDrawing.style.text : 'Text'}
                     onCommit={(text) => updateSelectedStyle({ text })}
                   />
-                  <ColorPicker label="Text color" value={colorInputValue(selectedDrawing.style.color, '#2962ff')} onChange={(color) => updateSelectedStyle({ color })} />
+                  <ColorPicker
+                    label="Text color"
+                    value={colorInputValue(selectedDrawing.style.color, '#2962ff')}
+                    onChange={(color) => updateSelectedStyle({ color })}
+                  />
                   <select
                     className="toolbar-select thickness-select"
                     aria-label="Font size"
@@ -1976,7 +2422,11 @@ function WorkspaceApp({ user, onLogout, onUserRefresh }: WorkspaceAppProps) {
                     value={styleNumber(selectedDrawing.style.fontSize, 14)}
                     onChange={(event) => updateSelectedStyle({ fontSize: Number(event.target.value) })}
                   >
-                    {[10, 12, 14, 16, 20, 24, 32, 48].map((size) => <option value={size} key={size}>{size}px</option>)}
+                    {[10, 12, 14, 16, 20, 24, 32, 48].map((size) => (
+                      <option value={size} key={size}>
+                        {size}px
+                      </option>
+                    ))}
                   </select>
                   <button
                     type="button"
@@ -2002,7 +2452,11 @@ function WorkspaceApp({ user, onLogout, onUserRefresh }: WorkspaceAppProps) {
                           onChange={(color) => updateSelectedStyle({ color, noBorder: false })}
                         />
                       ) : (
-                        <ColorPicker label="Line color" value={colorInputValue(selectedDrawing.style.color, '#f4b860')} onChange={(color) => updateSelectedStyle({ color: color })} />
+                        <ColorPicker
+                          label="Line color"
+                          value={colorInputValue(selectedDrawing.style.color, '#f4b860')}
+                          onChange={(color) => updateSelectedStyle({ color: color })}
+                        />
                       )}
                     </label>
                   )}
@@ -2013,7 +2467,11 @@ function WorkspaceApp({ user, onLogout, onUserRefresh }: WorkspaceAppProps) {
                     value={styleNumber(selectedDrawing.style.lineWidth, 2)}
                     onChange={(event) => updateSelectedStyle({ lineWidth: Number(event.target.value) })}
                   >
-                    {[1, 2, 3, 4, 5].map((width) => <option value={width} key={width}>{width}px</option>)}
+                    {[1, 2, 3, 4, 5].map((width) => (
+                      <option value={width} key={width}>
+                        {width}px
+                      </option>
+                    ))}
                   </select>
                   <select
                     className="toolbar-select style-select"
@@ -2045,7 +2503,11 @@ function WorkspaceApp({ user, onLogout, onUserRefresh }: WorkspaceAppProps) {
                         onChange={setTemplateState}
                       />
                       <label className="toolbar-color-control fill-control" title="Fill color">
-                        <ColorPicker label="Rectangle fill color" value={colorInputValue(selectedDrawing.style.fillColor, '#3aa9ff')} onChange={(color) => updateSelectedStyle({ fillColor: color })} />
+                        <ColorPicker
+                          label="Rectangle fill color"
+                          value={colorInputValue(selectedDrawing.style.fillColor, '#3aa9ff')}
+                          onChange={(color) => updateSelectedStyle({ fillColor: color })}
+                        />
                       </label>
                       <label className="toolbar-opacity" title="Fill opacity">
                         <span>{styleNumber(selectedDrawing.style.fillOpacity, 14)}%</span>
@@ -2079,9 +2541,13 @@ function WorkspaceApp({ user, onLogout, onUserRefresh }: WorkspaceAppProps) {
                 className={selectedDrawing.hidden ? 'toolbar-action active' : 'toolbar-action'}
                 aria-label={selectedDrawing.hidden ? 'Show object' : 'Hide object'}
                 title={selectedDrawing.hidden ? 'Show object' : 'Hide object'}
-                onClick={() => drawingStore.execute(updateDrawing(selectedDrawing.id, {
-                  hidden: !selectedDrawing.hidden,
-                }))}
+                onClick={() =>
+                  drawingStore.execute(
+                    updateDrawing(selectedDrawing.id, {
+                      hidden: !selectedDrawing.hidden,
+                    }),
+                  )
+                }
               >
                 {selectedDrawing.hidden ? <EyeOffIcon /> : <EyeIcon />}
               </button>
@@ -2090,9 +2556,13 @@ function WorkspaceApp({ user, onLogout, onUserRefresh }: WorkspaceAppProps) {
                 className={selectedDrawing.locked ? 'toolbar-action active' : 'toolbar-action'}
                 aria-label={selectedDrawing.locked ? 'Unlock object' : 'Lock object'}
                 title={selectedDrawing.locked ? 'Unlock object' : 'Lock object'}
-                onClick={() => drawingStore.execute(updateDrawing(selectedDrawing.id, {
-                  locked: !selectedDrawing.locked,
-                }))}
+                onClick={() =>
+                  drawingStore.execute(
+                    updateDrawing(selectedDrawing.id, {
+                      locked: !selectedDrawing.locked,
+                    }),
+                  )
+                }
               >
                 {selectedDrawing.locked ? <LockIcon /> : <UnlockIcon />}
               </button>
@@ -2143,7 +2613,9 @@ function WorkspaceApp({ user, onLogout, onUserRefresh }: WorkspaceAppProps) {
                   <h3>Risk inputs</h3>
                   <div className="position-settings-grid">
                     <label>
-                      <span>Account size <small>{market.quoteAsset}</small></span>
+                      <span>
+                        Account size <small>{market.quoteAsset}</small>
+                      </span>
                       <input
                         type="number"
                         min="0"
@@ -2153,28 +2625,36 @@ function WorkspaceApp({ user, onLogout, onUserRefresh }: WorkspaceAppProps) {
                       />
                     </label>
                     <label>
-                      <span>Risk per trade <small>%</small></span>
+                      <span>
+                        Risk per trade <small>%</small>
+                      </span>
                       <input
                         type="number"
                         min="0.01"
                         max="100"
                         step="0.1"
                         value={styleNumber(selectedDrawing.style.riskPercent, 1)}
-                        onChange={(event) => updateSelectedStyle({ riskPercent: Math.max(0.01, Math.min(100, Number(event.target.value))) })}
+                        onChange={(event) =>
+                          updateSelectedStyle({ riskPercent: Math.max(0.01, Math.min(100, Number(event.target.value))) })
+                        }
                       />
                     </label>
                   </div>
                   {selectedDrawing.anchors.length > 3 && (
                     <div className="position-settings-grid">
                       <label>
-                        <span>DCA size <small>× entry order</small></span>
+                        <span>
+                          DCA size <small>× entry order</small>
+                        </span>
                         <input
                           type="number"
                           min="0.1"
                           max="20"
                           step="0.1"
                           value={styleNumber(selectedDrawing.style.dcaSize, 1)}
-                          onChange={(event) => updateSelectedStyle({ dcaSize: Math.max(0.1, Math.min(20, Number(event.target.value) || 1)) })}
+                          onChange={(event) =>
+                            updateSelectedStyle({ dcaSize: Math.max(0.1, Math.min(20, Number(event.target.value) || 1)) })
+                          }
                         />
                       </label>
                     </div>
@@ -2187,19 +2667,35 @@ function WorkspaceApp({ user, onLogout, onUserRefresh }: WorkspaceAppProps) {
                   <div className="position-settings-grid colors-grid">
                     <label>
                       <span>Target color</span>
-                      <ColorPicker label="Target color" value={colorInputValue(selectedDrawing.style.targetColor, '#16a085')} onChange={(color) => updateSelectedStyle({ targetColor: color })} />
+                      <ColorPicker
+                        label="Target color"
+                        value={colorInputValue(selectedDrawing.style.targetColor, '#16a085')}
+                        onChange={(color) => updateSelectedStyle({ targetColor: color })}
+                      />
                     </label>
                     <label>
                       <span>Stop color</span>
-                      <ColorPicker label="Stop color" value={colorInputValue(selectedDrawing.style.stopColor, '#f0445e')} onChange={(color) => updateSelectedStyle({ stopColor: color })} />
+                      <ColorPicker
+                        label="Stop color"
+                        value={colorInputValue(selectedDrawing.style.stopColor, '#f0445e')}
+                        onChange={(color) => updateSelectedStyle({ stopColor: color })}
+                      />
                     </label>
                     <label>
                       <span>Line color</span>
-                      <ColorPicker label="Line color" value={colorInputValue(selectedDrawing.style.lineColor, '#c7d0db')} onChange={(color) => updateSelectedStyle({ lineColor: color })} />
+                      <ColorPicker
+                        label="Line color"
+                        value={colorInputValue(selectedDrawing.style.lineColor, '#c7d0db')}
+                        onChange={(color) => updateSelectedStyle({ lineColor: color })}
+                      />
                     </label>
                     <label>
                       <span>Text color</span>
-                      <ColorPicker label="Text color" value={colorInputValue(selectedDrawing.style.textColor, '#ffffff')} onChange={(color) => updateSelectedStyle({ textColor: color })} />
+                      <ColorPicker
+                        label="Text color"
+                        value={colorInputValue(selectedDrawing.style.textColor, '#ffffff')}
+                        onChange={(color) => updateSelectedStyle({ textColor: color })}
+                      />
                     </label>
                     <label>
                       <span>Line thickness</span>
@@ -2207,11 +2703,17 @@ function WorkspaceApp({ user, onLogout, onUserRefresh }: WorkspaceAppProps) {
                         value={styleNumber(selectedDrawing.style.lineWidth, 1)}
                         onChange={(event) => updateSelectedStyle({ lineWidth: Number(event.target.value) })}
                       >
-                        {[1, 2, 3, 4, 5].map((width) => <option value={width} key={width}>{width}px</option>)}
+                        {[1, 2, 3, 4, 5].map((width) => (
+                          <option value={width} key={width}>
+                            {width}px
+                          </option>
+                        ))}
                       </select>
                     </label>
                     <label>
-                      <span>Fill opacity <small>{styleNumber(selectedDrawing.style.fillOpacity, 22)}%</small></span>
+                      <span>
+                        Fill opacity <small>{styleNumber(selectedDrawing.style.fillOpacity, 22)}%</small>
+                      </span>
                       <input
                         type="range"
                         min="0"
@@ -2224,7 +2726,9 @@ function WorkspaceApp({ user, onLogout, onUserRefresh }: WorkspaceAppProps) {
                 </div>
 
                 <footer>
-                  <button type="button" onClick={() => setPositionSettingsOpen(false)}>Done</button>
+                  <button type="button" onClick={() => setPositionSettingsOpen(false)}>
+                    Done
+                  </button>
                 </footer>
               </section>
             </div>
@@ -2283,7 +2787,9 @@ function WorkspaceApp({ user, onLogout, onUserRefresh }: WorkspaceAppProps) {
               <span className="object-market-symbol">{market.mark}</span>
               <div>
                 <strong>{displaySymbol(market.symbol)}</strong>
-                <span>{market.venue} {marketKindLabel(market)} · {interval}</span>
+                <span>
+                  {market.venue} {marketKindLabel(market)} · {interval}
+                </span>
               </div>
             </div>
 
@@ -2314,7 +2820,10 @@ function WorkspaceApp({ user, onLogout, onUserRefresh }: WorkspaceAppProps) {
             aria-label="Watchlist"
             aria-pressed={watchlistOpen}
             title="Watchlist"
-            onClick={() => { setWatchlistOpen((open) => !open); setAlertsOpen(false) }}
+            onClick={() => {
+              setWatchlistOpen((open) => !open)
+              setAlertsOpen(false)
+            }}
           >
             <StarIcon />
           </button>
@@ -2334,12 +2843,13 @@ function WorkspaceApp({ user, onLogout, onUserRefresh }: WorkspaceAppProps) {
             aria-label="Price alerts"
             aria-pressed={alertsOpen}
             title="Price alerts"
-            onClick={() => { setAlertsOpen((open) => !open); setWatchlistOpen(false) }}
+            onClick={() => {
+              setAlertsOpen((open) => !open)
+              setWatchlistOpen(false)
+            }}
           >
             <BellIcon />
-            {alerts.filter((alert) => alert.enabled).length > 0 && (
-              <span>{alerts.filter((alert) => alert.enabled).length}</span>
-            )}
+            {alerts.filter((alert) => alert.enabled).length > 0 && <span>{alerts.filter((alert) => alert.enabled).length}</span>}
           </button>
         </aside>
       </main>
@@ -2369,21 +2879,31 @@ function WorkspaceApp({ user, onLogout, onUserRefresh }: WorkspaceAppProps) {
           onToggle={toggleAlert}
           onDelete={deleteAlert}
           onClearTriggered={() => setAlerts((current) => current.filter((alert) => !isTriggered(alert)))}
-          onOpenSymbol={(symbol) => { const next = findWatchMarket(symbol); if (next) changeMarket(next) }}
+          onOpenSymbol={(symbol) => {
+            const next = findWatchMarket(symbol)
+            if (next) changeMarket(next)
+          }}
           onClose={() => setAlertsOpen(false)}
           notificationSummary={`Browser ${pushStatus === 'on' ? 'on' : 'off'}${telegram?.configured ? ` · Telegram ${telegram.linked ? 'on' : 'off'}` : ''}`}
-          notifications={(
+          notifications={
             <>
               <div className="alert-background">
                 <div>
                   <strong>Alerts when TradeHorizon is closed</strong>
                   <small>
                     {pushStatus === 'on' && 'On for this device. The server watches prices and notifies you even with the browser closed.'}
-                    {pushStatus === 'off' && 'Get a notification on this device when a price alert triggers, even with TradeHorizon closed.'}
-                    {pushStatus === 'blocked' && 'Notifications are blocked for this site. Allow them in your browser settings, then try again.'}
-                    {pushStatus === 'unsupported' && 'This browser does not support background notifications. On iPhone, add TradeHorizon to the Home Screen first.'}
+                    {pushStatus === 'off' &&
+                      'Get a notification on this device when a price alert triggers, even with TradeHorizon closed.'}
+                    {pushStatus === 'blocked' &&
+                      'Notifications are blocked for this site. Allow them in your browser settings, then try again.'}
+                    {pushStatus === 'unsupported' &&
+                      'This browser does not support background notifications. On iPhone, add TradeHorizon to the Home Screen first.'}
                   </small>
-                  {pushError && <small className="alert-error" role="alert">{pushError}</small>}
+                  {pushError && (
+                    <small className="alert-error" role="alert">
+                      {pushError}
+                    </small>
+                  )}
                 </div>
                 {pushStatus !== 'unsupported' && pushStatus !== 'blocked' && (
                   <button type="button" onClick={() => void togglePush()} disabled={pushBusy}>
@@ -2400,12 +2920,38 @@ function WorkspaceApp({ user, onLogout, onUserRefresh }: WorkspaceAppProps) {
                         ? `Connected${telegram.chats[0]?.name ? ` as ${telegram.chats[0].name}` : ''}. Triggered alerts are sent to your Telegram chat, on your phone too.`
                         : 'Get triggered alerts as Telegram messages on your phone, with TradeHorizon closed.'}
                     </small>
-                    {telegramMessage && <small className={telegramPending ? '' : 'alert-error'} role="status">{telegramMessage}</small>}
+                    {telegramMessage && (
+                      <small className={telegramPending ? '' : 'alert-error'} role="status">
+                        {telegramMessage}
+                      </small>
+                    )}
                   </div>
                   {telegram.linked ? (
                     <span className="alert-telegram-actions">
-                      <button type="button" disabled={telegramBusy} onClick={() => void runTelegram(async () => { await sendTelegramTest(); return 'Test message sent.' })}>Send test</button>
-                      <button type="button" disabled={telegramBusy} onClick={() => void runTelegram(async () => { await unlinkTelegram(); setTelegram(await getTelegramStatus()) })}>Disconnect</button>
+                      <button
+                        type="button"
+                        disabled={telegramBusy}
+                        onClick={() =>
+                          void runTelegram(async () => {
+                            await sendTelegramTest()
+                            return 'Test message sent.'
+                          })
+                        }
+                      >
+                        Send test
+                      </button>
+                      <button
+                        type="button"
+                        disabled={telegramBusy}
+                        onClick={() =>
+                          void runTelegram(async () => {
+                            await unlinkTelegram()
+                            setTelegram(await getTelegramStatus())
+                          })
+                        }
+                      >
+                        Disconnect
+                      </button>
                     </span>
                   ) : (
                     <button type="button" disabled={telegramBusy || !telegram.ready} onClick={() => void connectTelegram()}>
@@ -2415,7 +2961,7 @@ function WorkspaceApp({ user, onLogout, onUserRefresh }: WorkspaceAppProps) {
                 </div>
               )}
             </>
-          )}
+          }
         />
       )}
 
@@ -2434,18 +2980,28 @@ function WorkspaceApp({ user, onLogout, onUserRefresh }: WorkspaceAppProps) {
             setSymbolSearch(null)
             setSearchSeed(undefined)
           }}
-          onClose={() => { setSymbolSearch(null); setSearchSeed(undefined) }}
+          onClose={() => {
+            setSymbolSearch(null)
+            setSearchSeed(undefined)
+          }}
         />
       )}
 
-      {toast && <div className="toast" role="status">{toast}</div>}
+      {toast && (
+        <div className="toast" role="status">
+          {toast}
+        </div>
+      )}
 
       {intervalInput !== null && (
         <div className="interval-prompt" role="dialog" aria-label="Change interval">
           <small>Change interval</small>
           <strong>{intervalInput}</strong>
           <span className={intervalError ? 'interval-prompt-error' : ''}>
-            {intervalError || (parseIntervalInput(intervalInput) ? `Enter: ${parseIntervalInput(intervalInput)}` : 'm minutes · h hours · D day · W week · M month')}
+            {intervalError ||
+              (parseIntervalInput(intervalInput)
+                ? `Enter: ${parseIntervalInput(intervalInput)}`
+                : 'm minutes · h hours · D day · W week · M month')}
           </span>
         </div>
       )}
@@ -2465,14 +3021,30 @@ function WorkspaceApp({ user, onLogout, onUserRefresh }: WorkspaceAppProps) {
             }}
           >
             <header>
-              <div><LayersIcon /><h2 id="save-layout-title">Save layout as</h2></div>
-              <button type="button" onClick={() => setSaveAsOpen(false)} aria-label="Close"><CloseIcon /></button>
+              <div>
+                <LayersIcon />
+                <h2 id="save-layout-title">Save layout as</h2>
+              </div>
+              <button type="button" onClick={() => setSaveAsOpen(false)} aria-label="Close">
+                <CloseIcon />
+              </button>
             </header>
             <label>
               <span>Layout name</span>
-              <input autoFocus required maxLength={48} value={layoutDraftName} onChange={(event) => setLayoutDraftName(event.target.value)} />
+              <input
+                autoFocus
+                required
+                maxLength={48}
+                value={layoutDraftName}
+                onChange={(event) => setLayoutDraftName(event.target.value)}
+              />
             </label>
-            <footer><button type="button" onClick={() => setSaveAsOpen(false)}>Cancel</button><button type="submit">Save copy</button></footer>
+            <footer>
+              <button type="button" onClick={() => setSaveAsOpen(false)}>
+                Cancel
+              </button>
+              <button type="submit">Save copy</button>
+            </footer>
           </form>
         </div>
       )}
@@ -2500,7 +3072,13 @@ function WorkspaceApp({ user, onLogout, onUserRefresh }: WorkspaceAppProps) {
           indicators={indicators}
           volumeVisible={workspace.volumeVisible}
           market={market}
-          dominanceNote={runtime.dominance === 'loading' ? 'Importing dominance data…' : runtime.dominance === 'error' ? `Could not import dominance data: ${runtime.dominanceError}` : undefined}
+          dominanceNote={
+            runtime.dominance === 'loading'
+              ? 'Importing dominance data…'
+              : runtime.dominance === 'error'
+                ? `Could not import dominance data: ${runtime.dominanceError}`
+                : undefined
+          }
           favorites={preferences.favoriteIndicators}
           scripts={scripts}
           onUpdate={updateIndicators}
@@ -2516,22 +3094,31 @@ function WorkspaceApp({ user, onLogout, onUserRefresh }: WorkspaceAppProps) {
 
       {scriptEditor && <ScriptEditorDialog script={scriptEditor.script} onSave={saveScript} onClose={() => setScriptEditor(undefined)} />}
 
-      {scriptSettingsId && indicators.scripts.some((item) => item.id === scriptSettingsId) && (() => {
-        const instance = indicators.scripts.find((item) => item.id === scriptSettingsId)!
-        return (
-          <ScriptSettingsDialog
-            key={instance.id}
-            instance={instance}
-            onChange={changeScriptInstance}
-            onEdit={() => {
-              setScriptSettingsId(undefined)
-              setScriptEditor({ script: scripts.find((item) => item.id === instance.scriptId) ?? { id: instance.scriptId, name: instance.name, source: instance.source, updatedAtMs: 0 } })
-            }}
-            onRemove={() => removeScriptInstance(instance.id)}
-            onClose={() => setScriptSettingsId(undefined)}
-          />
-        )
-      })()}
+      {scriptSettingsId &&
+        indicators.scripts.some((item) => item.id === scriptSettingsId) &&
+        (() => {
+          const instance = indicators.scripts.find((item) => item.id === scriptSettingsId)!
+          return (
+            <ScriptSettingsDialog
+              key={instance.id}
+              instance={instance}
+              onChange={changeScriptInstance}
+              onEdit={() => {
+                setScriptSettingsId(undefined)
+                setScriptEditor({
+                  script: scripts.find((item) => item.id === instance.scriptId) ?? {
+                    id: instance.scriptId,
+                    name: instance.name,
+                    source: instance.source,
+                    updatedAtMs: 0,
+                  },
+                })
+              }}
+              onRemove={() => removeScriptInstance(instance.id)}
+              onClose={() => setScriptSettingsId(undefined)}
+            />
+          )
+        })()}
 
       {studySettingsId && indicators.studies.some((study) => study.id === studySettingsId) && (
         <StudySettingsDialog
@@ -2554,49 +3141,68 @@ function WorkspaceApp({ user, onLogout, onUserRefresh }: WorkspaceAppProps) {
         />
       )}
 
-      {drawingMenu && (() => {
-        const drawing = drawingSnapshot.drawings.find((item) => item.id === drawingMenu.id)
-        if (!drawing) return null
-        const group = multiSelection.length > 1 && multiSelection.includes(drawing.id)
-        const ids = group ? [...multiSelection] : [drawing.id]
-        const targets = drawingSnapshot.drawings.filter((item) => ids.includes(item.id))
-        const locked = targets.every((item) => item.locked)
-        const single = ids.length === 1
-        return (
-          <DrawingContextMenu
-            left={drawingMenu.left}
-            top={drawingMenu.top}
-            locked={locked}
-            count={ids.length}
-            onSettings={() => (isPositionTool(drawing.type) ? setPositionSettingsOpen(true) : setDrawingSettings({ id: drawing.id, tab: 'style' }))}
-            onVisibility={() => setDrawingSettings({ id: drawing.id, tab: 'visibility' })}
-            onAddAlert={single && (drawing.type === 'trendLine' || drawing.type === 'ray') ? () => {
-              const [first, second] = drawing.anchors
-              const line = { t1: first.timeMs, p1: Number(first.price), t2: second.timeMs, p2: Number(second.price) }
-              const now = Date.now()
-              const target = targetAt({ id: '', symbol: market.symbol, targetPrice: line.p1, direction: 'above', line }, now)
-              const last = runtime.quote?.close
-              createAlert({ targetPrice: Number(target.toFixed(market.pricePrecision)), direction: last !== undefined && last > target ? 'below' : 'above', condition: 'crossing', line }, market.symbol)
-              showToast(`Alert on the trend line: fires when the price crosses it (now ${target.toFixed(market.pricePrecision)}).`)
-            } : undefined}
-            onClone={() => { for (const id of ids) controller?.cloneDrawing(id) }}
-            onLock={() => drawingStore.execute(batchDrawings(targets.map((item) => updateDrawing(item.id, { locked: !locked }))))}
-            onHide={() => drawingStore.execute(batchDrawings(targets.map((item) => updateDrawing(item.id, { hidden: true }))))}
-            onDelete={() => (group ? controller?.deleteSelected() : drawingStore.execute(deleteDrawing(drawing.id)))}
-            onClose={() => setDrawingMenu(undefined)}
-          />
-        )
-      })()}
+      {drawingMenu &&
+        (() => {
+          const drawing = drawingSnapshot.drawings.find((item) => item.id === drawingMenu.id)
+          if (!drawing) return null
+          const group = multiSelection.length > 1 && multiSelection.includes(drawing.id)
+          const ids = group ? [...multiSelection] : [drawing.id]
+          const targets = drawingSnapshot.drawings.filter((item) => ids.includes(item.id))
+          const locked = targets.every((item) => item.locked)
+          const single = ids.length === 1
+          return (
+            <DrawingContextMenu
+              left={drawingMenu.left}
+              top={drawingMenu.top}
+              locked={locked}
+              count={ids.length}
+              onSettings={() =>
+                isPositionTool(drawing.type) ? setPositionSettingsOpen(true) : setDrawingSettings({ id: drawing.id, tab: 'style' })
+              }
+              onVisibility={() => setDrawingSettings({ id: drawing.id, tab: 'visibility' })}
+              onAddAlert={
+                single && (drawing.type === 'trendLine' || drawing.type === 'ray')
+                  ? () => {
+                      const [first, second] = drawing.anchors
+                      const line = { t1: first.timeMs, p1: Number(first.price), t2: second.timeMs, p2: Number(second.price) }
+                      const now = Date.now()
+                      const target = targetAt({ id: '', symbol: market.symbol, targetPrice: line.p1, direction: 'above', line }, now)
+                      const last = runtime.quote?.close
+                      createAlert(
+                        {
+                          targetPrice: Number(target.toFixed(market.pricePrecision)),
+                          direction: last !== undefined && last > target ? 'below' : 'above',
+                          condition: 'crossing',
+                          line,
+                        },
+                        market.symbol,
+                      )
+                      showToast(`Alert on the trend line: fires when the price crosses it (now ${target.toFixed(market.pricePrecision)}).`)
+                    }
+                  : undefined
+              }
+              onClone={() => {
+                for (const id of ids) controller?.cloneDrawing(id)
+              }}
+              onLock={() => drawingStore.execute(batchDrawings(targets.map((item) => updateDrawing(item.id, { locked: !locked }))))}
+              onHide={() => drawingStore.execute(batchDrawings(targets.map((item) => updateDrawing(item.id, { hidden: true }))))}
+              onDelete={() => (group ? controller?.deleteSelected() : drawingStore.execute(deleteDrawing(drawing.id)))}
+              onClose={() => setDrawingMenu(undefined)}
+            />
+          )
+        })()}
 
       {chartSettingsOpen && (
         <ChartSettingsDialog
           preferences={preferences}
           onPreferences={setPreferences}
           scaleMode={workspace.scaleMode ?? 'normal'}
-          onScaleMode={(mode) => setWorkspace((current) => {
-            const { scaleMode: _previous, ...rest } = current
-            return mode === 'normal' ? rest : { ...rest, scaleMode: mode }
-          })}
+          onScaleMode={(mode) =>
+            setWorkspace((current) => {
+              const { scaleMode: _previous, ...rest } = current
+              return mode === 'normal' ? rest : { ...rest, scaleMode: mode }
+            })
+          }
           onClose={() => setChartSettingsOpen(false)}
         />
       )}
@@ -2607,17 +3213,23 @@ function WorkspaceApp({ user, onLogout, onUserRefresh }: WorkspaceAppProps) {
           interval={interval}
           timeZone={chartTimeZone}
           scaleMode={workspace.scaleMode ?? 'normal'}
-          onScaleMode={(mode) => setWorkspace((current) => {
-            const { scaleMode: _previous, ...rest } = current
-            return mode === 'normal' ? rest : { ...rest, scaleMode: mode }
-          })}
+          onScaleMode={(mode) =>
+            setWorkspace((current) => {
+              const { scaleMode: _previous, ...rest } = current
+              return mode === 'normal' ? rest : { ...rest, scaleMode: mode }
+            })
+          }
           onInterval={changeInterval}
         />
         <span className="status-separator" />
-        <span className="status-venue">{market.venue.toUpperCase()} {marketKindLabel(market).toUpperCase()}</span>
+        <span className="status-venue">
+          {market.venue.toUpperCase()} {marketKindLabel(market).toUpperCase()}
+        </span>
         <TimeZoneMenu value={preferences.timeZone} onChange={(timeZone) => setPreferences((current) => ({ ...current, timeZone }))} />
         <span className="status-separator" />
-        <span>{marketDrawings.length} saved drawing{marketDrawings.length === 1 ? '' : 's'} for {market.symbol}</span>
+        <span>
+          {marketDrawings.length} saved drawing{marketDrawings.length === 1 ? '' : 's'} for {market.symbol}
+        </span>
         <span className="status-spacer" />
         <button
           type="button"
@@ -2634,10 +3246,12 @@ function WorkspaceApp({ user, onLogout, onUserRefresh }: WorkspaceAppProps) {
         )}
         <ScaleToggles
           scaleMode={workspace.scaleMode ?? 'normal'}
-          onScaleMode={(mode) => setWorkspace((current) => {
-            const { scaleMode: _previous, ...rest } = current
-            return mode === 'normal' ? rest : { ...rest, scaleMode: mode }
-          })}
+          onScaleMode={(mode) =>
+            setWorkspace((current) => {
+              const { scaleMode: _previous, ...rest } = current
+              return mode === 'normal' ? rest : { ...rest, scaleMode: mode }
+            })
+          }
         />
       </footer>
     </div>
@@ -2657,9 +3271,7 @@ function AuthScreen({ onAuthenticated }: { onAuthenticated(user: AppUser): void 
     setBusy(true)
     setError(undefined)
     try {
-      const user = mode === 'signup'
-        ? await signUp(displayName, email, password)
-        : await logIn(email, password)
+      const user = mode === 'signup' ? await signUp(displayName, email, password) : await logIn(email, password)
       onAuthenticated(user)
     } catch (nextError) {
       setError(nextError instanceof Error ? nextError.message : 'Authentication failed.')
@@ -2671,28 +3283,77 @@ function AuthScreen({ onAuthenticated }: { onAuthenticated(user: AppUser): void 
   return (
     <main className="auth-shell">
       <section className="auth-card">
-        <div className="auth-brand"><HorizonLogo /><div><strong>TradeHorizon</strong><span>Crypto Supercharts</span></div></div>
+        <div className="auth-brand">
+          <HorizonLogo />
+          <div>
+            <strong>TradeHorizon</strong>
+            <span>Crypto Supercharts</span>
+          </div>
+        </div>
         <div className="auth-copy">
           <span className="preview-pill">ALPHA</span>
           <h1>{mode === 'login' ? 'Welcome back' : 'Create your trading workspace'}</h1>
           <p>Your chart tabs, drawings, Long Positions, and price alerts are saved to your account and follow you to any device.</p>
         </div>
         <div className="auth-tabs">
-          <button type="button" className={mode === 'login' ? 'active' : ''} onClick={() => { setMode('login'); setError(undefined) }}>Log in</button>
-          <button type="button" className={mode === 'signup' ? 'active' : ''} onClick={() => { setMode('signup'); setError(undefined) }}>Sign up</button>
+          <button
+            type="button"
+            className={mode === 'login' ? 'active' : ''}
+            onClick={() => {
+              setMode('login')
+              setError(undefined)
+            }}
+          >
+            Log in
+          </button>
+          <button
+            type="button"
+            className={mode === 'signup' ? 'active' : ''}
+            onClick={() => {
+              setMode('signup')
+              setError(undefined)
+            }}
+          >
+            Sign up
+          </button>
         </div>
         <form onSubmit={submit}>
           {mode === 'signup' && (
-            <label><span>Display name</span><input value={displayName} onChange={(event) => setDisplayName(event.target.value)} autoComplete="name" required /></label>
+            <label>
+              <span>Display name</span>
+              <input value={displayName} onChange={(event) => setDisplayName(event.target.value)} autoComplete="name" required />
+            </label>
           )}
-          <label><span>Email address</span><input type="email" value={email} onChange={(event) => setEmail(event.target.value)} autoComplete="email" required /></label>
-          <label><span>Password</span><input type="password" minLength={8} value={password} onChange={(event) => setPassword(event.target.value)} autoComplete={mode === 'login' ? 'current-password' : 'new-password'} required /></label>
-          {error && <div className="auth-error" role="alert">{error}</div>}
-          <button type="submit" className="auth-submit" disabled={busy}>{busy ? 'Please wait…' : mode === 'login' ? 'Log in' : 'Create account'}</button>
+          <label>
+            <span>Email address</span>
+            <input type="email" value={email} onChange={(event) => setEmail(event.target.value)} autoComplete="email" required />
+          </label>
+          <label>
+            <span>Password</span>
+            <input
+              type="password"
+              minLength={8}
+              value={password}
+              onChange={(event) => setPassword(event.target.value)}
+              autoComplete={mode === 'login' ? 'current-password' : 'new-password'}
+              required
+            />
+          </label>
+          {error && (
+            <div className="auth-error" role="alert">
+              {error}
+            </div>
+          )}
+          <button type="submit" className="auth-submit" disabled={busy}>
+            {busy ? 'Please wait…' : mode === 'login' ? 'Log in' : 'Create account'}
+          </button>
           {mode === 'login' && (
             <details className="auth-forgot">
               <summary>Forgot your password?</summary>
-              <p>Ask the TradeHorizon administrator for a temporary password. After you sign in with it you will be asked to choose a new one.</p>
+              <p>
+                Ask the TradeHorizon administrator for a temporary password. After you sign in with it you will be asked to choose a new
+                one.
+              </p>
             </details>
           )}
         </form>
@@ -2715,7 +3376,7 @@ export function App() {
       const returning = hasSyncedBefore(user.id)
       if (returning) setSyncedUserId(user.id)
       const sync = startUserSync(user.id)
-      if (!await verifySession()) {
+      if (!(await verifySession())) {
         stopUserSync()
         if (live) setUser(null)
         return
@@ -2725,15 +3386,28 @@ export function App() {
       // Newer data from other devices is applied in place (subscribeRemoteData), so no reload is needed.
       if (live && !returning) setSyncedUserId(user.id)
     })()
-    return () => { live = false }
+    return () => {
+      live = false
+    }
   }, [user?.id])
   if (!user) return <AuthScreen onAuthenticated={setUser} />
-  if (syncedUserId !== user.id) return <main className="auth-shell"><section className="auth-card"><div className="auth-copy"><h1>Loading your workspace…</h1></div></section></main>
+  if (syncedUserId !== user.id)
+    return (
+      <main className="auth-shell">
+        <section className="auth-card">
+          <div className="auth-copy">
+            <h1>Loading your workspace…</h1>
+          </div>
+        </section>
+      </main>
+    )
   return (
     <WorkspaceApp
       key={user.id}
       user={user}
-      onUserRefresh={() => { void verifySession().then(() => setUser((current) => restoreSession() ?? current)) }}
+      onUserRefresh={() => {
+        void verifySession().then(() => setUser((current) => restoreSession() ?? current))
+      }}
       onLogout={() => {
         stopUserSync()
         void logOut()

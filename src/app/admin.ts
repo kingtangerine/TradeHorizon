@@ -29,7 +29,7 @@ export interface AdminUser {
   readonly bytes: number
   readonly lastSyncAtMs: number | null
   readonly counts: AdminCounts
-  readonly devices: ReadonlyArray<{ readonly name: string, readonly lastSaveAtMs: number }>
+  readonly devices: ReadonlyArray<{ readonly name: string; readonly lastSaveAtMs: number }>
 }
 
 export interface AdminUserItem {
@@ -57,31 +57,46 @@ export interface AdminOverview {
     readonly startedAtMs: number
     readonly uptimeSec: number
     readonly startsLast24h: number
-    readonly memoryMb: { readonly app: number, readonly heapUsed: number }
-    readonly eventLoopDelayMs: { readonly p50: number, readonly p99: number, readonly max: number }
-    readonly hostMemoryMb: { readonly total: number, readonly free: number }
+    readonly memoryMb: { readonly app: number; readonly heapUsed: number }
+    readonly eventLoopDelayMs: { readonly p50: number; readonly p99: number; readonly max: number }
+    readonly hostMemoryMb: { readonly total: number; readonly free: number }
     readonly loadAverage: readonly number[]
     readonly dataDir: string
     readonly dataBytes: number
-    readonly disk: { readonly freeBytes: number, readonly totalBytes: number } | null
+    readonly disk: { readonly freeBytes: number; readonly totalBytes: number } | null
     readonly envFile: readonly string[] | null
   }
   readonly database: AdminDatabase
   readonly services: {
-    readonly telegram: { readonly state: string, readonly bot?: string | null, readonly problem?: string }
+    readonly telegram: { readonly state: string; readonly bot?: string | null; readonly problem?: string }
     readonly telegramLinkedUsers: number
     readonly pushReady: boolean
     readonly pushDevices: number
-    readonly keepAlive: { readonly origin: string | null, readonly lastPingAtMs: number | null, readonly lastPingOk: boolean }
+    readonly keepAlive: { readonly origin: string | null; readonly lastPingAtMs: number | null; readonly lastPingOk: boolean }
     readonly marketsLoaded: number
     readonly marketsAgeMin: number | null
     readonly alertsWatched: number
-    readonly notificationQueues: Readonly<Record<'telegram' | 'push', { readonly pending: number, readonly sent: number, readonly retried: number, readonly failed: number, readonly dropped: number, readonly pausedForSec: number, readonly lastError: string | null }>>
+    readonly notificationQueues: Readonly<
+      Record<
+        'telegram' | 'push',
+        {
+          readonly pending: number
+          readonly sent: number
+          readonly retried: number
+          readonly failed: number
+          readonly dropped: number
+          readonly pausedForSec: number
+          readonly lastError: string | null
+        }
+      >
+    >
     readonly alertPrices: {
       readonly symbols: number
       readonly live: number
       readonly polled: number
-      readonly feed: Readonly<Record<'binance' | 'bybit', { readonly connected: boolean, readonly symbols: number, readonly lastMessageAgoSec: number | null }>>
+      readonly feed: Readonly<
+        Record<'binance' | 'bybit', { readonly connected: boolean; readonly symbols: number; readonly lastMessageAgoSec: number | null }>
+      >
     }
   }
   readonly users: {
@@ -101,7 +116,7 @@ async function call<T>(path: string, init: RequestInit = {}): Promise<T> {
     cache: 'no-store',
     headers: { Authorization: `Bearer ${getSessionToken() ?? ''}`, 'Content-Type': 'application/json' },
   })
-  const body = await response.json().catch(() => ({})) as T & { error?: string }
+  const body = (await response.json().catch(() => ({}))) as T & { error?: string }
   if (!response.ok) throw new Error(body.error ?? `The server answered ${response.status}.`)
   return body
 }
@@ -121,13 +136,14 @@ export interface AdminDatabase {
     readonly keep: number
     readonly count: number
     readonly lastBackupAtMs: number | null
-    readonly newest: { readonly name: string, readonly bytes: number, readonly createdAtMs: number } | null
+    readonly newest: { readonly name: string; readonly bytes: number; readonly createdAtMs: number } | null
     readonly lastError: string | null
   }
 }
 
-export const backUpNow = () => call<{ ok: true, database: AdminDatabase }>('/api/admin/backup', { method: 'POST' })
-export const setTemporaryPassword = (id: string) => call<{ password: string }>(`/api/admin/users/${encodeURIComponent(id)}/password`, { method: 'POST' })
+export const backUpNow = () => call<{ ok: true; database: AdminDatabase }>('/api/admin/backup', { method: 'POST' })
+export const setTemporaryPassword = (id: string) =>
+  call<{ password: string }>(`/api/admin/users/${encodeURIComponent(id)}/password`, { method: 'POST' })
 export const signOutUser = (id: string) => call<{ ok: true }>(`/api/admin/users/${encodeURIComponent(id)}/signout`, { method: 'POST' })
 export const deleteUser = (id: string, confirmEmail: string) =>
   call<{ ok: true }>(`/api/admin/users/${encodeURIComponent(id)}/delete`, { method: 'POST', body: JSON.stringify({ confirmEmail }) })

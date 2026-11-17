@@ -36,10 +36,13 @@ beforeEach(() => {
 
 describe('workspace persistence', () => {
   it('migrates the previous workspace shape with safe defaults', () => {
-    storage.setItem(workspaceKey('user-1'), JSON.stringify({
-      tabs: [{ id: 'tab-1', symbol: 'BTCUSDT', interval: '15m', createdAtMs: 1 }],
-      activeTabId: 'tab-1',
-    }))
+    storage.setItem(
+      workspaceKey('user-1'),
+      JSON.stringify({
+        tabs: [{ id: 'tab-1', symbol: 'BTCUSDT', interval: '15m', createdAtMs: 1 }],
+        activeTabId: 'tab-1',
+      }),
+    )
 
     expect(loadWorkspace('user-1')).toMatchObject({
       layoutName: 'Main layout',

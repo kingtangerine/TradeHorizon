@@ -57,8 +57,20 @@ describe('merging lists of items (layouts, alerts, drawings)', () => {
 describe('merging nested documents', () => {
   it('merges drawings inside their envelope', () => {
     const start = { version: 1, drawings: [{ id: 'd1', anchors: [1] }] }
-    const local = { version: 1, drawings: [{ id: 'd1', anchors: [1] }, { id: 'mine', anchors: [2] }] }
-    const remote = { version: 1, drawings: [{ id: 'd1', anchors: [1] }, { id: 'theirs', anchors: [3] }] }
+    const local = {
+      version: 1,
+      drawings: [
+        { id: 'd1', anchors: [1] },
+        { id: 'mine', anchors: [2] },
+      ],
+    }
+    const remote = {
+      version: 1,
+      drawings: [
+        { id: 'd1', anchors: [1] },
+        { id: 'theirs', anchors: [3] },
+      ],
+    }
     const merged = merge(baseOf(start), local, remote) as typeof start
     expect(merged.drawings.map((drawing) => drawing.id).sort()).toEqual(['d1', 'mine', 'theirs'])
   })
@@ -66,9 +78,18 @@ describe('merging nested documents', () => {
   it('merges folders and their assignments', () => {
     const start = { groups: [{ id: 'g1', name: 'One' }], assignments: { x: 'g1' } }
     const local = { groups: [{ id: 'g1', name: 'One' }], assignments: { x: 'g1', y: 'g1' } }
-    const remote = { groups: [{ id: 'g1', name: 'One' }, { id: 'g2', name: 'Two' }], assignments: { x: 'g1', z: 'g2' } }
+    const remote = {
+      groups: [
+        { id: 'g1', name: 'One' },
+        { id: 'g2', name: 'Two' },
+      ],
+      assignments: { x: 'g1', z: 'g2' },
+    }
     expect(merge(baseOf(start), local, remote)).toEqual({
-      groups: [{ id: 'g1', name: 'One' }, { id: 'g2', name: 'Two' }],
+      groups: [
+        { id: 'g1', name: 'One' },
+        { id: 'g2', name: 'Two' },
+      ],
       assignments: { x: 'g1', z: 'g2', y: 'g1' },
     })
   })

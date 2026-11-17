@@ -2,14 +2,7 @@ import { useState } from 'react'
 import { DRAWING_TOOLS } from '../chart/tools'
 import type { Drawing, DrawingType } from '../drawings'
 import { ChevronIcon, EyeIcon, EyeOffIcon, FolderIcon, TrashIcon } from './Icons'
-import {
-  assignToGroup,
-  createGroup,
-  deleteGroup,
-  renameGroup,
-  toggleGroupCollapsed,
-  type GroupState,
-} from './groups'
+import { assignToGroup, createGroup, deleteGroup, renameGroup, toggleGroupCollapsed, type GroupState } from './groups'
 
 type IconComponent = (props: React.SVGProps<SVGSVGElement>) => React.JSX.Element
 
@@ -50,18 +43,19 @@ export function ObjectList({
   const ungrouped = numbered.filter(({ drawing }) => !groupState.assignments[drawing.id])
   const checkedIds = drawings.filter((drawing) => checked.has(drawing.id)).map((drawing) => drawing.id)
 
-  const toggleChecked = (id: string) => setChecked((current) => {
-    const next = new Set(current)
-    if (!next.delete(id)) next.add(id)
-    return next
-  })
+  const toggleChecked = (id: string) =>
+    setChecked((current) => {
+      const next = new Set(current)
+      if (!next.delete(id)) next.add(id)
+      return next
+    })
   const finishSelecting = () => {
     setChecked(new Set())
     setNewName('')
     onSelectModeChange(false)
   }
 
-  const row = ({ drawing, number }: { drawing: Drawing, number: number }, nested: boolean) => {
+  const row = ({ drawing, number }: { drawing: Drawing; number: number }, nested: boolean) => {
     const label = DRAWING_TOOLS[drawing.type].label
     const Icon = icons[drawing.type]
     const detail = drawing.type === 'text' && typeof drawing.style.text === 'string' ? drawing.style.text : `#${number}`
@@ -72,10 +66,27 @@ export function ObjectList({
         key={drawing.id}
         onClick={() => (selectMode ? toggleChecked(drawing.id) : onFocus(drawing.id))}
       >
-        {selectMode
-          ? <input type="checkbox" checked={checked.has(drawing.id)} onChange={() => toggleChecked(drawing.id)} aria-label={`Select ${label.toLowerCase()} ${number}`} onClick={(event) => event.stopPropagation()} />
-          : <Icon />}
-        <button type="button" className="object-name" title={`Focus ${label.toLowerCase()}`} onClick={(event) => { if (selectMode) return; event.stopPropagation(); onFocus(drawing.id) }}>
+        {selectMode ? (
+          <input
+            type="checkbox"
+            checked={checked.has(drawing.id)}
+            onChange={() => toggleChecked(drawing.id)}
+            aria-label={`Select ${label.toLowerCase()} ${number}`}
+            onClick={(event) => event.stopPropagation()}
+          />
+        ) : (
+          <Icon />
+        )}
+        <button
+          type="button"
+          className="object-name"
+          title={`Focus ${label.toLowerCase()}`}
+          onClick={(event) => {
+            if (selectMode) return
+            event.stopPropagation()
+            onFocus(drawing.id)
+          }}
+        >
           <span>{label}</span>
           <small>{detail}</small>
         </button>
@@ -84,7 +95,10 @@ export function ObjectList({
           className="object-icon-button"
           aria-label={`${drawing.hidden ? 'Show' : 'Hide'} ${label.toLowerCase()}`}
           title={drawing.hidden ? 'Show object' : 'Hide object'}
-          onClick={(event) => { event.stopPropagation(); onSetHidden([drawing.id], !drawing.hidden) }}
+          onClick={(event) => {
+            event.stopPropagation()
+            onSetHidden([drawing.id], !drawing.hidden)
+          }}
         >
           {drawing.hidden ? <EyeOffIcon /> : <EyeIcon />}
         </button>
@@ -93,7 +107,10 @@ export function ObjectList({
           className="object-icon-button delete"
           aria-label={`Delete ${label.toLowerCase()}`}
           title="Delete object"
-          onClick={(event) => { event.stopPropagation(); onDelete(drawing.id) }}
+          onClick={(event) => {
+            event.stopPropagation()
+            onDelete(drawing.id)
+          }}
         >
           <TrashIcon />
         </button>
@@ -145,7 +162,10 @@ export function ObjectList({
                     type="button"
                     className="object-name"
                     title="Click to rename"
-                    onClick={() => { setEditingId(group.id); setEditName(group.name) }}
+                    onClick={() => {
+                      setEditingId(group.id)
+                      setEditName(group.name)
+                    }}
                   >
                     <span>{group.name}</span>
                     <small>{members.length}</small>
@@ -157,7 +177,12 @@ export function ObjectList({
                     className="object-icon-button"
                     aria-label={allHidden ? `Show all in ${group.name}` : `Hide all in ${group.name}`}
                     title={allHidden ? 'Show group' : 'Hide group'}
-                    onClick={() => onSetHidden(members.map(({ drawing }) => drawing.id), !allHidden)}
+                    onClick={() =>
+                      onSetHidden(
+                        members.map(({ drawing }) => drawing.id),
+                        !allHidden,
+                      )
+                    }
                   >
                     {allHidden ? <EyeOffIcon /> : <EyeIcon />}
                   </button>
@@ -204,7 +229,10 @@ export function ObjectList({
             <button
               type="button"
               disabled={checkedIds.length === 0}
-              onClick={() => { onGroupState(createGroup(groupState, newName, checkedIds)); finishSelecting() }}
+              onClick={() => {
+                onGroupState(createGroup(groupState, newName, checkedIds))
+                finishSelecting()
+              }}
             >
               Create group
             </button>
@@ -222,11 +250,17 @@ export function ObjectList({
               }}
             >
               <option value="">Move to existing group…</option>
-              {groupState.groups.map((group) => <option value={group.id} key={group.id}>{group.name}</option>)}
+              {groupState.groups.map((group) => (
+                <option value={group.id} key={group.id}>
+                  {group.name}
+                </option>
+              ))}
               <option value="__none">Remove from group</option>
             </select>
           )}
-          <button type="button" className="object-group-done" onClick={finishSelecting}>Done</button>
+          <button type="button" className="object-group-done" onClick={finishSelecting}>
+            Done
+          </button>
         </div>
       )}
     </>

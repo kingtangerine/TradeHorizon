@@ -25,7 +25,10 @@ const groups = new Map<string, Set<SyncMember>>()
 
 export function joinSyncGroup(group: string, member: SyncMember): () => void {
   let members = groups.get(group)
-  if (!members) { members = new Set(); groups.set(group, members) }
+  if (!members) {
+    members = new Set()
+    groups.set(group, members)
+  }
   members.add(member)
   return () => {
     const current = groups.get(group)

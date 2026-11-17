@@ -1,14 +1,24 @@
 import { describe, expect, it } from 'vitest'
 import { EXAMPLE_SCRIPT, ScriptError, compileScript, runScript } from './script'
 
-const bars = Array.from({ length: 60 }, (_, index) => ({ timestamp: index * 60_000, open: 100 + index, high: 102 + index, low: 98 + index, close: 101 + index, volume: 10 }))
+const bars = Array.from({ length: 60 }, (_, index) => ({
+  timestamp: index * 60_000,
+  open: 100 + index,
+  high: 102 + index,
+  low: 98 + index,
+  close: 101 + index,
+  volume: 10,
+}))
 
 describe('user scripts', () => {
   it('reads title, pane and inputs, and runs the example', () => {
     const script = compileScript(EXAMPLE_SCRIPT)
     expect(script.title).toBe('EMA cross')
     expect(script.overlay).toBe(true)
-    expect(script.inputs.map((input) => [input.title, input.defaultValue])).toEqual([['Fast length', 12], ['Slow length', 26]])
+    expect(script.inputs.map((input) => [input.title, input.defaultValue])).toEqual([
+      ['Fast length', 12],
+      ['Slow length', 26],
+    ])
     const result = runScript(script, bars)
     expect(result.plots.map((plot) => plot.title)).toEqual(['Fast', 'Slow'])
     expect(result.plots[0].color).toBe('#2962ff')
@@ -23,7 +33,9 @@ describe('user scripts', () => {
   })
 
   it('handles operators, history, ternaries and signals', () => {
-    const script = compileScript('d = close - close[1]\nup = d > 0 and volume >= 10 ? 1 : -1\nplot(up)\nplot(crossover(close, 120))\nhline(0, "Zero")')
+    const script = compileScript(
+      'd = close - close[1]\nup = d > 0 and volume >= 10 ? 1 : -1\nplot(up)\nplot(crossover(close, 120))\nhline(0, "Zero")',
+    )
     const result = runScript(script, bars)
     expect(Number.isNaN(result.plots[0].values[0])).toBe(false)
     expect(result.plots[0].values[5]).toBe(1)

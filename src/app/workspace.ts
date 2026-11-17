@@ -105,9 +105,7 @@ export function shortSymbol(symbol: string): string {
 /** A readable default name for a split: "BTC · ETH · SOL", or "BTC 15m · 1h · 4h" when every chart is the same symbol. */
 export function defaultSplitName(panes: readonly PaneSpec[]): string {
   const labels = [...new Set(panes.map((pane) => shortSymbol(pane.symbol)))]
-  const name = labels.length === 1
-    ? `${labels[0]} ${panes.map((pane) => pane.interval).join(' · ')}`
-    : labels.join(' · ')
+  const name = labels.length === 1 ? `${labels[0]} ${panes.map((pane) => pane.interval).join(' · ')}` : labels.join(' · ')
   return name.slice(0, 48)
 }
 
@@ -157,17 +155,12 @@ export function createSplitLayout(
   }
 }
 
-export function filterAndSortLayouts(
-  layouts: readonly SavedLayout[],
-  query: string,
-  sort: LayoutSort,
-): SavedLayout[] {
+export function filterAndSortLayouts(layouts: readonly SavedLayout[], query: string, sort: LayoutSort): SavedLayout[] {
   const needle = query.trim().toLowerCase()
   const matches = needle
-    ? layouts.filter((layout) => (
-        layout.name.toLowerCase().includes(needle) ||
-        layout.tabs.some((tab) => tab.symbol.toLowerCase().includes(needle))
-      ))
+    ? layouts.filter(
+        (layout) => layout.name.toLowerCase().includes(needle) || layout.tabs.some((tab) => tab.symbol.toLowerCase().includes(needle)),
+      )
     : [...layouts]
   const order = (a: SavedLayout, b: SavedLayout): number => {
     if (sort === 'name') return a.name.localeCompare(b.name, undefined, { sensitivity: 'base' })
@@ -207,24 +200,26 @@ export function layoutsKey(userId: string): string {
 
 function validTabs(value: unknown): ChartTab[] {
   if (!Array.isArray(value)) return []
-  return value.filter((item): item is ChartTab => (
-    typeof item === 'object' && item !== null &&
-    typeof (item as ChartTab).id === 'string' &&
-    typeof (item as ChartTab).symbol === 'string' &&
-    isMarketInterval((item as ChartTab).interval) &&
-    typeof (item as ChartTab).createdAtMs === 'number'
-  )).map((tab) => {
-    const { split, ...rest } = tab
-    const valid = parseSplit(split, { symbol: tab.symbol, interval: tab.interval })
-    return valid ? { ...rest, split: valid } : rest
-  })
+  return value
+    .filter(
+      (item): item is ChartTab =>
+        typeof item === 'object' &&
+        item !== null &&
+        typeof (item as ChartTab).id === 'string' &&
+        typeof (item as ChartTab).symbol === 'string' &&
+        isMarketInterval((item as ChartTab).interval) &&
+        typeof (item as ChartTab).createdAtMs === 'number',
+    )
+    .map((tab) => {
+      const { split, ...rest } = tab
+      const valid = parseSplit(split, { symbol: tab.symbol, interval: tab.interval })
+      return valid ? { ...rest, split: valid } : rest
+    })
 }
 
 function validCustomIntervals(value: unknown): MarketInterval[] {
   return Array.isArray(value)
-    ? value.filter((item, index): item is MarketInterval => (
-        isMarketInterval(item) && value.indexOf(item) === index
-      ))
+    ? value.filter((item, index): item is MarketInterval => isMarketInterval(item) && value.indexOf(item) === index)
     : []
 }
 
@@ -233,15 +228,12 @@ export function loadWorkspace(userId: string): UserWorkspace {
     const value = JSON.parse(localStorage.getItem(workspaceKey(userId)) ?? 'null') as Partial<UserWorkspace> | null
     const tabs = validTabs(value?.tabs)
     if (!value || tabs.length === 0) return defaultWorkspace()
-    const activeTabId = typeof value.activeTabId === 'string' && tabs.some((tab) => tab.id === value.activeTabId)
-      ? value.activeTabId
-      : tabs[0].id
+    const activeTabId =
+      typeof value.activeTabId === 'string' && tabs.some((tab) => tab.id === value.activeTabId) ? value.activeTabId : tabs[0].id
     return {
       tabs,
       activeTabId,
-      layoutName: typeof value.layoutName === 'string' && value.layoutName.trim()
-        ? value.layoutName.trim()
-        : 'Main layout',
+      layoutName: typeof value.layoutName === 'string' && value.layoutName.trim() ? value.layoutName.trim() : 'Main layout',
       ...(typeof value.activeLayoutId === 'string' ? { activeLayoutId: value.activeLayoutId } : {}),
       volumeVisible: value.volumeVisible !== false,
       customIntervals: validCustomIntervals(value.customIntervals),
@@ -251,7 +243,9 @@ export function loadWorkspace(userId: string): UserWorkspace {
       ...(value.stayInDrawingMode === true ? { stayInDrawingMode: true as const } : {}),
       ...(value.lockAllDrawings === true ? { lockAllDrawings: true as const } : {}),
       ...(value.hideAllDrawings === true ? { hideAllDrawings: true as const } : {}),
-      ...(isChartType(value.chartType) && (value.chartType as string) !== 'candles' ? { chartType: value.chartType as Exclude<ChartType, 'candles'> } : {}),
+      ...(isChartType(value.chartType) && (value.chartType as string) !== 'candles'
+        ? { chartType: value.chartType as Exclude<ChartType, 'candles'> }
+        : {}),
     }
   } catch {
     return defaultWorkspace()
@@ -276,22 +270,26 @@ export function loadSavedLayouts(userId: string): SavedLayout[] {
         tabs.length === 0 ||
         typeof candidate.createdAtMs !== 'number' ||
         typeof candidate.updatedAtMs !== 'number'
-      ) return []
-      const activeTabId = typeof candidate.activeTabId === 'string' && tabs.some((tab) => tab.id === candidate.activeTabId)
-        ? candidate.activeTabId
-        : tabs[0].id
-      return [{
-        id: candidate.id,
-        name: candidate.name.trim() || 'Untitled layout',
-        tabs,
-        activeTabId,
-        volumeVisible: candidate.volumeVisible !== false,
-        customIntervals: validCustomIntervals(candidate.customIntervals),
-        ...(candidate.indicators ? { indicators: normalizeIndicators(candidate.indicators) } : {}),
-        createdAtMs: candidate.createdAtMs,
-        updatedAtMs: candidate.updatedAtMs,
-        ...(candidate.favorite === true ? { favorite: true } : {}),
-      }]
+      )
+        return []
+      const activeTabId =
+        typeof candidate.activeTabId === 'string' && tabs.some((tab) => tab.id === candidate.activeTabId)
+          ? candidate.activeTabId
+          : tabs[0].id
+      return [
+        {
+          id: candidate.id,
+          name: candidate.name.trim() || 'Untitled layout',
+          tabs,
+          activeTabId,
+          volumeVisible: candidate.volumeVisible !== false,
+          customIntervals: validCustomIntervals(candidate.customIntervals),
+          ...(candidate.indicators ? { indicators: normalizeIndicators(candidate.indicators) } : {}),
+          createdAtMs: candidate.createdAtMs,
+          updatedAtMs: candidate.updatedAtMs,
+          ...(candidate.favorite === true ? { favorite: true } : {}),
+        },
+      ]
     })
   } catch {
     return []
@@ -326,13 +324,19 @@ export function autosaveLayouts(layouts: readonly SavedLayout[], workspace: User
     if (group.length === 0) return layout
     const activeTabId = group.some((tab) => tab.id === workspace.activeTabId)
       ? workspace.activeTabId
-      : group.some((tab) => tab.id === layout.activeTabId) ? layout.activeTabId : group[0].id
+      : group.some((tab) => tab.id === layout.activeTabId)
+        ? layout.activeTabId
+        : group[0].id
     const candidate: SavedLayout = {
       ...layout,
       tabs: group.map(({ layoutId: _layoutId, ...tab }) => tab),
       activeTabId,
       ...(layout.id === activeLayoutId
-        ? { volumeVisible: workspace.volumeVisible, customIntervals: workspace.customIntervals, ...(workspace.indicators ? { indicators: workspace.indicators } : {}) }
+        ? {
+            volumeVisible: workspace.volumeVisible,
+            customIntervals: workspace.customIntervals,
+            ...(workspace.indicators ? { indicators: workspace.indicators } : {}),
+          }
         : {}),
     }
     if (layoutContent(candidate) === layoutContent(layout)) return layout

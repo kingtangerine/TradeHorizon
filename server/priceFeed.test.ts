@@ -29,24 +29,40 @@ function fakeSockets() {
       this.sent = []
       sockets.push(this)
     }
-    send(text: string) { this.sent.push(JSON.parse(text) as SentMessage) }
-    close() { this.readyState = 3 }
-    open() { this.readyState = 1; this.onopen?.() }
-    push(message: unknown) { this.onmessage?.({ data: JSON.stringify(message) }) }
-    drop() { this.readyState = 3; this.onclose?.() }
+    send(text: string) {
+      this.sent.push(JSON.parse(text) as SentMessage)
+    }
+    close() {
+      this.readyState = 3
+    }
+    open() {
+      this.readyState = 1
+      this.onopen?.()
+    }
+    push(message: unknown) {
+      this.onmessage?.({ data: JSON.stringify(message) })
+    }
+    drop() {
+      this.readyState = 3
+      this.onclose?.()
+    }
   }
   return { FakeSocket, sockets, byUrl: (part: string) => sockets.filter((socket) => socket.url.includes(part)) }
 }
 
 const quiet = { log() {}, warn() {} }
-afterEach(() => { vi.useRealTimers() })
+afterEach(() => {
+  vi.useRealTimers()
+})
 
 describe('exchange message formats', () => {
   it('reads Binance mini tickers and Bybit tickers', () => {
     expect(binanceProtocol.parse({ e: '24hrMiniTicker', s: 'BTCUSDT', c: '101.5' })).toEqual([['BTCUSDT', 101.5]])
     expect(binanceProtocol.parse({ result: null, id: 1 })).toEqual([])
     expect(binanceProtocol.subscribe(['BTCUSDT'], 7)).toEqual({ method: 'SUBSCRIBE', params: ['btcusdt@miniTicker'], id: 7 })
-    expect(bybitProtocol.parse({ topic: 'tickers.ZETAUSDT', data: { symbol: 'ZETAUSDT', lastPrice: '0.25' } })).toEqual([['ZETAUSDT', 0.25]])
+    expect(bybitProtocol.parse({ topic: 'tickers.ZETAUSDT', data: { symbol: 'ZETAUSDT', lastPrice: '0.25' } })).toEqual([
+      ['ZETAUSDT', 0.25],
+    ])
     expect(bybitProtocol.parse({ op: 'pong' })).toEqual([])
   })
 })
@@ -97,7 +113,13 @@ describe('alerts with live prices', () => {
 
   function setup({ time = 1000 } = {}) {
     const values: Record<string, string> = { u1: alertsValue }
-    const store = { listUserIds: () => ['u1'], getAlertsValue: (id: string) => values[id], setAlertsValue: (id: string, value: string) => { values[id] = value } }
+    const store = {
+      listUserIds: () => ['u1'],
+      getAlertsValue: (id: string) => values[id],
+      setAlertsValue: (id: string, value: string) => {
+        values[id] = value
+      },
+    }
     const notifications: string[] = []
     const watched: SymbolGroups[] = []
     const fetched: SymbolGroups[] = []
@@ -105,14 +127,28 @@ describe('alerts with live prices', () => {
     const service = createAlertService({
       store,
       exchangeOf: (symbol) => (symbol === 'FUTUSDT' ? 'binance-futures' : 'binance'),
-      fetchPrices: async (groups) => { fetched.push(groups); return new Map() },
-      notify: async (userId, payload) => { notifications.push(payload.alertId) },
+      fetchPrices: async (groups) => {
+        fetched.push(groups)
+        return new Map()
+      },
+      notify: async (userId, payload) => {
+        notifications.push(payload.alertId)
+      },
       feed: { setSymbols: (groups) => watched.push(groups) },
       now: () => clock,
       log: quiet,
     })
     service.start()
-    return { service, values, notifications, watched, fetched, advance: (ms: number) => { clock += ms } }
+    return {
+      service,
+      values,
+      notifications,
+      watched,
+      fetched,
+      advance: (ms: number) => {
+        clock += ms
+      },
+    }
   }
 
   it('tells the feed which symbols to watch and fires on the first live price that crosses', () => {

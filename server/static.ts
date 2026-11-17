@@ -56,7 +56,11 @@ function cacheControl(urlPath: string): string {
 export function createStaticHandler(distDir: string): (req: IncomingMessage, res: ServerResponse, urlPath: string) => Promise<void> {
   return async function serveStatic(req, res, urlPath) {
     let decoded: string
-    try { decoded = decodeURIComponent(urlPath) } catch { decoded = '/' }
+    try {
+      decoded = decodeURIComponent(urlPath)
+    } catch {
+      decoded = '/'
+    }
     let file = normalize(join(distDir, decoded))
     if (file !== distDir && !file.startsWith(distDir + sep)) file = join(distDir, 'index.html')
 
@@ -66,10 +70,20 @@ export function createStaticHandler(distDir: string): (req: IncomingMessage, res
       entry = await load(file)
     } catch {
       // Missing assets are real 404s; any other path is a client-side route and gets the app shell.
-      if (decoded.startsWith('/assets/') || extname(decoded)) { res.writeHead(404); res.end('Not found'); return }
+      if (decoded.startsWith('/assets/') || extname(decoded)) {
+        res.writeHead(404)
+        res.end('Not found')
+        return
+      }
       file = join(distDir, 'index.html')
       servedPath = '/index.html'
-      try { entry = await load(file) } catch { res.writeHead(404); res.end('Run `npm run build` first.'); return }
+      try {
+        entry = await load(file)
+      } catch {
+        res.writeHead(404)
+        res.end('Run `npm run build` first.')
+        return
+      }
     }
 
     const headers: OutgoingHttpHeaders = {
@@ -78,12 +92,21 @@ export function createStaticHandler(distDir: string): (req: IncomingMessage, res
       ETag: entry.etag,
       Vary: 'Accept-Encoding',
     }
-    if (req.headers['if-none-match'] === entry.etag) { res.writeHead(304, headers); res.end(); return }
+    if (req.headers['if-none-match'] === entry.etag) {
+      res.writeHead(304, headers)
+      res.end()
+      return
+    }
 
     const accepts = String(req.headers['accept-encoding'] ?? '')
     let body = entry.raw
-    if (entry.br && /\bbr\b/.test(accepts)) { body = entry.br; headers['Content-Encoding'] = 'br' }
-    else if (entry.gzip && /\bgzip\b/.test(accepts)) { body = entry.gzip; headers['Content-Encoding'] = 'gzip' }
+    if (entry.br && /\bbr\b/.test(accepts)) {
+      body = entry.br
+      headers['Content-Encoding'] = 'br'
+    } else if (entry.gzip && /\bgzip\b/.test(accepts)) {
+      body = entry.gzip
+      headers['Content-Encoding'] = 'gzip'
+    }
     headers['Content-Length'] = body.length
     res.writeHead(200, headers)
     res.end(req.method === 'HEAD' ? undefined : body)

@@ -1,5 +1,14 @@
 import { describe, expect, it } from 'vitest'
-import { ellipsePolygon, extendLine, fibExtensionPrice, formatDuration, parallelOffset, pitchforkMedian, rangeSummary, thinStroke } from './geometry'
+import {
+  ellipsePolygon,
+  extendLine,
+  fibExtensionPrice,
+  formatDuration,
+  parallelOffset,
+  pitchforkMedian,
+  rangeSummary,
+  thinStroke,
+} from './geometry'
 
 describe('wave 3 drawing maths', () => {
   it('projects Fibonacci extensions from the third point', () => {

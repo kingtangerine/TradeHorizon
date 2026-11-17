@@ -14,6 +14,7 @@ describe('passwords', () => {
   it('makes readable, random temporary passwords', () => {
     const passwords = new Set(Array.from({ length: 200 }, temporaryPassword))
     expect(passwords.size).toBe(200)
-    for (const password of passwords) expect(password).toMatch(/^[a-km-np-zA-HJ-NP-Z2-9]{4}-[a-km-np-zA-HJ-NP-Z2-9]{4}-[a-km-np-zA-HJ-NP-Z2-9]{4}$/)
+    for (const password of passwords)
+      expect(password).toMatch(/^[a-km-np-zA-HJ-NP-Z2-9]{4}-[a-km-np-zA-HJ-NP-Z2-9]{4}-[a-km-np-zA-HJ-NP-Z2-9]{4}$/)
   })
 })

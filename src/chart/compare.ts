@@ -4,7 +4,10 @@
 export const MAX_COMPARE = 3
 export const COMPARE_COLORS = ['#ff9800', '#e91e63', '#00bcd4'] as const
 
-export interface CompareBar { readonly timestamp: number, readonly close: number }
+export interface CompareBar {
+  readonly timestamp: number
+  readonly close: number
+}
 
 /** Close of the compare candle that contains `timestamp` (the last one opening at or before it). */
 export function closeAt(bars: readonly CompareBar[], timestamp: number): number | undefined {
@@ -24,7 +27,7 @@ export function closeAt(bars: readonly CompareBar[], timestamp: number): number 
  * close there. Undefined where the compare symbol has no data yet.
  */
 export function scaledCompare(
-  mainBars: ReadonlyArray<{ readonly timestamp: number, readonly close: number }>,
+  mainBars: ReadonlyArray<{ readonly timestamp: number; readonly close: number }>,
   compare: readonly CompareBar[],
   from: number,
   to: number,
@@ -57,5 +60,8 @@ export function compareChange(
 
 export function normalizeCompare(value: unknown): string[] {
   if (!Array.isArray(value)) return []
-  return [...new Set(value.filter((item): item is string => typeof item === 'string' && /^[A-Z0-9.]{2,32}$/.test(item)))].slice(0, MAX_COMPARE)
+  return [...new Set(value.filter((item): item is string => typeof item === 'string' && /^[A-Z0-9.]{2,32}$/.test(item)))].slice(
+    0,
+    MAX_COMPARE,
+  )
 }

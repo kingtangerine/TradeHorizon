@@ -56,12 +56,20 @@ export function Watchlist({ state, findMarket, currentSymbol, onState, onOpen, o
     const controller = new AbortController()
     const run = () => {
       void fetchExchangeQuotes(markets, controller.signal)
-        .then((next) => { if (live) setQuotes((current) => ({ ...current, ...next })) })
-        .catch(() => { /* keep the last quotes; the next tick retries */ })
+        .then((next) => {
+          if (live) setQuotes((current) => ({ ...current, ...next }))
+        })
+        .catch(() => {
+          /* keep the last quotes; the next tick retries */
+        })
     }
     run()
     const timer = setInterval(run, EXCHANGE_REFRESH_MS)
-    return () => { live = false; controller.abort(); clearInterval(timer) }
+    return () => {
+      live = false
+      controller.abort()
+      clearInterval(timer)
+    }
     // markets is derived from marketKey; the key keeps the timer from restarting on every render.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [marketKey])
@@ -70,12 +78,19 @@ export function Watchlist({ state, findMarket, currentSymbol, onState, onOpen, o
     let live = true
     const run = () => {
       void fetchIndexQuotes(markets)
-        .then((next) => { if (live) setQuotes((current) => ({ ...current, ...next })) })
-        .catch(() => { /* CoinGecko may be rate limited; try again next minute */ })
+        .then((next) => {
+          if (live) setQuotes((current) => ({ ...current, ...next }))
+        })
+        .catch(() => {
+          /* CoinGecko may be rate limited; try again next minute */
+        })
     }
     run()
     const timer = setInterval(run, INDEX_REFRESH_MS)
-    return () => { live = false; clearInterval(timer) }
+    return () => {
+      live = false
+      clearInterval(timer)
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [marketKey])
 
@@ -84,7 +99,10 @@ export function Watchlist({ state, findMarket, currentSymbol, onState, onOpen, o
   const sortBy = (key: SortKey) => {
     if (sortKey === key) {
       if (direction === 'desc') setDirection('asc')
-      else { setSortKey('manual'); setDirection('desc') }
+      else {
+        setSortKey('manual')
+        setDirection('desc')
+      }
     } else {
       setSortKey(key)
       setDirection(key === 'symbol' ? 'asc' : 'desc')
@@ -100,9 +118,16 @@ export function Watchlist({ state, findMarket, currentSymbol, onState, onOpen, o
   return (
     <aside className="watchlist-panel" aria-label="Watchlist">
       <header>
-        <div><StarIcon /><strong>Watchlist</strong></div>
-        <button type="button" onClick={onAdd} aria-label="Add symbol" title="Add symbol"><PlusIcon /></button>
-        <button type="button" onClick={onClose} aria-label="Close watchlist"><CloseIcon /></button>
+        <div>
+          <StarIcon />
+          <strong>Watchlist</strong>
+        </div>
+        <button type="button" onClick={onAdd} aria-label="Add symbol" title="Add symbol">
+          <PlusIcon />
+        </button>
+        <button type="button" onClick={onClose} aria-label="Close watchlist">
+          <CloseIcon />
+        </button>
       </header>
 
       <div className="watchlist-lists">
@@ -121,16 +146,28 @@ export function Watchlist({ state, findMarket, currentSymbol, onState, onOpen, o
             }}
           />
         ) : (
-          <select
-            aria-label="Watchlist"
-            value={list.id}
-            onChange={(event) => onState(setActiveList(state, event.target.value))}
-          >
-            {state.lists.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
+          <select aria-label="Watchlist" value={list.id} onChange={(event) => onState(setActiveList(state, event.target.value))}>
+            {state.lists.map((item) => (
+              <option key={item.id} value={item.id}>
+                {item.name}
+              </option>
+            ))}
           </select>
         )}
-        <button type="button" title="Rename list" aria-label="Rename list" onClick={() => { setRenameValue(list.name); setRenaming(true) }}>Rename</button>
-        <button type="button" title="New list" aria-label="New list" onClick={() => setNewName('')}>New</button>
+        <button
+          type="button"
+          title="Rename list"
+          aria-label="Rename list"
+          onClick={() => {
+            setRenameValue(list.name)
+            setRenaming(true)
+          }}
+        >
+          Rename
+        </button>
+        <button type="button" title="New list" aria-label="New list" onClick={() => setNewName('')}>
+          New
+        </button>
         <button
           type="button"
           className="delete"
@@ -152,17 +189,33 @@ export function Watchlist({ state, findMarket, currentSymbol, onState, onOpen, o
             setNewName(undefined)
           }}
         >
-          <input autoFocus value={newName} maxLength={40} placeholder="List name" aria-label="New list name" onChange={(event) => setNewName(event.target.value)} onKeyDown={(event) => event.stopPropagation()} />
+          <input
+            autoFocus
+            value={newName}
+            maxLength={40}
+            placeholder="List name"
+            aria-label="New list name"
+            onChange={(event) => setNewName(event.target.value)}
+            onKeyDown={(event) => event.stopPropagation()}
+          />
           <button type="submit">Create</button>
-          <button type="button" onClick={() => setNewName(undefined)}>Cancel</button>
+          <button type="button" onClick={() => setNewName(undefined)}>
+            Cancel
+          </button>
         </form>
       )}
 
       <div className="watchlist-columns" role="row">
         <span />
-        <button type="button" onClick={() => sortBy('symbol')}>Symbol{arrow('symbol')}</button>
-        <button type="button" className="num" onClick={() => sortBy('last')}>Last{arrow('last')}</button>
-        <button type="button" className="num" onClick={() => sortBy('changePercent')}>Chg%{arrow('changePercent')}</button>
+        <button type="button" onClick={() => sortBy('symbol')}>
+          Symbol{arrow('symbol')}
+        </button>
+        <button type="button" className="num" onClick={() => sortBy('last')}>
+          Last{arrow('last')}
+        </button>
+        <button type="button" className="num" onClick={() => sortBy('changePercent')}>
+          Chg%{arrow('changePercent')}
+        </button>
         <span />
       </div>
 
@@ -183,11 +236,18 @@ export function Watchlist({ state, findMarket, currentSymbol, onState, onOpen, o
                 className={item.flag ? `watchlist-flag flag-${item.flag}` : 'watchlist-flag'}
                 aria-label={`Flag ${item.symbol}`}
                 title="Color flag"
-                onClick={(event) => { event.stopPropagation(); onState(cycleFlag(state, item.symbol)) }}
+                onClick={(event) => {
+                  event.stopPropagation()
+                  onState(cycleFlag(state, item.symbol))
+                }}
               />
               <span className="watchlist-symbol">
                 <strong>{market?.pair ?? item.symbol}</strong>
-                <small>{market ? `${market.name}${market.exchange !== 'binance' && market.exchange !== 'binance-futures' && market.kind !== 'dominance' ? ` · ${market.venue}` : ''}` : 'Unavailable'}</small>
+                <small>
+                  {market
+                    ? `${market.name}${market.exchange !== 'binance' && market.exchange !== 'binance-futures' && market.kind !== 'dominance' ? ` · ${market.venue}` : ''}`
+                    : 'Unavailable'}
+                </small>
               </span>
               <span className="watchlist-last num">{quote ? formatPrice(quote.last, market) : '—'}</span>
               <span className={quote ? (up ? 'watchlist-change num price-up' : 'watchlist-change num price-down') : 'watchlist-change num'}>
@@ -198,7 +258,10 @@ export function Watchlist({ state, findMarket, currentSymbol, onState, onOpen, o
                 className="watchlist-remove"
                 aria-label={`Remove ${item.symbol}`}
                 title="Remove from list"
-                onClick={(event) => { event.stopPropagation(); onState(removeSymbol(state, item.symbol)) }}
+                onClick={(event) => {
+                  event.stopPropagation()
+                  onState(removeSymbol(state, item.symbol))
+                }}
               >
                 <CloseIcon />
               </button>

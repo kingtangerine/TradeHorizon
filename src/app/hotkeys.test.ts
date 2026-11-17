@@ -30,7 +30,13 @@ describe('typed timeframes', () => {
 })
 
 describe('typing on the chart', () => {
-  const key = (value: string, extra: Partial<KeyboardEvent> = {}) => ({ key: value, ctrlKey: false, metaKey: false, altKey: false, ...extra })
+  const key = (value: string, extra: Partial<KeyboardEvent> = {}) => ({
+    key: value,
+    ctrlKey: false,
+    metaKey: false,
+    altKey: false,
+    ...extra,
+  })
   it('takes plain characters but not shortcuts or special keys', () => {
     expect(isChartTypingKey(key('e'), null)).toBe(true)
     expect(isChartTypingKey(key('5'), null)).toBe(true)

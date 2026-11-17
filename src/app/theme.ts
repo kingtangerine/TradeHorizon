@@ -14,18 +14,34 @@ function parse(value: unknown): Theme | undefined {
 
 export function applyTheme(theme: Theme): void {
   document.documentElement.dataset.theme = theme
-  try { localStorage.setItem(DEVICE_KEY, theme) } catch { /* storage unavailable */ }
+  try {
+    localStorage.setItem(DEVICE_KEY, theme)
+  } catch {
+    /* storage unavailable */
+  }
 }
 
 // Reading localStorage throws when storage is blocked; the dark default is then the right answer, not an error.
 export function initialTheme(): Theme {
-  try { return parse(localStorage.getItem(DEVICE_KEY)) ?? 'dark' } catch { return 'dark' }
+  try {
+    return parse(localStorage.getItem(DEVICE_KEY)) ?? 'dark'
+  } catch {
+    return 'dark'
+  }
 }
 
 export function loadUserTheme(userId: string): Theme {
-  try { return parse(localStorage.getItem(userThemeKey(userId))) ?? initialTheme() } catch { return 'dark' }
+  try {
+    return parse(localStorage.getItem(userThemeKey(userId))) ?? initialTheme()
+  } catch {
+    return 'dark'
+  }
 }
 
 export function saveUserTheme(userId: string, theme: Theme): void {
-  try { localStorage.setItem(userThemeKey(userId), theme) } catch { /* storage unavailable */ }
+  try {
+    localStorage.setItem(userThemeKey(userId), theme)
+  } catch {
+    /* storage unavailable */
+  }
 }

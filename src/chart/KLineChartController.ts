@@ -26,7 +26,15 @@ import { COMPARE_COLORS, compareChange, scaledCompare } from './compare'
 import { getMarket, type CryptoMarket as CompareMarket } from './markets'
 import { STUDIES, type Study } from './studies'
 import { fibSettings, visibleOnInterval } from './drawingVisibility'
-import { broadcastCrosshair, broadcastTime, followerBarSpace, joinSyncGroup, type SyncMember, type SyncedCrosshair, type SyncedTime } from './chartSync'
+import {
+  broadcastCrosshair,
+  broadcastTime,
+  followerBarSpace,
+  joinSyncGroup,
+  type SyncMember,
+  type SyncedCrosshair,
+  type SyncedTime,
+} from './chartSync'
 import { ALERT_LINE_OVERLAY_NAME } from './overlayNames'
 import { QVWAP_INDICATOR_NAME, VWAP_INDICATOR_NAME, registerVwapIndicators } from './vwapIndicator'
 import { VWAP_ANCHORS } from './vwap'
@@ -61,15 +69,7 @@ import {
   loadDominanceWeights,
   registerDominanceIndicators,
 } from './dominance'
-import {
-  lockToAxis,
-  magnetPrice,
-  positionPoints,
-  rectanglePoints,
-  stackLevels,
-  translatePoints,
-  type ChartPoint,
-} from './geometry'
+import { lockToAxis, magnetPrice, positionPoints, rectanglePoints, stackLevels, translatePoints, type ChartPoint } from './geometry'
 import {
   DOMINANCE_COLORS,
   MOVING_AVERAGE_COLORS,
@@ -81,13 +81,7 @@ import {
   type MovingAverageSettings,
 } from './indicators'
 import { intervalToPeriod, periodToInterval } from './intervals'
-import {
-  DRAWING_GROUP_ID,
-  candleToKLineData,
-  decimalString,
-  drawingFromOverlay,
-  drawingPoints,
-} from './model'
+import { DRAWING_GROUP_ID, candleToKLineData, decimalString, drawingFromOverlay, drawingPoints } from './model'
 import type { CryptoMarket } from './markets'
 import { registerTradeHorizonOverlays } from './overlays'
 import { DEFAULT_REPLAY_SPEED_MS, replayStartCursor, replayTransitionCursor } from './replay'
@@ -158,7 +152,14 @@ registerScriptIndicator()
 /** The candle under the crosshair, for the legend (TradingView shows the hovered candle's values). */
 export interface HoverState {
   readonly index: number
-  readonly bar: { readonly timestamp: number, readonly open: number, readonly high: number, readonly low: number, readonly close: number, readonly volume?: number }
+  readonly bar: {
+    readonly timestamp: number
+    readonly open: number
+    readonly high: number
+    readonly low: number
+    readonly close: number
+    readonly volume?: number
+  }
   readonly previousClose?: number
   /** The newest candle: the legend shows live values instead. */
   readonly latest: boolean
@@ -184,7 +185,7 @@ interface ToolSession {
   /** Three-point tools: the points fixed so far. Freehand: the stroke so far. */
   fixed?: ChartPoint[]
   /** Freehand: the stroke in pixels, to keep only points a few pixels apart. */
-  strokePx?: Array<{ x: number, y: number }>
+  strokePx?: Array<{ x: number; y: number }>
 }
 
 interface OverlayMove {
@@ -208,9 +209,7 @@ function barToQuote(bar: KLineData): ChartQuote {
 }
 
 function anchorsEqual(a: readonly Anchor[], b: readonly Anchor[]): boolean {
-  return a.length === b.length && a.every((anchor, index) => (
-    anchor.timeMs === b[index].timeMs && anchor.price === b[index].price
-  ))
+  return a.length === b.length && a.every((anchor, index) => anchor.timeMs === b[index].timeMs && anchor.price === b[index].price)
 }
 
 interface ReplaySession {
@@ -249,9 +248,9 @@ export interface KLineChartControllerCallbacks {
 
 /** Drawing gestures the app answers with its own UI (settings window, context menu, multi-selection toolbar). */
 export type DrawingEvent =
-  | { readonly kind: 'doubleClick', readonly id: string }
-  | { readonly kind: 'contextMenu', readonly id: string, readonly clientX: number, readonly clientY: number }
-  | { readonly kind: 'selection', readonly ids: readonly string[] }
+  | { readonly kind: 'doubleClick'; readonly id: string }
+  | { readonly kind: 'contextMenu'; readonly id: string; readonly clientX: number; readonly clientY: number }
+  | { readonly kind: 'selection'; readonly ids: readonly string[] }
 
 /** Tool-rail toggles that apply to every drawing. */
 export interface DrawingModes {
@@ -281,10 +280,7 @@ const ALERT_Z_LEVEL = 2_000_000
 const ALERT_PAUSED_COLOR = '#787b86'
 
 function isAbortError(error: unknown): boolean {
-  return (
-    (error instanceof DOMException && error.name === 'AbortError') ||
-    (error instanceof Error && error.name === 'AbortError')
-  )
+  return (error instanceof DOMException && error.name === 'AbortError') || (error instanceof Error && error.name === 'AbortError')
 }
 
 function createId(): string {
@@ -373,7 +369,7 @@ export class KLineChartController {
   readonly #viewListeners = new Set<() => void>()
   #timeZone = 'UTC'
   #hover: HoverState | null = null
-  #seriesIndicator: { id: string, name: string } | undefined
+  #seriesIndicator: { id: string; name: string } | undefined
   #scaleMode: ScaleMode = 'normal'
   /** Compare symbols: their candles at this chart's timeframe, refreshed while shown. */
   #compareSymbols: readonly string[] = []
@@ -382,11 +378,11 @@ export class KLineChartController {
   #compareTimer?: ReturnType<typeof globalThis.setInterval>
   #compareEpoch = 0
   /** Indicator-library studies on the chart: study id -> klinecharts indicator. */
-  readonly #studyIds = new Map<string, { indicatorId: string, type: Study['type'] }>()
+  readonly #studyIds = new Map<string, { indicatorId: string; type: Study['type'] }>()
   /** User scripts on the chart: instance id -> klinecharts indicator, its pane and its plots. */
-  readonly #scriptIds = new Map<string, { indicatorId: string, overlay: boolean, extend: ScriptExtend }>()
+  readonly #scriptIds = new Map<string, { indicatorId: string; overlay: boolean; extend: ScriptExtend }>()
   /** Date-range button waiting for its timeframe's candles. */
-  #pendingRange?: { fromMs: number, interval: MarketInterval }
+  #pendingRange?: { fromMs: number; interval: MarketInterval }
   readonly #hoverListeners = new Set<() => void>()
   #alertLines: readonly AlertLine[] = []
   #stackLevels = new Map<string, number>()
@@ -412,7 +408,9 @@ export class KLineChartController {
 
   public subscribeDrawingEvents(listener: (event: DrawingEvent) => void): () => void {
     this.#drawingListeners.add(listener)
-    return () => { this.#drawingListeners.delete(listener) }
+    return () => {
+      this.#drawingListeners.delete(listener)
+    }
   }
 
   /** Every selected drawing: the multi-selection, or the single selected one. */
@@ -487,7 +485,7 @@ export class KLineChartController {
   }
 
   /** Joins (or leaves) the split-view group of this chart's tab. */
-  public setSync(group: string | undefined, options: { crosshair: boolean, time: boolean }): void {
+  public setSync(group: string | undefined, options: { crosshair: boolean; time: boolean }): void {
     if (this.#disposed) return
     this.#syncOptions = options
     if (group !== this.#syncGroup) {
@@ -508,7 +506,10 @@ export class KLineChartController {
       const data = this.#chart.getDataList()
       const centre = data[Math.max(0, Math.min(data.length - 1, Math.round((range.from + range.to) / 2)))]
       if (!centre) return
-      broadcastTime(this.#syncGroup, this.#syncMember, { centreTimeMs: centre.timestamp, pixelsPerMs: this.#chart.getBarSpace().bar / this.#intervalMs() })
+      broadcastTime(this.#syncGroup, this.#syncMember, {
+        centreTimeMs: centre.timestamp,
+        pixelsPerMs: this.#chart.getBarSpace().bar / this.#intervalMs(),
+      })
     })
   }
 
@@ -528,7 +529,10 @@ export class KLineChartController {
 
   #applySyncedCrosshair(state: SyncedCrosshair | null): void {
     if (this.#disposed || !this.#syncOptions.crosshair) return
-    if (!state) { this.#chart.executeAction('onCrosshairChange', null as never); return }
+    if (!state) {
+      this.#chart.executeAction('onCrosshairChange', null as never)
+      return
+    }
     const data = this.#chart.getDataList()
     if (data.length === 0) return
     // The candle of this timeframe that contains the moment (the last one opening at or before it).
@@ -542,7 +546,9 @@ export class KLineChartController {
     const x = (this.#chart.convertToPixel({ dataIndex: low }, { paneId: 'candle_pane' }) as Partial<Coordinate>).x
     if (x === undefined) return
     const sameSymbol = state.symbol === this.#market.symbol
-    const y = sameSymbol ? (this.#chart.convertToPixel({ value: state.price }, { paneId: 'candle_pane' }) as Partial<Coordinate>).y : undefined
+    const y = sameSymbol
+      ? (this.#chart.convertToPixel({ value: state.price }, { paneId: 'candle_pane' }) as Partial<Coordinate>).y
+      : undefined
     // Off-screen y: only the vertical line shows on charts of other symbols.
     this.#chart.executeAction('onCrosshairChange', { x, y: y ?? -1000, paneId: 'candle_pane' } as never)
   }
@@ -605,12 +611,8 @@ export class KLineChartController {
           symbol: exchangeSymbol(this.#market.symbol),
           interval,
           limit: HISTORY_PAGE_SIZE,
-          ...(type === 'forward' && timestamp !== null
-            ? { endTimeMs: Math.max(0, timestamp - 1) }
-            : {}),
-          ...(type === 'backward' && timestamp !== null
-            ? { startTimeMs: timestamp + 1 }
-            : {}),
+          ...(type === 'forward' && timestamp !== null ? { endTimeMs: Math.max(0, timestamp - 1) } : {}),
+          ...(type === 'backward' && timestamp !== null ? { startTimeMs: timestamp + 1 } : {}),
         })
 
         if (this.#disposed || epoch !== this.#dataEpoch || interval !== this.#interval) return
@@ -623,9 +625,12 @@ export class KLineChartController {
         const pendingReplay = type === 'init' ? this.#pendingReplay : undefined
         const targetReplayTime = pendingReplay?.targetTimeMs
         const targetCenterTime = pending?.followingLive ? undefined : pending?.centerTimeMs
-        const backfillTarget = targetReplayTime !== undefined
-          ? (targetCenterTime !== undefined ? Math.min(targetReplayTime, targetCenterTime) : targetReplayTime)
-          : targetCenterTime
+        const backfillTarget =
+          targetReplayTime !== undefined
+            ? targetCenterTime !== undefined
+              ? Math.min(targetReplayTime, targetCenterTime)
+              : targetReplayTime
+            : targetCenterTime
 
         if (backfillTarget !== undefined) {
           const neededFrom = backfillTarget - VIEWPORT_BACKFILL_MARGIN_BARS * this.#intervalMs()
@@ -652,7 +657,10 @@ export class KLineChartController {
         if (type === 'init' && this.#pendingReplay) {
           const replayInfo = this.#pendingReplay
           this.#pendingReplay = undefined
-          const cursor = replayTransitionCursor(bars.map((b) => b.timestamp), replayInfo.targetTimeMs)
+          const cursor = replayTransitionCursor(
+            bars.map((b) => b.timestamp),
+            replayInfo.targetTimeMs,
+          )
           this.#replay = { bars, cursor, speedMs: replayInfo.speedMs }
           this.#replayPicking = replayInfo.wasPicking
           if (replayInfo.wasPicking) {
@@ -693,12 +701,7 @@ export class KLineChartController {
           this.#afterInitialData()
         }
       } catch (error) {
-        if (
-          this.#disposed ||
-          epoch !== this.#dataEpoch ||
-          error instanceof StaleMarketDataRequestError ||
-          isAbortError(error)
-        ) {
+        if (this.#disposed || epoch !== this.#dataEpoch || error instanceof StaleMarketDataRequestError || isAbortError(error)) {
           return
         }
 
@@ -868,7 +871,7 @@ export class KLineChartController {
     const axisElement = chart.getDom('candle_pane', 'yAxis')
     if (axisElement) axisElement.style.touchAction = 'none'
     if (import.meta.env.DEV) {
-      (globalThis as { __tradeHorizonChart?: Chart }).__tradeHorizonChart = chart
+      ;(globalThis as { __tradeHorizonChart?: Chart }).__tradeHorizonChart = chart
       ;(globalThis as { __tradeHorizonController?: unknown }).__tradeHorizonController = this
       ;((globalThis as { __tradeHorizonCharts?: Set<Chart> }).__tradeHorizonCharts ??= new Set()).add(chart)
     }
@@ -940,9 +943,9 @@ export class KLineChartController {
     this.cancelActiveTool()
     const targetTimeMs = this.#replay
       ? (this.#replay.bars[this.#replay.cursor - 1]?.timestamp ?? null)
-      : this.#pendingReplay?.targetTimeMs ?? null
+      : (this.#pendingReplay?.targetTimeMs ?? null)
     const speedMs = this.#replay?.speedMs ?? this.#pendingReplay?.speedMs ?? DEFAULT_REPLAY_SPEED_MS
-    const wasPlaying = (this.#replay?.timer !== undefined) || (this.#pendingReplay?.wasPlaying ?? false)
+    const wasPlaying = this.#replay?.timer !== undefined || (this.#pendingReplay?.wasPlaying ?? false)
     const wasPicking = this.#replayPicking || (this.#pendingReplay?.wasPicking ?? false)
 
     if (targetTimeMs !== null) {
@@ -980,9 +983,8 @@ export class KLineChartController {
     }
 
     this.resetPriceView()
-    this.#pendingViewport = this.#pendingRange?.interval === interval
-      ? { followingLive: true, barSpace: this.#chart.getBarSpace().bar }
-      : this.#captureViewport()
+    this.#pendingViewport =
+      this.#pendingRange?.interval === interval ? { followingLive: true, barSpace: this.#chart.getBarSpace().bar } : this.#captureViewport()
     this.#historyLoader.cancel()
     this.#stream?.stop()
     this.#stream = undefined
@@ -995,7 +997,10 @@ export class KLineChartController {
     }
     this.#chart.setPeriod(intervalToPeriod(interval))
     this.#syncDominanceData()
-    if (this.#compareSymbols.length > 0) { this.#compareSeries = []; void this.#loadCompare() }
+    if (this.#compareSymbols.length > 0) {
+      this.#compareSeries = []
+      void this.#loadCompare()
+    }
   }
 
   public retry(): void {
@@ -1018,12 +1023,22 @@ export class KLineChartController {
     if (this.#disposed) return
     const drawnByUs = type === 'heikinAshi' || type === 'baseline'
     const candleType = type === 'bars' ? 'ohlc' : type === 'hollow' ? 'candle_up_stroke' : type === 'candles' ? 'candle_solid' : 'area'
-    const area = type === 'area'
-      ? { lineColor: '#2962ff', lineSize: 2, backgroundColor: [{ offset: 0, color: 'rgba(41, 98, 255, 0.02)' }, { offset: 1, color: 'rgba(41, 98, 255, 0.32)' }] }
-      : drawnByUs
-        ? { lineColor: 'transparent', lineSize: 0, backgroundColor: 'transparent' }
-        : { lineColor: '#2962ff', lineSize: 2, backgroundColor: 'transparent' }
-    this.#chart.setStyles({ candle: { type: candleType, area: { ...area, value: 'close', smooth: false, point: { show: false } } } } as never)
+    const area =
+      type === 'area'
+        ? {
+            lineColor: '#2962ff',
+            lineSize: 2,
+            backgroundColor: [
+              { offset: 0, color: 'rgba(41, 98, 255, 0.02)' },
+              { offset: 1, color: 'rgba(41, 98, 255, 0.32)' },
+            ],
+          }
+        : drawnByUs
+          ? { lineColor: 'transparent', lineSize: 0, backgroundColor: 'transparent' }
+          : { lineColor: '#2962ff', lineSize: 2, backgroundColor: 'transparent' }
+    this.#chart.setStyles({
+      candle: { type: candleType, area: { ...area, value: 'close', smooth: false, point: { show: false } } },
+    } as never)
     // Heikin Ashi and baseline are our own series over the (hidden) candles.
     const wanted = type === 'heikinAshi' ? HEIKIN_ASHI_NAME : type === 'baseline' ? BASELINE_NAME : undefined
     if (this.#seriesIndicator && this.#seriesIndicator.name !== wanted) {
@@ -1031,7 +1046,10 @@ export class KLineChartController {
       this.#seriesIndicator = undefined
     }
     if (wanted && !this.#seriesIndicator) {
-      const id = this.#chart.createIndicator({ name: wanted, paneId: 'candle_pane', createTooltipDataSource: () => HIDDEN_INDICATOR_TOOLTIP }, true)
+      const id = this.#chart.createIndicator(
+        { name: wanted, paneId: 'candle_pane', createTooltipDataSource: () => HIDDEN_INDICATOR_TOOLTIP },
+        true,
+      )
       if (id) this.#seriesIndicator = { id, name: wanted }
     }
   }
@@ -1110,7 +1128,10 @@ export class KLineChartController {
   #enterReplay(timestamp: number): void {
     // Picking a new start while already replaying must rewind within the full original data.
     const bars = this.#replay?.bars ?? this.#chart.getDataList().slice()
-    const cursor = replayStartCursor(bars.map((bar) => bar.timestamp), timestamp)
+    const cursor = replayStartCursor(
+      bars.map((bar) => bar.timestamp),
+      timestamp,
+    )
     if (cursor === null) return
 
     const speedMs = this.#replay?.speedMs ?? DEFAULT_REPLAY_SPEED_MS
@@ -1187,7 +1208,14 @@ export class KLineChartController {
     const wick = (color: string) => (appearance.wicks ? color : 'transparent')
     this.#chart.setStyles({
       candle: {
-        bar: { upColor, downColor, upBorderColor: upColor, downBorderColor: downColor, upWickColor: wick(upColor), downWickColor: wick(downColor) },
+        bar: {
+          upColor,
+          downColor,
+          upBorderColor: upColor,
+          downBorderColor: downColor,
+          upWickColor: wick(upColor),
+          downWickColor: wick(downColor),
+        },
         priceMark: { last: { upColor, downColor, line: { show: appearance.lastPriceLine } } },
       },
       grid: {
@@ -1277,7 +1305,7 @@ export class KLineChartController {
    * The chart as a PNG data URL with its drawings, its size in CSS pixels and the colour behind it. The crosshair is
    * hidden first (TradingView's pictures have none); the library redraws on the next animation frame, so this waits.
    */
-  public async snapshot(): Promise<{ url: string, width: number, height: number, background: string } | null> {
+  public async snapshot(): Promise<{ url: string; width: number; height: number; background: string } | null> {
     if (this.#disposed) return null
     this.#chart.executeAction('onCrosshairChange', null as never)
     await new Promise<void>((resolve) => {
@@ -1292,17 +1320,28 @@ export class KLineChartController {
 
   public readonly subscribeHover = (listener: () => void): (() => void) => {
     this.#hoverListeners.add(listener)
-    return () => { this.#hoverListeners.delete(listener) }
+    return () => {
+      this.#hoverListeners.delete(listener)
+    }
   }
 
   public readonly getHover = (): HoverState | null => this.#hover
 
   /** The newest candle on the chart and the close before it, read when needed (no React state follows every tick). */
-  public latestCandle(): { open: number, high: number, low: number, close: number, volume?: number, previousClose?: number } | undefined {
+  public latestCandle(): { open: number; high: number; low: number; close: number; volume?: number; previousClose?: number } | undefined {
     if (this.#disposed) return undefined
     const list = this.#chart.getDataList()
     const last = list[list.length - 1]
-    return last ? { open: last.open, high: last.high, low: last.low, close: last.close, volume: last.volume, previousClose: list[list.length - 2]?.close } : undefined
+    return last
+      ? {
+          open: last.open,
+          high: last.high,
+          low: last.low,
+          close: last.close,
+          volume: last.volume,
+          previousClose: list[list.length - 2]?.close,
+        }
+      : undefined
   }
 
   /** Close of the candle before the newest one (the legend's change is measured from it). */
@@ -1321,7 +1360,12 @@ export class KLineChartController {
     }
     const series = (kind: MovingAverageKind, prefix: string): Array<number | undefined> => {
       const values = row(this.#movingAverageIds.get(kind))
-      return values ? Object.keys(values).filter((key) => key.startsWith(prefix)).sort((a, b) => Number(a.slice(prefix.length)) - Number(b.slice(prefix.length))).map((key) => values[key]) : []
+      return values
+        ? Object.keys(values)
+            .filter((key) => key.startsWith(prefix))
+            .sort((a, b) => Number(a.slice(prefix.length)) - Number(b.slice(prefix.length)))
+            .map((key) => values[key])
+        : []
     }
     return {
       sma: series('sma', 'ma'),
@@ -1348,8 +1392,13 @@ export class KLineChartController {
     this.#setHover({ index, bar: list[index], previousClose: list[index - 1]?.close, latest: index === list.length - 1 })
     if (this.#syncGroup && this.#syncOptions.crosshair) {
       const y = (data as { y?: number }).y
-      const [value] = typeof y === 'number' ? this.#chart.convertFromPixel([{ x, y }], { paneId: 'candle_pane' }) as Array<Partial<Point>> : []
-      broadcastCrosshair(this.#syncGroup, this.#syncMember, { timestamp: list[index].timestamp, price: value?.value ?? list[index].close, symbol: this.#market.symbol })
+      const [value] =
+        typeof y === 'number' ? (this.#chart.convertFromPixel([{ x, y }], { paneId: 'candle_pane' }) as Array<Partial<Point>>) : []
+      broadcastCrosshair(this.#syncGroup, this.#syncMember, {
+        timestamp: list[index].timestamp,
+        price: value?.value ?? list[index].close,
+        symbol: this.#market.symbol,
+      })
     }
   }
 
@@ -1359,12 +1408,18 @@ export class KLineChartController {
   }
 
   /** Time-axis labels on round times in the user's zone (see timeAxis.ts), also over the empty space to the right. */
-  readonly #createTimeTicks = ({ range, defaultTicks }: { range: { realFrom: number, realTo: number }, defaultTicks: Array<{ coord: number, value: number | string, text: string }> }) => {
+  readonly #createTimeTicks = ({
+    range,
+    defaultTicks,
+  }: {
+    range: { realFrom: number; realTo: number }
+    defaultTicks: Array<{ coord: number; value: number | string; text: string }>
+  }) => {
     const data = this.#chart.getDataList()
     if (data.length === 0) return defaultTicks
     const intervalMs = this.#intervalMs()
     const last = data[data.length - 1]
-    const bars: Array<{ index: number, timestamp: number }> = []
+    const bars: Array<{ index: number; timestamp: number }> = []
     for (let index = Math.max(0, Math.floor(range.realFrom) - 1); index <= Math.ceil(range.realTo); index += 1) {
       bars.push({ index, timestamp: index < data.length ? data[index].timestamp : last.timestamp + (index - data.length + 1) * intervalMs })
     }
@@ -1440,11 +1495,17 @@ export class KLineChartController {
       const name = script.title || instance.name
       const legend = (indicator: { result?: Array<Record<string, number | undefined>> }, dataIndex: number | undefined) => ({
         name,
-        calcParamsText: instance.inputs.length > 0 ? ` ${(instance.inputs.length ? instance.inputs : script.inputs.map((input) => input.defaultValue)).join(' ')}` : '',
+        calcParamsText:
+          instance.inputs.length > 0
+            ? ` ${(instance.inputs.length ? instance.inputs : script.inputs.map((input) => input.defaultValue)).join(' ')}`
+            : '',
         features: [],
         legends: extend.plots.map((plot, index) => {
-          const value = indicator.result?.[dataIndex ?? (indicator.result.length - 1)]?.[`p${index}`]
-          return { title: { text: `${plot.title}: `, color: plot.color }, value: { text: value === undefined ? '—' : value.toFixed(precision), color: plot.color } }
+          const value = indicator.result?.[dataIndex ?? indicator.result.length - 1]?.[`p${index}`]
+          return {
+            title: { text: `${plot.title}: `, color: plot.color },
+            value: { text: value === undefined ? '—' : value.toFixed(precision), color: plot.color },
+          }
         }),
       })
       const config = {
@@ -1452,10 +1513,21 @@ export class KLineChartController {
         visible: instance.visible,
         precision,
         extendData: extend,
-        styles: { lines: Array.from({ length: 8 }, (_, index) => ({ color: extend.plots[index]?.color ?? 'transparent', size: extend.plots[index]?.width ?? 1.5 })) },
+        styles: {
+          lines: Array.from({ length: 8 }, (_, index) => ({
+            color: extend.plots[index]?.color ?? 'transparent',
+            size: extend.plots[index]?.width ?? 1.5,
+          })),
+        },
         createTooltipDataSource: script.overlay
           ? () => HIDDEN_INDICATOR_TOOLTIP
-          : ({ indicator, crosshair }: { indicator: { result?: Array<Record<string, number | undefined>> }, crosshair: { dataIndex?: number } }) => legend(indicator, crosshair.dataIndex),
+          : ({
+              indicator,
+              crosshair,
+            }: {
+              indicator: { result?: Array<Record<string, number | undefined>> }
+              crosshair: { dataIndex?: number }
+            }) => legend(indicator, crosshair.dataIndex),
       }
       const existing = this.#scriptIds.get(instance.id)
       if (existing) {
@@ -1472,11 +1544,12 @@ export class KLineChartController {
   }
 
   /** A script's plots at a candle (the newest when `index` is undefined), for the legend of scripts on the candles. */
-  public scriptValuesAt(instanceId: string, index?: number): Array<{ title: string, color: string, value?: number }> {
+  public scriptValuesAt(instanceId: string, index?: number): Array<{ title: string; color: string; value?: number }> {
     const entry = this.#scriptIds.get(instanceId)
     if (!entry || this.#disposed) return []
     const at = index ?? this.#chart.getDataList().length - 1
-    const indicator = this.#chart.getIndicators({ id: entry.indicatorId })[0] as { result?: Array<Record<string, number | undefined>> } | undefined
+    const indicator = this.#chart.getIndicators({ id: entry.indicatorId })[0] as
+      { result?: Array<Record<string, number | undefined>> } | undefined
     const row = indicator?.result?.[at]
     return entry.extend.plots.map((plot, plotIndex) => ({ title: plot.title, color: plot.color, value: row?.[`p${plotIndex}`] }))
   }
@@ -1492,25 +1565,36 @@ export class KLineChartController {
   /** Loads every compare symbol's recent candles, then keeps the newest ones fresh every 20 seconds. */
   async #loadCompare(): Promise<void> {
     const epoch = ++this.#compareEpoch
-    if (this.#compareTimer !== undefined) { globalThis.clearInterval(this.#compareTimer); this.#compareTimer = undefined }
-    if (this.#compareSymbols.length === 0) { this.#renderCompare(); return }
+    if (this.#compareTimer !== undefined) {
+      globalThis.clearInterval(this.#compareTimer)
+      this.#compareTimer = undefined
+    }
+    if (this.#compareSymbols.length === 0) {
+      this.#renderCompare()
+      return
+    }
     const interval = this.#interval
     const load = async (limit: number) => {
-      const results = await Promise.all(this.#compareSymbols.map(async (symbol, index) => {
-        const market = getMarket(symbol)
-        if (market.symbol !== symbol || market.kind === 'dominance') return undefined
-        try {
-          const candles = await this.#fetchKlinesFor(market, { symbol: exchangeSymbol(market.symbol), interval, limit })
-          const bars = candles.map((candle) => ({ timestamp: candle.openTimeMs, close: Number(candle.close) })).filter((bar) => Number.isFinite(bar.close))
-          const previous = this.#compareSeries.find((item) => item.symbol === symbol)?.bars ?? []
-          const merged = limit < HISTORY_PAGE_SIZE && previous.length > 0
-            ? [...previous.filter((bar) => bar.timestamp < (bars[0]?.timestamp ?? Infinity)), ...bars]
-            : bars
-          return { symbol, color: COMPARE_COLORS[index % COMPARE_COLORS.length], bars: merged }
-        } catch {
-          return this.#compareSeries.find((item) => item.symbol === symbol)
-        }
-      }))
+      const results = await Promise.all(
+        this.#compareSymbols.map(async (symbol, index) => {
+          const market = getMarket(symbol)
+          if (market.symbol !== symbol || market.kind === 'dominance') return undefined
+          try {
+            const candles = await this.#fetchKlinesFor(market, { symbol: exchangeSymbol(market.symbol), interval, limit })
+            const bars = candles
+              .map((candle) => ({ timestamp: candle.openTimeMs, close: Number(candle.close) }))
+              .filter((bar) => Number.isFinite(bar.close))
+            const previous = this.#compareSeries.find((item) => item.symbol === symbol)?.bars ?? []
+            const merged =
+              limit < HISTORY_PAGE_SIZE && previous.length > 0
+                ? [...previous.filter((bar) => bar.timestamp < (bars[0]?.timestamp ?? Infinity)), ...bars]
+                : bars
+            return { symbol, color: COMPARE_COLORS[index % COMPARE_COLORS.length], bars: merged }
+          } catch {
+            return this.#compareSeries.find((item) => item.symbol === symbol)
+          }
+        }),
+      )
       if (this.#disposed || epoch !== this.#compareEpoch || interval !== this.#interval) return
       this.#compareSeries = results.filter((item): item is CompareSeries => item !== undefined)
       this.#renderCompare()
@@ -1530,7 +1614,10 @@ export class KLineChartController {
     const config = { name: COMPARE_INDICATOR_NAME, extendData: { series: this.#compareSeries } }
     if (this.#compareIndicatorId) this.#chart.overrideIndicator({ id: this.#compareIndicatorId, ...config })
     else {
-      const id = this.#chart.createIndicator({ ...config, paneId: 'candle_pane', createTooltipDataSource: () => HIDDEN_INDICATOR_TOOLTIP }, true)
+      const id = this.#chart.createIndicator(
+        { ...config, paneId: 'candle_pane', createTooltipDataSource: () => HIDDEN_INDICATOR_TOOLTIP },
+        true,
+      )
       if (id) this.#compareIndicatorId = id
     }
     // The price range includes the compare lines, so ask the axis to measure again.
@@ -1539,7 +1626,7 @@ export class KLineChartController {
   }
 
   /** Legend: each compare symbol's colour, last close and change over the visible candles. */
-  public compareLegend(): Array<{ symbol: string, color: string, last?: number, changePercent?: number }> {
+  public compareLegend(): Array<{ symbol: string; color: string; last?: number; changePercent?: number }> {
     if (this.#disposed) return []
     const data = this.#chart.getDataList()
     const range = this.#chart.getVisibleRange()
@@ -1558,7 +1645,19 @@ export class KLineChartController {
   }
 
   /** The automatic price range widened to fit the visible part of the compare lines. */
-  #withCompareRange<T extends { from: number, to: number, range: number, realFrom: number, realTo: number, realRange: number, displayFrom: number, displayTo: number, displayRange: number }>(range: T): T {
+  #withCompareRange<
+    T extends {
+      from: number
+      to: number
+      range: number
+      realFrom: number
+      realTo: number
+      realRange: number
+      displayFrom: number
+      displayTo: number
+      displayRange: number
+    },
+  >(range: T): T {
     if (this.#compareSeries.length === 0) return range
     const data = this.#chart.getDataList()
     const visible = this.#chart.getVisibleRange()
@@ -1577,7 +1676,18 @@ export class KLineChartController {
     const pad = (high - low) * 0.04
     low = Math.min(range.from, low - pad)
     high = Math.max(range.to, high + pad)
-    return { ...range, from: low, to: high, range: high - low, realFrom: low, realTo: high, realRange: high - low, displayFrom: low, displayTo: high, displayRange: high - low }
+    return {
+      ...range,
+      from: low,
+      to: high,
+      range: high - low,
+      realFrom: low,
+      realTo: high,
+      realRange: high - low,
+      displayFrom: low,
+      displayTo: high,
+      displayRange: high - low,
+    }
   }
 
   /** Library studies: price-pane ones stack on the candles (legend in HTML), the rest get their own pane and legend. */
@@ -1593,7 +1703,8 @@ export class KLineChartController {
     for (const study of studies) {
       const definition = STUDIES[study.type]
       const onPrice = definition.pane === 'price'
-      const precision = onPrice || study.type === 'atr' ? (this.#chart.getSymbol()?.pricePrecision ?? 2) : definition.type === 'macd' ? 4 : 2
+      const precision =
+        onPrice || study.type === 'atr' ? (this.#chart.getSymbol()?.pricePrecision ?? 2) : definition.type === 'macd' ? 4 : 2
       const config = {
         name: studyIndicatorName(study.type),
         calcParams: [...study.params],
@@ -1623,7 +1734,8 @@ export class KLineChartController {
     const entry = this.#studyIds.get(studyId)
     if (!entry || this.#disposed) return []
     const at = index ?? this.#chart.getDataList().length - 1
-    const indicator = this.#chart.getIndicators({ id: entry.indicatorId })[0] as { result?: Array<Record<string, number | undefined>> } | undefined
+    const indicator = this.#chart.getIndicators({ id: entry.indicatorId })[0] as
+      { result?: Array<Record<string, number | undefined>> } | undefined
     const row = indicator?.result?.[at]
     return STUDIES[entry.type].lines.map((line) => row?.[line.key])
   }
@@ -1723,10 +1835,7 @@ export class KLineChartController {
       return
     }
 
-    this.#dominanceIndicatorPoll ??= globalThis.setInterval(
-      () => this.#refreshDominanceRows(false),
-      DOMINANCE_INDICATOR_REFRESH_MS,
-    )
+    this.#dominanceIndicatorPoll ??= globalThis.setInterval(() => this.#refreshDominanceRows(false), DOMINANCE_INDICATOR_REFRESH_MS)
     if (this.#dominanceRows && this.#dominanceRowsInterval === this.#interval) {
       this.#pushDominanceRows(this.#dominanceRows)
       return
@@ -1844,18 +1953,15 @@ export class KLineChartController {
     if (raw?.timestamp === undefined || raw.value === undefined || !Number.isFinite(raw.value)) return null
 
     const candle = raw.dataIndex === undefined ? undefined : this.#chart.getDataList()[raw.dataIndex]
-    const value = this.#magnet
-      ? magnetPrice(raw.value, candle, (price) => this.#priceToPixel(price), MAGNET_TOLERANCE_PX)
-      : raw.value
+    const value = this.#magnet ? magnetPrice(raw.value, candle, (price) => this.#priceToPixel(price), MAGNET_TOLERANCE_PX) : raw.value
     return { timestamp: raw.timestamp, value }
   }
 
   #positionDefaults(): { priceSpan: number; timeSpanMs: number } {
     const rect = this.#paneRect()
-    const [top, bottom] = this.#chart.convertFromPixel(
-      [{ y: 0 }, { y: rect?.height ?? 0 }],
-      { paneId: 'candle_pane' },
-    ) as Array<Partial<Point>>
+    const [top, bottom] = this.#chart.convertFromPixel([{ y: 0 }, { y: rect?.height ?? 0 }], { paneId: 'candle_pane' }) as Array<
+      Partial<Point>
+    >
     const visiblePrice = Math.abs((top?.value ?? 0) - (bottom?.value ?? 0))
     const range = this.#chart.getVisibleRange()
     const bars = Math.max(8, Math.round((range.realTo - range.realFrom) * 0.18))
@@ -1883,10 +1989,7 @@ export class KLineChartController {
 
     let end = current
     if (shiftKey && (tool.type === 'trendLine' || tool.type === 'ray' || tool.type === 'extendedLine' || tool.type === 'arrow')) {
-      const [from, to] = this.#chart.convertToPixel(
-        [start, current],
-        { paneId: 'candle_pane' },
-      ) as Array<Partial<Coordinate>>
+      const [from, to] = this.#chart.convertToPixel([start, current], { paneId: 'candle_pane' }) as Array<Partial<Coordinate>>
       end = lockToAxis(start, current, {
         dx: (to?.x ?? 0) - (from?.x ?? 0),
         dy: (to?.y ?? 0) - (from?.y ?? 0),
@@ -1916,9 +2019,7 @@ export class KLineChartController {
 
   #finishDraft(tool: ToolSession): void {
     const overlay = tool.draftId ? this.#chart.getOverlays({ id: tool.draftId })[0] : undefined
-    let drawing = overlay
-      ? drawingFromOverlay(overlay, this.#market.marketId, undefined, tool.type)
-      : null
+    let drawing = overlay ? drawingFromOverlay(overlay, this.#market.marketId, undefined, tool.type) : null
     if (!drawing) return
     const startStyle = this.#toolStyles.get(tool.type)
     if (startStyle) drawing = { ...drawing, style: { ...drawing.style, ...startStyle } }
@@ -1970,20 +2071,50 @@ export class KLineChartController {
         from = Math.max(from, to * 1e-4, Number.MIN_VALUE)
         const realFrom = Math.log10(from)
         const realTo = Math.log10(Math.max(to, from * 1.0001))
-        return { from, to, range: to - from, realFrom, realTo, realRange: realTo - realFrom, displayFrom: from, displayTo: to, displayRange: to - from }
+        return {
+          from,
+          to,
+          range: to - from,
+          realFrom,
+          realTo,
+          realRange: realTo - realFrom,
+          displayFrom: from,
+          displayTo: to,
+          displayRange: to - from,
+        }
       }
       const data = this.#chart.getDataList()
       const base = data[Math.max(0, Math.floor(this.#chart.getVisibleRange().from))]?.close
       if (!base) return defaultRange
       const realFrom = ((from - base) / base) * 100
       const realTo = ((to - base) / base) * 100
-      return { from, to, range: to - from, realFrom, realTo, realRange: realTo - realFrom, displayFrom: realFrom, displayTo: realTo, displayRange: realTo - realFrom }
+      return {
+        from,
+        to,
+        range: to - from,
+        realFrom,
+        realTo,
+        realRange: realTo - realFrom,
+        displayFrom: realFrom,
+        displayTo: realTo,
+        displayRange: realTo - realFrom,
+      }
     }
     if (k === 1 && shift === 0) return defaultRange
     const [from, to] = grow(defaultRange.from, defaultRange.to)
     const [realFrom, realTo] = grow(defaultRange.realFrom, defaultRange.realTo)
     const [displayFrom, displayTo] = grow(defaultRange.displayFrom, defaultRange.displayTo)
-    return { from, to, range: to - from, realFrom, realTo, realRange: realTo - realFrom, displayFrom, displayTo, displayRange: displayTo - displayFrom }
+    return {
+      from,
+      to,
+      range: to - from,
+      realFrom,
+      realTo,
+      realRange: realTo - realFrom,
+      displayFrom,
+      displayTo,
+      displayRange: displayTo - displayFrom,
+    }
   }
 
   #applyPriceView(scale: number, offset: number): void {
@@ -2057,7 +2188,9 @@ export class KLineChartController {
   }
 
   readonly #handlePageHide = (): void => this.#persistBars()
-  readonly #handleResumeNow = (): void => { this.#stream?.nudge?.(true) }
+  readonly #handleResumeNow = (): void => {
+    this.#stream?.nudge?.(true)
+  }
 
   #persistBars(): void {
     if (this.#disposed || this.#replay || this.#pendingReplay || this.#market.kind === 'dominance') return
@@ -2080,7 +2213,10 @@ export class KLineChartController {
   readonly #handlePanPointerDown = (event: PointerEvent): void => {
     this.#pointersDown.add(event.pointerId)
     // A second finger means pinch-zoom, not a pan.
-    if (this.#pointersDown.size > 1) { this.#pan = undefined; return }
+    if (this.#pointersDown.size > 1) {
+      this.#pan = undefined
+      return
+    }
     if (event.button !== 0 || this.#tool || this.#replayPicking || !this.#insidePane(event.clientX, event.clientY)) return
     this.#pan = { pointerId: event.pointerId, startY: event.clientY, startOffset: this.#priceOffset, active: false }
   }
@@ -2090,7 +2226,10 @@ export class KLineChartController {
     if (!pan || event.pointerId !== pan.pointerId) return
     if (!pan.active) {
       if (Math.abs(event.clientY - pan.startY) < PAN_START_PX) return
-      if (this.#drawingIsPressed()) { this.#pan = undefined; return }
+      if (this.#drawingIsPressed()) {
+        this.#pan = undefined
+        return
+      }
       pan.active = true
       pan.startY = event.clientY
     }
@@ -2147,7 +2286,10 @@ export class KLineChartController {
       tool.start = point
       const placement = DRAWING_TOOLS[tool.type].placement
       if (placement === 'threePoint') tool.fixed = [point]
-      if (placement === 'freehand') { tool.fixed = [point]; tool.strokePx = [{ x: event.clientX, y: event.clientY }] }
+      if (placement === 'freehand') {
+        tool.fixed = [point]
+        tool.strokePx = [{ x: event.clientX, y: event.clientY }]
+      }
     }
     this.#updateDraft(tool, point, event.shiftKey)
   }
@@ -2249,7 +2391,9 @@ export class KLineChartController {
           if (event.figure?.key === 'alert-delete') this.#callbacks.onAlertDelete?.(line.id)
         },
         // The library deletes an overlay on right-click unless this is prevented.
-        onRightClick: (event: OverlayEvent<unknown>) => { event.preventDefault?.() },
+        onRightClick: (event: OverlayEvent<unknown>) => {
+          event.preventDefault?.()
+        },
       }
       if (existing.has(overlayId)) this.#chart.overrideOverlay(configuration as never)
       else this.#chart.createOverlay(configuration as never)
@@ -2258,7 +2402,9 @@ export class KLineChartController {
 
   /** True while the pointer is over a drawing (a right-click there selects the drawing instead of opening the chart menu). */
   public drawingUnderPointer(): boolean {
-    const store = (this.#chart as unknown as { _chartStore?: { getHoverOverlayInfo?(): { overlay?: { groupId?: string } | null, figureType?: string } } })._chartStore
+    const store = (
+      this.#chart as unknown as { _chartStore?: { getHoverOverlayInfo?(): { overlay?: { groupId?: string } | null; figureType?: string } } }
+    )._chartStore
     const hovered = store?.getHoverOverlayInfo?.()
     return !!hovered?.overlay && hovered.figureType !== 'none' && hovered.overlay.groupId === DRAWING_GROUP_ID
   }
@@ -2285,9 +2431,7 @@ export class KLineChartController {
     if (!drawing) return
 
     this.#selectOverlay(id)
-    const centerTimeMs = Math.round(
-      drawing.anchors.reduce((sum, anchor) => sum + anchor.timeMs, 0) / drawing.anchors.length,
-    )
+    const centerTimeMs = Math.round(drawing.anchors.reduce((sum, anchor) => sum + anchor.timeMs, 0) / drawing.anchors.length)
     this.#withIgnoredNavigation(() => this.#scrollToCentre(centerTimeMs, 180))
   }
 
@@ -2319,7 +2463,11 @@ export class KLineChartController {
    */
   #showHandles(id: string): void {
     const overlay = this.#chart.getOverlays({ id })[0]
-    const store = (this.#chart as unknown as { _chartStore?: { setClickOverlayInfo?(info: unknown, onSelected: () => void, onDeselected: () => void): void } })._chartStore
+    const store = (
+      this.#chart as unknown as {
+        _chartStore?: { setClickOverlayInfo?(info: unknown, onSelected: () => void, onDeselected: () => void): void }
+      }
+    )._chartStore
     if (!overlay || !store?.setClickOverlayInfo) return
     store.setClickOverlayInfo(
       { paneId: 'candle_pane', overlay, figureType: 'point', figureIndex: 0, figure: null },
@@ -2332,7 +2480,11 @@ export class KLineChartController {
     this.#selectOverlay(undefined)
     // klinecharts has no public API to deselect, so it keeps drawing handles on the last
     // clicked overlay. Reset its click state (pinned version 10.0.3) so Esc leaves clean shapes.
-    const store = (this.#chart as unknown as { _chartStore?: { setClickOverlayInfo?(info: unknown, onSelected: () => void, onDeselected: () => void): void } })._chartStore
+    const store = (
+      this.#chart as unknown as {
+        _chartStore?: { setClickOverlayInfo?(info: unknown, onSelected: () => void, onDeselected: () => void): void }
+      }
+    )._chartStore
     store?.setClickOverlayInfo?.(
       { paneId: '', overlay: null, figureType: 'none', figureIndex: -1, figure: null },
       () => undefined,
@@ -2414,7 +2566,9 @@ export class KLineChartController {
   /** Called when what is on screen may have moved (scroll, zoom, price view, new price). */
   public onViewChange(listener: () => void): () => void {
     this.#viewListeners.add(listener)
-    return () => { this.#viewListeners.delete(listener) }
+    return () => {
+      this.#viewListeners.delete(listener)
+    }
   }
 
   /**
@@ -2460,11 +2614,7 @@ export class KLineChartController {
     return fetchMarketKlines(this.#market, options)
   }
 
-  async #backfillAfterReconnect(
-    interval: MarketInterval,
-    epoch: number,
-    callback: (data: KLineData) => void,
-  ): Promise<void> {
+  async #backfillAfterReconnect(interval: MarketInterval, epoch: number, callback: (data: KLineData) => void): Promise<void> {
     try {
       const candles = await this.#fetchKlines({
         symbol: exchangeSymbol(this.#market.symbol),
@@ -2504,9 +2654,11 @@ export class KLineChartController {
 
     try {
       const weights = await loadDominanceWeights()
-      const page = await fetchDominancePage(weights, interval, type === 'forward' && timestamp !== null
-        ? { endTimeMs: Math.max(0, timestamp - 1), reference: this.#dominanceReference }
-        : {})
+      const page = await fetchDominancePage(
+        weights,
+        interval,
+        type === 'forward' && timestamp !== null ? { endTimeMs: Math.max(0, timestamp - 1), reference: this.#dominanceReference } : {},
+      )
       if (this.#disposed || epoch !== this.#dataEpoch || interval !== this.#interval) return
 
       if (type === 'init') this.#dominanceReference = page.reference
@@ -2515,7 +2667,10 @@ export class KLineChartController {
       if (type === 'init' && this.#pendingReplay) {
         const replayInfo = this.#pendingReplay
         this.#pendingReplay = undefined
-        const cursor = replayTransitionCursor(bars.map((b) => b.timestamp), replayInfo.targetTimeMs)
+        const cursor = replayTransitionCursor(
+          bars.map((b) => b.timestamp),
+          replayInfo.targetTimeMs,
+        )
         this.#replay = { bars, cursor, speedMs: replayInfo.speedMs }
         this.#replayPicking = replayInfo.wasPicking
         if (replayInfo.wasPicking) {
@@ -2640,11 +2795,7 @@ export class KLineChartController {
     }, 300)
   }
 
-  #drawingOverlayConfiguration(
-    id: string,
-    drawing: Drawing | undefined,
-    type: DrawingType,
-  ): OverlayCreate {
+  #drawingOverlayConfiguration(id: string, drawing: Drawing | undefined, type: DrawingType): OverlayCreate {
     const style = { ...DRAWING_TOOLS[type].defaultStyle, ...this.#toolStyles.get(type), ...drawing?.style }
     const text = (key: string, fallback: string): string => {
       const value = style[key]
@@ -2671,7 +2822,7 @@ export class KLineChartController {
       modeSensitivity: MAGNET_TOLERANCE_PX,
       lock: (drawing?.locked ?? false) || this.#drawingModes.lockAll,
       visible: !(drawing?.hidden ?? false) && !this.#drawingModes.hideAll && visibleOnInterval(drawing?.style, this.#interval),
-      zLevel: drawing ? this.#stackLevels.get(id) ?? DRAFT_Z_LEVEL : DRAFT_Z_LEVEL,
+      zLevel: drawing ? (this.#stackLevels.get(id) ?? DRAFT_Z_LEVEL) : DRAFT_Z_LEVEL,
       fixedZLevel: true,
       needDefaultPointFigure: type !== 'brush',
       needDefaultXAxisFigure: type !== 'horizontalLine' && type !== 'horizontalRay' && type !== 'brush',
@@ -2775,10 +2926,7 @@ export class KLineChartController {
     if (event.figure?.key?.startsWith(POINT_HANDLE_KEY_PREFIX)) return
     if (event.x === undefined || event.y === undefined) return
 
-    const [start] = this.#chart.convertFromPixel(
-      [{ x: event.x, y: event.y }],
-      { paneId: 'candle_pane' },
-    ) as Array<Partial<Point>>
+    const [start] = this.#chart.convertFromPixel([{ x: event.x, y: event.y }], { paneId: 'candle_pane' }) as Array<Partial<Point>>
     const points: ChartPoint[] = []
     for (const point of event.overlay.points) {
       if (point.timestamp === undefined || point.value === undefined) return
@@ -2800,7 +2948,9 @@ export class KLineChartController {
         const other = this.#chart.getOverlays({ id })[0]
         const drawing = this.#drawingStore.getSnapshot().drawings.find((item) => item.id === id)
         if (!other || !drawing || drawing.locked || this.#drawingModes.lockAll) continue
-        const start = other.points.filter((point) => point.timestamp !== undefined && point.value !== undefined).map((point) => ({ timestamp: point.timestamp!, value: point.value! }))
+        const start = other.points
+          .filter((point) => point.timestamp !== undefined && point.value !== undefined)
+          .map((point) => ({ timestamp: point.timestamp!, value: point.value! }))
         if (start.length === other.points.length) group.set(id, start)
       }
       if (group.size > 0) this.#groupMove = group
@@ -2812,10 +2962,7 @@ export class KLineChartController {
     if (!move || move.id !== event.overlay.id || event.x === undefined || event.y === undefined) return
     this.#lastOverlayMoveEvent = event
 
-    const [current] = this.#chart.convertFromPixel(
-      [{ x: event.x, y: event.y }],
-      { paneId: 'candle_pane' },
-    ) as Array<Partial<Point>>
+    const [current] = this.#chart.convertFromPixel([{ x: event.x, y: event.y }], { paneId: 'candle_pane' }) as Array<Partial<Point>>
     if (current?.dataIndex === undefined || current.value === undefined) return
 
     const deltaBars = Math.round(current.dataIndex - move.startIndex)
@@ -2833,9 +2980,7 @@ export class KLineChartController {
     if (this.#suppressDrawingEvents || this.#disposed) return
     if (event.overlay.id === this.#activeDrawingId) return
 
-    const existing = this.#drawingStore
-      .getSnapshot()
-      .drawings.find((drawing) => drawing.id === event.overlay.id)
+    const existing = this.#drawingStore.getSnapshot().drawings.find((drawing) => drawing.id === event.overlay.id)
     if (!existing) return
     const drawing = drawingFromOverlay(event.overlay, this.#market.marketId, existing, type)
     const group = this.#groupMove
@@ -2867,7 +3012,10 @@ export class KLineChartController {
     const previous = this.#selectedDrawingId
     this.#selectedDrawingId = id
     if (previous !== id) {
-      for (const [overlayId, showValues] of [[previous, 0], [id, 1]] as const) {
+      for (const [overlayId, showValues] of [
+        [previous, 0],
+        [id, 1],
+      ] as const) {
         if (overlayId) this.#chart.overrideOverlay({ id: overlayId, styles: { showValues } })
       }
     }
@@ -2883,9 +3031,7 @@ export class KLineChartController {
   #syncDrawings(): void {
     if (this.#disposed) return
 
-    const desired = this.#drawingStore
-      .getSnapshot()
-      .drawings.filter((drawing) => drawing.marketId === this.#market.marketId)
+    const desired = this.#drawingStore.getSnapshot().drawings.filter((drawing) => drawing.marketId === this.#market.marketId)
     const desiredById = new Map(desired.map((drawing) => [drawing.id, drawing]))
     const existing = this.#chart.getOverlays({ groupId: DRAWING_GROUP_ID })
     const existingIds = new Set(existing.map((overlay) => overlay.id))

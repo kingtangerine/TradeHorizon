@@ -40,7 +40,15 @@ function kindOf(value: unknown): Kind {
     const ids = new Set<string>()
     if (value.every((item) => isPlainObject(item) && typeof item.id === 'string' && !ids.has(item.id) && ids.add(item.id))) return 'idArray'
     const values = new Set<string>()
-    if (value.every((item) => (item === null || ['string', 'number', 'boolean'].includes(typeof item)) && !values.has(JSON.stringify(item)) && values.add(JSON.stringify(item)))) return 'valueArray'
+    if (
+      value.every(
+        (item) =>
+          (item === null || ['string', 'number', 'boolean'].includes(typeof item)) &&
+          !values.has(JSON.stringify(item)) &&
+          values.add(JSON.stringify(item)),
+      )
+    )
+      return 'valueArray'
     return 'leaf'
   }
   return isPlainObject(value) ? 'object' : 'leaf'
@@ -111,8 +119,12 @@ function mergeKeyed(kind: Kind, children: Base['c'], local: unknown, remote: unk
   return order.map((key) => result.get(key))
 }
 
-function parse(raw: string): { ok: true, value: unknown } | { ok: false } {
-  try { return { ok: true, value: JSON.parse(raw) } } catch { return { ok: false } }
+function parse(raw: string): { ok: true; value: unknown } | { ok: false } {
+  try {
+    return { ok: true, value: JSON.parse(raw) }
+  } catch {
+    return { ok: false }
+  }
 }
 
 /** Base for a stored string (JSON or not). */

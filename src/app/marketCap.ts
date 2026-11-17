@@ -33,7 +33,12 @@ export function capTier(marketCap: number | undefined): CapTierInfo {
 }
 
 export function formatUsdCompact(value: number): string {
-  const units: Array<[number, string]> = [[1e12, 'T'], [1e9, 'B'], [1e6, 'M'], [1e3, 'K']]
+  const units: Array<[number, string]> = [
+    [1e12, 'T'],
+    [1e9, 'B'],
+    [1e6, 'M'],
+    [1e3, 'K'],
+  ]
   for (const [size, suffix] of units) {
     if (Math.abs(value) >= size) {
       const scaled = value / size
@@ -48,7 +53,13 @@ export function coinSymbol(baseAsset: string): string {
   return baseAsset.toUpperCase().replace(/^(1000000|1000|1M)(?=[A-Z])/, '')
 }
 
-export interface CapRow { s: string, n: string, c: number, r: number, v: number }
+export interface CapRow {
+  s: string
+  n: string
+  c: number
+  r: number
+  v: number
+}
 
 /** Index by symbol; when several coins share a symbol the biggest wins (the one traders mean). */
 export function indexMarketCaps(rows: readonly CapRow[]): Map<string, MarketCapInfo> {
@@ -71,7 +82,7 @@ export function loadMarketCaps(): Promise<Map<string, MarketCapInfo>> {
   if (!loading || Date.now() - loadedAtMs > REFRESH_MS) {
     loadedAtMs = Date.now()
     loading = fetch('/api/cg/caps')
-      .then(async (response) => (response.ok ? indexMarketCaps(await response.json() as CapRow[]) : new Map<string, MarketCapInfo>()))
+      .then(async (response) => (response.ok ? indexMarketCaps((await response.json()) as CapRow[]) : new Map<string, MarketCapInfo>()))
       .catch(() => new Map<string, MarketCapInfo>())
       .then((index) => {
         if (index.size === 0) loadedAtMs = 0 // try again on the next chart instead of keeping the failure for 30 minutes

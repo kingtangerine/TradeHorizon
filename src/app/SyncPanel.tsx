@@ -6,12 +6,18 @@ const time = (ms?: number) => (ms ? new Date(ms).toLocaleTimeString() : 'never')
 
 export function syncStatusText(status: SyncStatus): string {
   switch (status.state) {
-    case 'off': return 'Sync is off'
-    case 'starting': return 'Connecting…'
-    case 'saving': return `Saving ${status.pending} change${status.pending === 1 ? '' : 's'}…`
-    case 'offline': return 'Offline: changes are kept and sent later'
-    case 'error': return 'Sync problem'
-    default: return `Synced · checked ${time(status.lastDownloadAtMs)}`
+    case 'off':
+      return 'Sync is off'
+    case 'starting':
+      return 'Connecting…'
+    case 'saving':
+      return `Saving ${status.pending} change${status.pending === 1 ? '' : 's'}…`
+    case 'offline':
+      return 'Offline: changes are kept and sent later'
+    case 'error':
+      return 'Sync problem'
+    default:
+      return `Synced · checked ${time(status.lastDownloadAtMs)}`
   }
 }
 
@@ -34,7 +40,9 @@ export function SyncPanel({ userId }: { userId: string }) {
   const [report, setReport] = useState<SyncCheckReport>()
   const [copied, setCopied] = useState(false)
 
-  useEffect(() => { setCopied(false) }, [report])
+  useEffect(() => {
+    setCopied(false)
+  }, [report])
 
   const check = async () => {
     setBusy(true)
@@ -48,7 +56,12 @@ export function SyncPanel({ userId }: { userId: string }) {
 
   const copy = async () => {
     if (!report) return
-    try { await navigator.clipboard.writeText(formatSyncReport(report)); setCopied(true) } catch { setCopied(false) }
+    try {
+      await navigator.clipboard.writeText(formatSyncReport(report))
+      setCopied(true)
+    } catch {
+      setCopied(false)
+    }
   }
 
   return (
@@ -58,7 +71,11 @@ export function SyncPanel({ userId }: { userId: string }) {
         <i aria-hidden="true" /> {syncStatusText(status)}
         {status.lastUploadAtMs && <small> · last saved {time(status.lastUploadAtMs)}</small>}
       </p>
-      {status.error && <p className="sync-error" role="alert">{status.error}</p>}
+      {status.error && (
+        <p className="sync-error" role="alert">
+          {status.error}
+        </p>
+      )}
 
       <label className="sync-device">
         <span>This device</span>
@@ -78,14 +95,26 @@ export function SyncPanel({ userId }: { userId: string }) {
       {report && (
         <div className="sync-report">
           <p className="sync-report-head">
-            Checked {time(report.checkedAtMs)} · app v{report.appVersion} · server {report.serverVersion ? `v${report.serverVersion}` : 'unknown'}
+            Checked {time(report.checkedAtMs)} · app v{report.appVersion} · server{' '}
+            {report.serverVersion ? `v${report.serverVersion}` : 'unknown'}
           </p>
-          {report.problems.length === 0
-            ? <p className="sync-ok">Everything on this device matches the server.</p>
-            : <ul className="sync-problems">{report.problems.map((problem) => <li key={problem}>{problem}</li>)}</ul>}
+          {report.problems.length === 0 ? (
+            <p className="sync-ok">Everything on this device matches the server.</p>
+          ) : (
+            <ul className="sync-problems">
+              {report.problems.map((problem) => (
+                <li key={problem}>{problem}</li>
+              ))}
+            </ul>
+          )}
           <table>
             <thead>
-              <tr><th>Item</th><th>This device</th><th>Server</th><th /></tr>
+              <tr>
+                <th>Item</th>
+                <th>This device</th>
+                <th>Server</th>
+                <th />
+              </tr>
             </thead>
             <tbody>
               {report.rows.map((row) => (
@@ -98,15 +127,35 @@ export function SyncPanel({ userId }: { userId: string }) {
                   </td>
                   <td>
                     {row.server ? row.server.text : '—'}
-                    {row.server && row.server.updatedAtMs > 0 && <small>saved {new Date(row.server.updatedAtMs).toLocaleString()} by {row.server.byThisDevice ? 'this device' : row.server.byName ?? 'unknown device'}</small>}
-                    {row.onlyServer && row.onlyServer.length > 0 && <small className="sync-names">Only on server: {row.onlyServer.join(', ')}</small>}
+                    {row.server && row.server.updatedAtMs > 0 && (
+                      <small>
+                        saved {new Date(row.server.updatedAtMs).toLocaleString()} by{' '}
+                        {row.server.byThisDevice ? 'this device' : (row.server.byName ?? 'unknown device')}
+                      </small>
+                    )}
+                    {row.onlyServer && row.onlyServer.length > 0 && (
+                      <small className="sync-names">Only on server: {row.onlyServer.join(', ')}</small>
+                    )}
                   </td>
-                  <td>{row.name === 'workspace:v1' && row.verdict !== 'same' ? <span className="sync-own" title="Open tabs belong to each device; another device's tabs are taken over when the app starts.">Own tabs</span> : VERDICT_TEXT[row.verdict]}</td>
+                  <td>
+                    {row.name === 'workspace:v1' && row.verdict !== 'same' ? (
+                      <span
+                        className="sync-own"
+                        title="Open tabs belong to each device; another device's tabs are taken over when the app starts."
+                      >
+                        Own tabs
+                      </span>
+                    ) : (
+                      VERDICT_TEXT[row.verdict]
+                    )}
+                  </td>
                 </tr>
               ))}
             </tbody>
           </table>
-          <button type="button" className="sync-copy" onClick={() => void copy()}>{copied ? 'Copied' : 'Copy report'}</button>
+          <button type="button" className="sync-copy" onClick={() => void copy()}>
+            {copied ? 'Copied' : 'Copy report'}
+          </button>
         </div>
       )}
     </section>

@@ -4,7 +4,7 @@ import { zoneOffsetMinutes } from '../chart/timeAxis'
 export const AUTO_TIME_ZONE = 'auto'
 
 /** Common trading time zones (IANA names), west to east. */
-export const TIME_ZONES: ReadonlyArray<{ readonly zone: string, readonly city: string }> = [
+export const TIME_ZONES: ReadonlyArray<{ readonly zone: string; readonly city: string }> = [
   { zone: 'Pacific/Honolulu', city: 'Honolulu' },
   { zone: 'America/Anchorage', city: 'Anchorage' },
   { zone: 'America/Los_Angeles', city: 'Los Angeles' },

@@ -39,10 +39,14 @@ export function snapshotValues(candle: LegendCandle, precision: number): Snapsho
   const change = candleChange(candle)
   const sign = change.value >= 0 ? '+' : '−'
   return [
-    { text: 'O', tone: 'label' }, { text: formatPrice(candle.open, precision), tone },
-    { text: 'H', tone: 'label' }, { text: formatPrice(candle.high, precision), tone },
-    { text: 'L', tone: 'label' }, { text: formatPrice(candle.low, precision), tone },
-    { text: 'C', tone: 'label' }, { text: formatPrice(candle.close, precision), tone },
+    { text: 'O', tone: 'label' },
+    { text: formatPrice(candle.open, precision), tone },
+    { text: 'H', tone: 'label' },
+    { text: formatPrice(candle.high, precision), tone },
+    { text: 'L', tone: 'label' },
+    { text: formatPrice(candle.low, precision), tone },
+    { text: 'C', tone: 'label' },
+    { text: formatPrice(candle.close, precision), tone },
     {
       text: `${sign}${formatPrice(Math.abs(change.value), precision)} (${sign}${Math.abs(change.percent).toFixed(2)}%)`,
       tone: change.value >= 0 ? 'up' : 'down',
@@ -84,7 +88,8 @@ export async function composeSnapshot(input: SnapshotInput): Promise<Blob> {
   const text = input.dark ? '#d1d4dc' : '#131722'
   const muted = input.dark ? '#787b86' : '#6a6d78'
   const line = input.dark ? '#2a2e39' : '#e0e3eb'
-  const font = (weight: number, size: number) => `${weight} ${size}px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Ubuntu, sans-serif`
+  const font = (weight: number, size: number) =>
+    `${weight} ${size}px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Ubuntu, sans-serif`
 
   context.fillStyle = chart.background
   context.fillRect(0, 0, width, height)

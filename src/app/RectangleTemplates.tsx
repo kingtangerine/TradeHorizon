@@ -1,13 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { CloseIcon, StarIcon, TemplateIcon } from './Icons'
-import {
-  deleteTemplate,
-  saveTemplate,
-  toggleDefaultTemplate,
-  type RectangleStyle,
-  type TemplateState,
-} from './templates'
+import { deleteTemplate, saveTemplate, toggleDefaultTemplate, type RectangleStyle, type TemplateState } from './templates'
 
 interface RectangleTemplatesProps {
   state: TemplateState
@@ -36,7 +30,10 @@ export function RectangleTemplates({ state, current, onApply, onChange }: Rectan
       setOpen(false)
     }
     const escape = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') { event.stopPropagation(); setOpen(false) }
+      if (event.key === 'Escape') {
+        event.stopPropagation()
+        setOpen(false)
+      }
     }
     document.addEventListener('pointerdown', close)
     document.addEventListener('keydown', escape, true)
@@ -76,62 +73,83 @@ export function RectangleTemplates({ state, current, onApply, onChange }: Rectan
       >
         <TemplateIcon />
       </button>
-      {open && createPortal(
-        <div ref={popoverRef} className="template-popover" role="dialog" aria-label="Rectangle templates" style={position}>
-          <strong>Rectangle templates</strong>
-          {state.templates.length === 0 && <p className="template-empty">No templates yet. Style a rectangle, then save its look below.</p>}
-          <div className="template-list">
-            {state.templates.map((template) => (
-              <div className="template-row" key={template.id}>
-                <button
-                  type="button"
-                  className="template-apply"
-                  title="Apply to this rectangle"
-                  onClick={() => { onApply(template.style); setOpen(false) }}
-                >
-                  <span
-                    className="template-swatch"
-                    style={{ background: rgba(template.style.fillColor, template.style.fillOpacity), borderColor: template.style.color, borderStyle: template.style.lineStyle }}
-                  />
-                  <span className="template-name">{template.name}</span>
-                  <small>{template.style.fillOpacity}% fill · {template.style.lineWidth}px</small>
-                </button>
-                <button
-                  type="button"
-                  className={state.defaultId === template.id ? 'object-icon-button active' : 'object-icon-button'}
-                  aria-label={state.defaultId === template.id ? `Stop using ${template.name} for new rectangles` : `Use ${template.name} for new rectangles`}
-                  aria-pressed={state.defaultId === template.id}
-                  title={state.defaultId === template.id ? 'Default for new rectangles (click to clear)' : 'Use for new rectangles'}
-                  onClick={() => onChange(toggleDefaultTemplate(state, template.id))}
-                >
-                  <StarIcon filled={state.defaultId === template.id} />
-                </button>
-                <button
-                  type="button"
-                  className="object-icon-button delete"
-                  aria-label={`Delete template ${template.name}`}
-                  title="Delete template"
-                  onClick={() => onChange(deleteTemplate(state, template.id))}
-                >
-                  <CloseIcon />
-                </button>
-              </div>
-            ))}
-          </div>
-          <div className="template-save">
-            <input
-              value={name}
-              maxLength={40}
-              placeholder="Template name"
-              aria-label="Template name"
-              onChange={(event) => setName(event.target.value)}
-              onKeyDown={(event) => { event.stopPropagation(); if (event.key === 'Enter') save() }}
-            />
-            <button type="button" onClick={save}>Save current</button>
-          </div>
-        </div>,
-        document.body,
-      )}
+      {open &&
+        createPortal(
+          <div ref={popoverRef} className="template-popover" role="dialog" aria-label="Rectangle templates" style={position}>
+            <strong>Rectangle templates</strong>
+            {state.templates.length === 0 && (
+              <p className="template-empty">No templates yet. Style a rectangle, then save its look below.</p>
+            )}
+            <div className="template-list">
+              {state.templates.map((template) => (
+                <div className="template-row" key={template.id}>
+                  <button
+                    type="button"
+                    className="template-apply"
+                    title="Apply to this rectangle"
+                    onClick={() => {
+                      onApply(template.style)
+                      setOpen(false)
+                    }}
+                  >
+                    <span
+                      className="template-swatch"
+                      style={{
+                        background: rgba(template.style.fillColor, template.style.fillOpacity),
+                        borderColor: template.style.color,
+                        borderStyle: template.style.lineStyle,
+                      }}
+                    />
+                    <span className="template-name">{template.name}</span>
+                    <small>
+                      {template.style.fillOpacity}% fill · {template.style.lineWidth}px
+                    </small>
+                  </button>
+                  <button
+                    type="button"
+                    className={state.defaultId === template.id ? 'object-icon-button active' : 'object-icon-button'}
+                    aria-label={
+                      state.defaultId === template.id
+                        ? `Stop using ${template.name} for new rectangles`
+                        : `Use ${template.name} for new rectangles`
+                    }
+                    aria-pressed={state.defaultId === template.id}
+                    title={state.defaultId === template.id ? 'Default for new rectangles (click to clear)' : 'Use for new rectangles'}
+                    onClick={() => onChange(toggleDefaultTemplate(state, template.id))}
+                  >
+                    <StarIcon filled={state.defaultId === template.id} />
+                  </button>
+                  <button
+                    type="button"
+                    className="object-icon-button delete"
+                    aria-label={`Delete template ${template.name}`}
+                    title="Delete template"
+                    onClick={() => onChange(deleteTemplate(state, template.id))}
+                  >
+                    <CloseIcon />
+                  </button>
+                </div>
+              ))}
+            </div>
+            <div className="template-save">
+              <input
+                value={name}
+                maxLength={40}
+                placeholder="Template name"
+                aria-label="Template name"
+                onChange={(event) => setName(event.target.value)}
+                onKeyDown={(event) => {
+                  event.stopPropagation()
+                  if (event.key === 'Enter') save()
+                }}
+              />
+              <button type="button" onClick={save}>
+                Save current
+              </button>
+            </div>
+          </div>,
+          document.body,
+        )}
     </>
   )
 }

@@ -2,7 +2,13 @@ import { describe, expect, it } from 'vitest'
 import { VWAP_ANCHORS, anchorStart, computeVwap, type VwapBar } from './vwap'
 
 const utc = (iso: string) => Date.parse(`${iso}Z`)
-const bar = (iso: string, price: number, volume: number): VwapBar => ({ timestamp: utc(iso), high: price, low: price, close: price, volume })
+const bar = (iso: string, price: number, volume: number): VwapBar => ({
+  timestamp: utc(iso),
+  high: price,
+  low: price,
+  close: price,
+  volume,
+})
 
 describe('anchor periods (UTC)', () => {
   it('finds the start of the day, week, month, quarter and year', () => {

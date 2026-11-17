@@ -10,7 +10,12 @@ import {
   type SavedLayout,
 } from './workspace'
 
-const layout = (id: string, symbol: string, interval: SavedLayout['tabs'][number]['interval'], split?: SavedLayout['tabs'][number]['split']): SavedLayout => ({
+const layout = (
+  id: string,
+  symbol: string,
+  interval: SavedLayout['tabs'][number]['interval'],
+  split?: SavedLayout['tabs'][number]['split'],
+): SavedLayout => ({
   id,
   name: id,
   tabs: [{ id: `${id}-tab`, symbol, interval, createdAtMs: 1, ...(split ? { split } : {}) }],
@@ -39,24 +44,52 @@ describe('combining saved layouts into a split view', () => {
   })
 
   it('builds a split tab whose first chart is the tab itself', () => {
-    const tab = splitTabFromPanes(combinedPanes([layout('a', 'ETHUSDT', '1h'), layout('b', 'BTCUSDT', '15m'), layout('c', 'SOLUSDT', '4h')]), 't1', 99)
+    const tab = splitTabFromPanes(
+      combinedPanes([layout('a', 'ETHUSDT', '1h'), layout('b', 'BTCUSDT', '15m'), layout('c', 'SOLUSDT', '4h')]),
+      't1',
+      99,
+    )
     expect(tab).toMatchObject({ id: 't1', symbol: 'ETHUSDT', interval: '1h', createdAtMs: 99 })
     expect(tab.split).toEqual({
       count: 3,
-      panes: [{ symbol: 'BTCUSDT', interval: '15m' }, { symbol: 'SOLUSDT', interval: '4h' }],
+      panes: [
+        { symbol: 'BTCUSDT', interval: '15m' },
+        { symbol: 'SOLUSDT', interval: '4h' },
+      ],
       active: 0,
     })
     expect(panesOf(tab)).toHaveLength(3)
   })
 
   it('names a split from its symbols, or from its timeframes when they all share one symbol', () => {
-    expect(defaultSplitName([{ symbol: 'ETHUSDT', interval: '1h' }, { symbol: 'BTCUSDT', interval: '15m' }, { symbol: 'ETHUSDT', interval: '4h' }])).toBe('ETH · BTC')
-    expect(defaultSplitName([{ symbol: 'BTCUSDT', interval: '15m' }, { symbol: 'BTCUSDT', interval: '1h' }])).toBe('BTC 15m · 1h')
+    expect(
+      defaultSplitName([
+        { symbol: 'ETHUSDT', interval: '1h' },
+        { symbol: 'BTCUSDT', interval: '15m' },
+        { symbol: 'ETHUSDT', interval: '4h' },
+      ]),
+    ).toBe('ETH · BTC')
+    expect(
+      defaultSplitName([
+        { symbol: 'BTCUSDT', interval: '15m' },
+        { symbol: 'BTCUSDT', interval: '1h' },
+      ]),
+    ).toBe('BTC 15m · 1h')
     expect(shortSymbol('ETHBTC')).toBe('ETHBTC')
   })
 
   it('saves a split as a layout with its own tab id and no link to another layout', () => {
-    const tab = { ...splitTabFromPanes([{ symbol: 'BTCUSDT', interval: '15m' }, { symbol: 'ETHUSDT', interval: '1h' }], 't1', 5), layoutId: 'other' }
+    const tab = {
+      ...splitTabFromPanes(
+        [
+          { symbol: 'BTCUSDT', interval: '15m' },
+          { symbol: 'ETHUSDT', interval: '1h' },
+        ],
+        't1',
+        5,
+      ),
+      layoutId: 'other',
+    }
     const saved = createSplitLayout('  My pair  ', tab, { volumeVisible: false, customIntervals: ['2h'] }, 7)
     expect(saved.name).toBe('My pair')
     expect(saved.tabs).toHaveLength(1)

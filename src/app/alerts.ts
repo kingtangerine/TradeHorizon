@@ -32,7 +32,10 @@ export interface PriceAlert {
 }
 
 /** What the alert form chooses beyond symbol and price. */
-export type AlertOptions = Pick<PriceAlert, 'targetPrice' | 'direction' | 'condition' | 'upperPrice' | 'percent' | 'windowMs' | 'line' | 'frequency' | 'expiresAtMs' | 'message'>
+export type AlertOptions = Pick<
+  PriceAlert,
+  'targetPrice' | 'direction' | 'condition' | 'upperPrice' | 'percent' | 'windowMs' | 'line' | 'frequency' | 'expiresAtMs' | 'message'
+>
 
 function key(userId: string): string {
   return `trade-horizon:user:${userId}:alerts:v1`
@@ -81,9 +84,10 @@ export function groupAlerts(alerts: readonly PriceAlert[], filter: AlertFilter, 
     .sort(([a], [b]) => (a === currentSymbol ? -1 : b === currentSymbol ? 1 : a.localeCompare(b)))
     .map(([symbol, list]) => ({
       symbol,
-      alerts: filter === 'triggered'
-        ? [...list].sort((a, b) => (b.triggeredAtMs ?? 0) - (a.triggeredAtMs ?? 0))
-        : [...list].sort((a, b) => b.targetPrice - a.targetPrice),
+      alerts:
+        filter === 'triggered'
+          ? [...list].sort((a, b) => (b.triggeredAtMs ?? 0) - (a.triggeredAtMs ?? 0))
+          : [...list].sort((a, b) => b.targetPrice - a.targetPrice),
     }))
 }
 

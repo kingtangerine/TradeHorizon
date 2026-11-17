@@ -2,10 +2,23 @@ import { describe, expect, it } from 'vitest'
 import { formatAgo, formatBytes, formatDuration, sortAdminUsers, type AdminUser } from './admin'
 
 const user = (id: string, extra: Partial<AdminUser>): AdminUser => ({
-  id, email: `${id}@example.com`, displayName: id, createdAtMs: 0, lastLoginAtMs: null, lastSeenAtMs: null, isAdmin: false,
-  sessions: 0, telegram: false, pushDevices: 0, storageBytes: 0, items: 0, bytes: 0, lastSyncAtMs: null,
+  id,
+  email: `${id}@example.com`,
+  displayName: id,
+  createdAtMs: 0,
+  lastLoginAtMs: null,
+  lastSeenAtMs: null,
+  isAdmin: false,
+  sessions: 0,
+  telegram: false,
+  pushDevices: 0,
+  storageBytes: 0,
+  items: 0,
+  bytes: 0,
+  lastSyncAtMs: null,
   counts: { layouts: 0, drawings: 0, alerts: 0, activeAlerts: 0, openTabs: 0, watchlistSymbols: 0, layoutFolders: 0, templates: 0 },
-  devices: [], ...extra,
+  devices: [],
+  ...extra,
 })
 
 describe('admin helpers', () => {

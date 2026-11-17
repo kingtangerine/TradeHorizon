@@ -28,7 +28,7 @@ async function binanceSpot(symbols: readonly string[], signal?: AbortSignal): Pr
   if (symbols.length === 0) return {}
   const rows = await getJson(`${BINANCE_TICKER}?symbols=${encodeURIComponent(JSON.stringify(symbols))}`, signal)
   const quotes: Quotes = {}
-  for (const row of Array.isArray(rows) ? rows as Array<Record<string, unknown>> : []) {
+  for (const row of Array.isArray(rows) ? (rows as Array<Record<string, unknown>>) : []) {
     const last = num(row.lastPrice)
     const change = num(row.priceChange)
     const changePercent = num(row.priceChangePercent)
@@ -41,44 +41,57 @@ async function binanceSpot(symbols: readonly string[], signal?: AbortSignal): Pr
 
 async function binanceFutures(symbols: readonly string[], signal?: AbortSignal): Promise<Quotes> {
   const quotes: Quotes = {}
-  await Promise.all(symbols.map(async (symbol) => {
-    const row = await getJson(`${FUTURES_TICKER}?symbol=${encodeURIComponent(exchangeSymbol(symbol))}`, signal) as Record<string, unknown>
-    const last = num(row.lastPrice)
-    const change = num(row.priceChange)
-    const changePercent = num(row.priceChangePercent)
-    if (last !== undefined && change !== undefined && changePercent !== undefined) quotes[symbol] = { last, change, changePercent }
-  }))
+  await Promise.all(
+    symbols.map(async (symbol) => {
+      const row = (await getJson(`${FUTURES_TICKER}?symbol=${encodeURIComponent(exchangeSymbol(symbol))}`, signal)) as Record<
+        string,
+        unknown
+      >
+      const last = num(row.lastPrice)
+      const change = num(row.priceChange)
+      const changePercent = num(row.priceChangePercent)
+      if (last !== undefined && change !== undefined && changePercent !== undefined) quotes[symbol] = { last, change, changePercent }
+    }),
+  )
   return quotes
 }
 
 async function bybitSpot(symbols: readonly string[], signal?: AbortSignal): Promise<Quotes> {
   const quotes: Quotes = {}
-  await Promise.all(symbols.map(async (symbol) => {
-    const payload = await getJson(`${BYBIT_TICKERS}?category=spot&symbol=${encodeURIComponent(exchangeSymbol(symbol.replace(/^BYBIT:/, '')))}`, signal) as {
-      result?: { list?: Array<Record<string, unknown>> }
-    }
-    const row = payload.result?.list?.[0]
-    const last = num(row?.lastPrice)
-    const previous = num(row?.prevPrice24h)
-    if (last !== undefined && previous !== undefined && previous > 0) {
-      quotes[symbol] = { last, change: last - previous, changePercent: ((last - previous) / previous) * 100 }
-    }
-  }))
+  await Promise.all(
+    symbols.map(async (symbol) => {
+      const payload = (await getJson(
+        `${BYBIT_TICKERS}?category=spot&symbol=${encodeURIComponent(exchangeSymbol(symbol.replace(/^BYBIT:/, '')))}`,
+        signal,
+      )) as {
+        result?: { list?: Array<Record<string, unknown>> }
+      }
+      const row = payload.result?.list?.[0]
+      const last = num(row?.lastPrice)
+      const previous = num(row?.prevPrice24h)
+      if (last !== undefined && previous !== undefined && previous > 0) {
+        quotes[symbol] = { last, change: last - previous, changePercent: ((last - previous) / previous) * 100 }
+      }
+    }),
+  )
   return quotes
 }
 
 /** One ticker request per exchange covers every watched symbol there (Bybit perpetuals, OKX, Bitget, Gate). */
 async function venueQuotes(venue: 'bybit-futures' | PolledVenue, markets: readonly CryptoMarket[], signal?: AbortSignal): Promise<Quotes> {
   if (markets.length === 0) return {}
-  const bySymbol = new Map(markets.map((market) => [market.apiSymbol ?? exchangeSymbol(market.symbol.replace(/^[A-Z]+:/, '')), market.symbol]))
+  const bySymbol = new Map(
+    markets.map((market) => [market.apiSymbol ?? exchangeSymbol(market.symbol.replace(/^[A-Z]+:/, '')), market.symbol]),
+  )
   const quotes: Quotes = {}
   if (venue === 'bybit-futures') {
-    const payload = await getJson(`${BYBIT_TICKERS}?category=linear`, signal) as { result?: { list?: Array<Record<string, unknown>> } }
+    const payload = (await getJson(`${BYBIT_TICKERS}?category=linear`, signal)) as { result?: { list?: Array<Record<string, unknown>> } }
     for (const row of payload.result?.list ?? []) {
       const symbol = bySymbol.get(String(row.symbol))
       const last = num(row.lastPrice)
       const previous = num(row.prevPrice24h)
-      if (symbol && last !== undefined && previous !== undefined && previous > 0) quotes[symbol] = { last, change: last - previous, changePercent: ((last - previous) / previous) * 100 }
+      if (symbol && last !== undefined && previous !== undefined && previous > 0)
+        quotes[symbol] = { last, change: last - previous, changePercent: ((last - previous) / previous) * 100 }
     }
     return quotes
   }
@@ -91,14 +104,19 @@ async function venueQuotes(venue: 'bybit-futures' | PolledVenue, markets: readon
 
 /** Live quotes for exchange-traded symbols. A failing exchange only leaves its own symbols without a quote. */
 export async function fetchExchangeQuotes(markets: readonly CryptoMarket[], signal?: AbortSignal): Promise<Quotes> {
-  const symbolsOn = (exchange: CryptoMarket['exchange']) => markets
-    .filter((market) => market.kind !== 'dominance' && market.exchange === exchange)
-    .map((market) => market.symbol)
+  const symbolsOn = (exchange: CryptoMarket['exchange']) =>
+    markets.filter((market) => market.kind !== 'dominance' && market.exchange === exchange).map((market) => market.symbol)
   const settled = await Promise.allSettled([
     binanceSpot(symbolsOn('binance'), signal),
     binanceFutures(symbolsOn('binance-futures'), signal),
     bybitSpot(symbolsOn('bybit'), signal),
-    ...(['bybit-futures', ...POLLED_VENUES] as const).map((venue) => venueQuotes(venue, markets.filter((market) => market.exchange === venue), signal)),
+    ...(['bybit-futures', ...POLLED_VENUES] as const).map((venue) =>
+      venueQuotes(
+        venue,
+        markets.filter((market) => market.exchange === venue),
+        signal,
+      ),
+    ),
   ])
   return Object.assign({}, ...settled.map((result) => (result.status === 'fulfilled' ? result.value : {}))) as Quotes
 }
@@ -116,7 +134,11 @@ export async function fetchIndexQuotes(markets: readonly CryptoMarket[]): Promis
     const previous = bars.at(-2)
     if (!latest) continue
     const base = previous?.close ?? latest.open
-    quotes[market.symbol] = { last: latest.close, change: latest.close - base, changePercent: base === 0 ? 0 : ((latest.close - base) / base) * 100 }
+    quotes[market.symbol] = {
+      last: latest.close,
+      change: latest.close - base,
+      changePercent: base === 0 ? 0 : ((latest.close - base) / base) * 100,
+    }
   }
   return quotes
 }

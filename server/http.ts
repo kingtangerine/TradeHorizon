@@ -12,7 +12,9 @@ export const trustProxy = process.env.TH_TRUST_PROXY === '1'
 /** The visitor's IP: the first X-Forwarded-For entry behind a trusted proxy, else the socket address. */
 export function clientIp(req: IncomingMessage): string {
   if (trustProxy) {
-    const forwarded = String(req.headers['x-forwarded-for'] ?? '').split(',')[0].trim()
+    const forwarded = String(req.headers['x-forwarded-for'] ?? '')
+      .split(',')[0]
+      .trim()
     if (forwarded) return forwarded
   }
   return req.socket.remoteAddress ?? 'unknown'
@@ -30,7 +32,13 @@ export function send(res: ServerResponse, status: number, body: unknown): void {
 }
 
 /** JSON response that is gzip-compressed when it is big and the client accepts it. */
-export async function sendCompressed(req: IncomingMessage, res: ServerResponse, status: number, body: unknown, cacheControl = 'no-store'): Promise<void> {
+export async function sendCompressed(
+  req: IncomingMessage,
+  res: ServerResponse,
+  status: number,
+  body: unknown,
+  cacheControl = 'no-store',
+): Promise<void> {
   const text = JSON.stringify(body)
   const headers: OutgoingHttpHeaders = { 'Content-Type': 'application/json', 'Cache-Control': cacheControl, Vary: 'Accept-Encoding' }
   if (text.length > 1024 && /\bgzip\b/.test(String(req.headers['accept-encoding'] ?? ''))) {
@@ -56,12 +64,21 @@ export function readBody(req: IncomingMessage, limit = 10_000): Promise<RequestB
     const chunks: Buffer[] = []
     req.on('data', (chunk: Buffer) => {
       size += chunk.length
-      if (size > limit) { fail(new Error('Request too large.')); req.destroy(); return }
+      if (size > limit) {
+        fail(new Error('Request too large.'))
+        req.destroy()
+        return
+      }
       chunks.push(chunk)
     })
     req.on('end', () => {
       let value: unknown
-      try { value = JSON.parse(Buffer.concat(chunks).toString('utf8') || '{}') } catch { fail(new Error('Invalid request.')); return }
+      try {
+        value = JSON.parse(Buffer.concat(chunks).toString('utf8') || '{}')
+      } catch {
+        fail(new Error('Invalid request.'))
+        return
+      }
       if (typeof value === 'object' && value !== null && !Array.isArray(value)) ok(value as RequestBody)
       else fail(new Error('Invalid request.'))
     })
@@ -103,9 +120,16 @@ const CSP = [
   "font-src 'self'",
   [
     "connect-src 'self'",
-    'https://data-api.binance.vision', 'https://fapi.binance.com', 'https://api.bybit.com', 'https://api.coingecko.com',
-    'https://www.okx.com', 'https://api.bitget.com', 'https://api.gateio.ws',
-    'wss://data-stream.binance.vision', 'wss://fstream.binance.com', 'wss://stream.bybit.com',
+    'https://data-api.binance.vision',
+    'https://fapi.binance.com',
+    'https://api.bybit.com',
+    'https://api.coingecko.com',
+    'https://www.okx.com',
+    'https://api.bitget.com',
+    'https://api.gateio.ws',
+    'wss://data-stream.binance.vision',
+    'wss://fstream.binance.com',
+    'wss://stream.bybit.com',
   ].join(' '),
   "worker-src 'self'",
   "manifest-src 'self'",

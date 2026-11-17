@@ -224,11 +224,19 @@ export const DRAWING_TOOLS: Readonly<Record<DrawingType, DrawingToolSpec>> = {
 }
 
 /** The tool rail's groups (TradingView's fly-out menus); each shows the last tool used from it. */
-export const TOOL_GROUPS: ReadonlyArray<{ readonly id: string, readonly label: string, readonly tools: readonly DrawingType[] }> = [
-  { id: 'lines', label: 'Lines', tools: ['trendLine', 'ray', 'extendedLine', 'horizontalLine', 'horizontalRay', 'verticalLine', 'parallelChannel', 'arrow'] },
+export const TOOL_GROUPS: ReadonlyArray<{ readonly id: string; readonly label: string; readonly tools: readonly DrawingType[] }> = [
+  {
+    id: 'lines',
+    label: 'Lines',
+    tools: ['trendLine', 'ray', 'extendedLine', 'horizontalLine', 'horizontalRay', 'verticalLine', 'parallelChannel', 'arrow'],
+  },
   { id: 'fib', label: 'Fibonacci and pitchfork', tools: ['fibRetracement', 'fibExtension', 'pitchfork'] },
   { id: 'shapes', label: 'Shapes', tools: ['rectangle', 'ellipse', 'brush'] },
-  { id: 'measure', label: 'Forecasting and measuring', tools: ['longPosition', 'shortPosition', 'priceRange', 'dateRange', 'datePriceRange'] },
+  {
+    id: 'measure',
+    label: 'Forecasting and measuring',
+    tools: ['longPosition', 'shortPosition', 'priceRange', 'dateRange', 'datePriceRange'],
+  },
   { id: 'text', label: 'Text and notes', tools: ['text', 'priceLabel'] },
 ]
 

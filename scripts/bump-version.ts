@@ -41,7 +41,10 @@ function main() {
 
   const changelog = read('CHANGELOG.md')
   const marker = changelog.indexOf('## [')
-  write('CHANGELOG.md', `${changelog.slice(0, marker)}${changelogStub(next, new Date().toISOString().slice(0, 10))}${changelog.slice(marker)}`)
+  write(
+    'CHANGELOG.md',
+    `${changelog.slice(0, marker)}${changelogStub(next, new Date().toISOString().slice(0, 10))}${changelog.slice(marker)}`,
+  )
   console.log(`Version ${pkg.version} -> ${next}. Fill in the new section of CHANGELOG.md, then commit.`)
 }
 
