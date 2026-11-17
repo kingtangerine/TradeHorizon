@@ -1,6 +1,6 @@
 name: CI
 
-# Runs on every push to main and on every pull request: lint, type-check, tests and a production build.
+# Runs on every push to main and on every pull request: formatting, lint, type-check, tests and a production build.
 on:
   push:
     branches: [main]
@@ -25,8 +25,11 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Formatting
+        run: npm run format:check
+
       - name: Lint
-        run: npm run lint
+        run: npm run lint -- --max-warnings 0
 
       - name: Type-check
         run: npx tsc -b
