@@ -1,8 +1,10 @@
 import { MarketDataHttpError } from '../errors'
 import type { MarketDataFetch } from './rest'
 
+/** Binance spot exchangeInfo URL on the public market-data mirror (no API key). */
 export const BINANCE_EXCHANGE_INFO_ENDPOINT = 'https://data-api.binance.vision/api/v3/exchangeInfo'
 
+/** One tradable pair in the symbol catalog, from any exchange despite the name; precisions are decimal places. */
 export interface BinanceSpotListing {
   /** Where the pair trades; missing means Binance (older cached catalogs). */
   exchange?:
@@ -26,6 +28,7 @@ export interface BinanceSpotListing {
   volumePrecision: number
 }
 
+/** Decimal places implied by a tick or step size string ("0.0100" -> 2, "1" -> 0); `fallback` for missing or invalid input. */
 export function precisionFromStep(step: unknown, fallback: number): number {
   if (typeof step !== 'string') return fallback
   const value = Number(step)
@@ -44,6 +47,7 @@ function filterValue(filters: unknown, type: string, key: string): unknown {
   return filter?.[key]
 }
 
+/** Extracts trading spot pairs quoted in USDT or BTC, sorted by base asset; throws TypeError if there is no symbols array. */
 export function parseBinanceExchangeInfo(payload: unknown): BinanceSpotListing[] {
   const symbols = (payload as { symbols?: unknown } | null)?.symbols
   if (!Array.isArray(symbols)) {
@@ -76,6 +80,7 @@ export function parseBinanceExchangeInfo(payload: unknown): BinanceSpotListing[]
   return listings.sort((a, b) => a.baseAsset.localeCompare(b.baseAsset))
 }
 
+/** Downloads and parses Binance's spot listings; throws MarketDataHttpError on a non-OK response. */
 export async function fetchBinanceSpotListings(
   fetcher: MarketDataFetch = (input, init) => globalThis.fetch(input, init),
   signal?: AbortSignal,

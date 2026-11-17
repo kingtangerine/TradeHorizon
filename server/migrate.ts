@@ -30,11 +30,13 @@ interface LegacyUsersFile {
   sessions: (Session | null)[]
 }
 
+/** The current time in ms (for the backup file names) and where to log. */
 export interface ImportOptions {
   now?: number
   log?: Logger
 }
 
+/** Whether the old JSON files were imported, with counts and the keys skipped, or why not. */
 export type ImportResult =
   { imported: false; reason: string } | { imported: true; users: number; items: number; sessions: number; skipped: string[] }
 

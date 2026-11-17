@@ -5,6 +5,7 @@ import { zoneOffsetMinutes } from './timeAxis'
 
 const DAY_MS = 86_400_000
 
+/** A date-range button: its label, tooltip and the timeframe it switches to. */
 export interface DateRange {
   readonly key: string
   readonly title: string
@@ -13,6 +14,7 @@ export interface DateRange {
   readonly days?: number
 }
 
+/** The date-range buttons, shortest first. */
 export const DATE_RANGES: readonly DateRange[] = [
   { key: '1D', title: '1 day in 5 minute intervals', interval: '5m', days: 1 },
   { key: '5D', title: '5 days in 15 minute intervals', interval: '15m', days: 5 },

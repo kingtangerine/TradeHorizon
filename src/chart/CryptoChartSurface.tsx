@@ -43,6 +43,10 @@ interface CryptoChartSurfaceProps {
   theme?: 'dark' | 'light'
 }
 
+/**
+ * React host for the klinecharts chart: creates a KLineChartController for the market and store, and pushes prop
+ * changes (interval, indicators, theme, alerts …) to it.
+ */
 export function CryptoChartSurface({
   interval,
   market,

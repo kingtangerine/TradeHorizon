@@ -1,6 +1,7 @@
 // Time zones for the chart. "auto" follows the computer's own zone, which is what TradingView users expect.
 import { zoneOffsetMinutes } from '../chart/timeAxis'
 
+/** Time zone preference meaning "use the computer's own zone". */
 export const AUTO_TIME_ZONE = 'auto'
 
 /** Common trading time zones (IANA names), west to east. */
@@ -65,6 +66,7 @@ export function browserTimeZone(): string {
   }
 }
 
+/** Whether the browser accepts the name as an IANA time zone. */
 export function isValidTimeZone(zone: string): boolean {
   try {
     new Intl.DateTimeFormat('en-US', { timeZone: zone })

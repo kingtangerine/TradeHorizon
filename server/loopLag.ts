@@ -9,12 +9,14 @@ export interface LoopLagStatus {
   max: number
 }
 
+/** Timer interval and measuring window in ms, and the clock (tests pass their own). */
 export interface LoopLagOptions {
   intervalMs?: number
   windowMs?: number
   now?: () => number
 }
 
+/** Measures event loop delay with a repeating timer; status() reports it in ms. */
 export interface LoopLagMonitor {
   start(): void
   stop(): void
@@ -22,6 +24,7 @@ export interface LoopLagMonitor {
   tick(): void
 }
 
+/** Builds the monitor; nothing is measured until start() (or tick() in tests). */
 export function createLoopLagMonitor({
   intervalMs = 100,
   windowMs = 60_000,

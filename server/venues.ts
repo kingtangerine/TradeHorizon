@@ -53,6 +53,7 @@ function listing(
   }
 }
 
+/** USDT perpetuals from Bybit linear instruments-info; throws when the answer has no list. */
 export function parseBybitLinear(payload: unknown): Listing[] {
   const list = records(field(field(payload, 'result'), 'list'))
   if (!list) throw new TypeError('Bybit linear instruments have no list')
@@ -78,6 +79,7 @@ export function parseBybitLinear(payload: unknown): Listing[] {
     .filter((item): item is Listing => Boolean(item))
 }
 
+/** USDT spot pairs (or linear USDT swaps when `swap`) from OKX instruments; throws when the answer has no data. */
 export function parseOkx(payload: unknown, swap: boolean): Listing[] {
   const list = records(field(payload, 'data'))
   if (!list) throw new TypeError('OKX instruments have no data')
@@ -97,6 +99,7 @@ export function parseOkx(payload: unknown, swap: boolean): Listing[] {
     .filter((item): item is Listing => Boolean(item))
 }
 
+/** USDT spot pairs (or USDT futures when `mix`) from Bitget; throws when the answer has no data. */
 export function parseBitget(payload: unknown, mix: boolean): Listing[] {
   const list = records(field(payload, 'data'))
   if (!list) throw new TypeError('Bitget symbols have no data')
@@ -116,6 +119,7 @@ export function parseBitget(payload: unknown, mix: boolean): Listing[] {
     .filter((item): item is Listing => Boolean(item))
 }
 
+/** USDT spot pairs (or USDT perpetuals when `futures`) from Gate; throws when the answer is not an array. */
 export function parseGate(payload: unknown, futures: boolean): Listing[] {
   const list = records(payload)
   if (!list) throw new TypeError('Gate list is not an array')
@@ -141,6 +145,7 @@ export function parseGate(payload: unknown, futures: boolean): Listing[] {
     .filter((item): item is Listing => Boolean(item))
 }
 
+/** The exchange lists the catalog is built from besides Binance, each with its URL and parser. */
 export const VENUE_LISTS: VenueList[] = [
   {
     name: 'Bybit perpetuals',

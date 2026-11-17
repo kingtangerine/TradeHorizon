@@ -1,5 +1,6 @@
 // Per-user chart preferences (synced with the account like the rest of the user's data).
 
+/** Chart preferences of one user. */
 export interface Preferences {
   /** Time left until the current candle closes, under the last price on the axis. */
   readonly candleCountdown: boolean
@@ -15,8 +16,10 @@ export interface Preferences {
   readonly favoriteIndicators: readonly string[]
 }
 
+/** Which grid lines the chart draws. */
 export type GridLines = 'both' | 'vertical' | 'horizontal' | 'none'
 
+/** Colours and canvas options of the chart. */
 export interface ChartAppearance {
   readonly upColor: string
   readonly downColor: string
@@ -27,6 +30,7 @@ export interface ChartAppearance {
   readonly lastPriceLine: boolean
 }
 
+/** Chart appearance before the user changes anything. */
 export const DEFAULT_APPEARANCE: ChartAppearance = {
   upColor: '#089981',
   downColor: '#f23645',
@@ -36,6 +40,7 @@ export const DEFAULT_APPEARANCE: ChartAppearance = {
   lastPriceLine: true,
 }
 
+/** Preferences of a new user. */
 export const DEFAULT_PREFERENCES: Preferences = {
   candleCountdown: true,
   alertLines: true,
@@ -47,6 +52,7 @@ export const DEFAULT_PREFERENCES: Preferences = {
 
 const COLOR = /^#[0-9a-fA-F]{6}$/
 
+/** Reads stored chart appearance, falling back to defaults for anything missing or invalid. Never throws. */
 export function parseAppearance(value: unknown): ChartAppearance {
   if (typeof value !== 'object' || value === null) return DEFAULT_APPEARANCE
   const raw = value as Record<string, unknown>
@@ -62,10 +68,12 @@ export function parseAppearance(value: unknown): ChartAppearance {
   }
 }
 
+/** localStorage key of this user's preferences. */
 export function preferencesKey(userId: string): string {
   return `trade-horizon:user:${userId}:prefs:v1`
 }
 
+/** Reads stored preferences, falling back to defaults for anything missing or invalid. Never throws. */
 export function parsePreferences(value: unknown): Preferences {
   if (typeof value !== 'object' || value === null) return DEFAULT_PREFERENCES
   const raw = value as Record<string, unknown>
@@ -81,6 +89,7 @@ export function parsePreferences(value: unknown): Preferences {
   }
 }
 
+/** Reads this user's preferences from localStorage; defaults when missing or unreadable. */
 export function loadPreferences(userId: string): Preferences {
   try {
     return parsePreferences(JSON.parse(localStorage.getItem(preferencesKey(userId)) ?? 'null'))
@@ -89,6 +98,7 @@ export function loadPreferences(userId: string): Preferences {
   }
 }
 
+/** Writes this user's preferences to localStorage; storage errors are ignored. */
 export function savePreferences(userId: string, preferences: Preferences): void {
   try {
     localStorage.setItem(preferencesKey(userId), JSON.stringify(preferences))

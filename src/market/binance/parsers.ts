@@ -2,6 +2,7 @@ import { MarketDataParseError } from '../errors'
 import { isMarketInterval, type MarketInterval } from '../intervals'
 import { marketIdFor, normalizeBinanceSpotSymbol, type Candle } from '../types'
 
+/** What a REST kline row lacks: its symbol and interval. `nowMs` (default now) decides whether the candle is final. */
 export interface BinanceKlineContext {
   symbol: string
   interval: MarketInterval
@@ -52,6 +53,7 @@ function asBoolean(value: unknown, label: string, payload: unknown): boolean {
   return value
 }
 
+/** Parses one REST kline array into a Candle, prices kept as strings; throws MarketDataParseError on a malformed row. */
 export function parseBinanceRestKline(raw: unknown, context: BinanceKlineContext): Candle {
   if (!Array.isArray(raw) || raw.length < 11) {
     return fail('Binance REST kline must contain at least 11 fields', raw)
@@ -84,6 +86,7 @@ export function parseBinanceRestKline(raw: unknown, context: BinanceKlineContext
   }
 }
 
+/** Parses a REST klines response into candles sorted by open time, duplicates collapsed; throws MarketDataParseError. */
 export function parseBinanceRestKlines(payload: unknown, context: BinanceKlineContext): Candle[] {
   if (!Array.isArray(payload)) {
     return fail('Binance REST klines response must be an array', payload)
@@ -101,6 +104,7 @@ export function parseBinanceRestKlines(payload: unknown, context: BinanceKlineCo
   return [...candlesByOpenTime.values()].sort((left, right) => left.openTimeMs - right.openTimeMs)
 }
 
+/** Parses a kline WebSocket event (JSON string or object) into a Candle with eventTimeMs; throws MarketDataParseError for anything else. */
 export function parseBinanceWebSocketKline(payload: unknown): Candle {
   let decoded = payload
 

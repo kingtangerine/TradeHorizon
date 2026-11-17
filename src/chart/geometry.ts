@@ -7,6 +7,7 @@ export interface ChartPoint {
   readonly value: number
 }
 
+/** Open, high, low and close of a candle, used when snapping points to a candle. */
 export interface CandleLevels {
   readonly open: number
   readonly high: number
@@ -14,8 +15,10 @@ export interface CandleLevels {
   readonly close: number
 }
 
+/** Side of a position drawing. */
 export type PositionDirection = 'long' | 'short'
 
+/** Default Fibonacci retracement levels, as fractions of the move. */
 export const FIB_LEVELS = [0, 0.236, 0.382, 0.5, 0.618, 0.786, 1, 1.618] as const
 
 /** Eight handles clockwise from the top-left corner. */
@@ -78,6 +81,7 @@ export function magnetPrice(
   return best
 }
 
+/** Size of a position box placed with a plain click. */
 export interface PositionDefaults {
   /** Distance from entry to target used for a plain click. */
   readonly priceSpan: number
@@ -156,6 +160,7 @@ const AREA_DRAWINGS = new Set([
   'datePriceRange',
 ])
 
+/** The parts of a drawing stackLevels needs: id, type and anchors (time in ms, price). */
 export interface StackableDrawing {
   readonly id: string
   readonly type: string

@@ -76,6 +76,7 @@ interface IndicatorsDialogProps {
   onClose(): void
 }
 
+/** The indicators window: browse and search indicators, scripts and dominance metrics, star favorites, add them to the chart. */
 export function IndicatorsDialog(props: IndicatorsDialogProps) {
   const {
     indicators,

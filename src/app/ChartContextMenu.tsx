@@ -1,6 +1,7 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { BellIcon, SettingsIcon, TargetIcon } from './Icons'
 
+/** Position, clicked price and actions of the chart right-click menu. */
 export interface ChartContextMenuProps {
   /** Where the right-click happened, relative to the chart pane. */
   readonly left: number

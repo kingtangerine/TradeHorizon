@@ -1,6 +1,7 @@
 // Saved rectangle looks (fill color, fill amount, line color/width/style, middle line).
 // Stored per user and synced with the rest of the account's data.
 
+/** The saved look of a rectangle drawing; colors are #rrggbb, fill opacity is 0-100 and line width 1-5. */
 export interface RectangleStyle {
   readonly color: string
   readonly lineWidth: number
@@ -12,23 +13,28 @@ export interface RectangleStyle {
   readonly noBorder: boolean
 }
 
+/** A named rectangle style the user saved. */
 export interface RectangleTemplate {
   readonly id: string
   readonly name: string
   readonly style: RectangleStyle
 }
 
+/** All of a user's rectangle templates and which one is the default. */
 export interface TemplateState {
   readonly templates: readonly RectangleTemplate[]
   /** Template whose look new rectangles start with. */
   readonly defaultId?: string
 }
 
+/** Template state with no templates and no default. */
 export const EMPTY_TEMPLATES: TemplateState = { templates: [] }
+/** Most templates a user can keep; saving more is ignored. */
 export const MAX_TEMPLATES = 30
 
 const HEX = /^#[0-9a-f]{6}$/i
 
+/** localStorage key holding this user's rectangle templates (synced with the account). */
 export function templatesKey(userId: string): string {
   return `trade-horizon:user:${userId}:rect-templates:v1`
 }
@@ -50,6 +56,7 @@ export function rectangleStyleOf(style: Readonly<Record<string, unknown>>): Rect
   }
 }
 
+/** Validates stored or synced data into template state, dropping malformed and duplicate entries; never throws. */
 export function parseTemplates(value: unknown): TemplateState {
   if (typeof value !== 'object' || value === null) return EMPTY_TEMPLATES
   const raw = value as { templates?: unknown; defaultId?: unknown }
@@ -68,6 +75,7 @@ export function parseTemplates(value: unknown): TemplateState {
   return { templates: templates.slice(0, MAX_TEMPLATES), ...(defaultId ? { defaultId } : {}) }
 }
 
+/** Reads the user's templates from localStorage; returns no templates when missing or unreadable. */
 export function loadTemplates(userId: string): TemplateState {
   try {
     return parseTemplates(JSON.parse(localStorage.getItem(templatesKey(userId)) ?? 'null'))
@@ -76,6 +84,7 @@ export function loadTemplates(userId: string): TemplateState {
   }
 }
 
+/** Stores the user's templates in localStorage; silently does nothing when storage is full or blocked. */
 export function saveTemplates(userId: string, state: TemplateState): void {
   try {
     localStorage.setItem(templatesKey(userId), JSON.stringify(state))
@@ -95,6 +104,7 @@ export function saveTemplate(state: TemplateState, name: string, style: Rectangl
   return { ...state, templates: [...state.templates, { id, name: cleanName, style }] }
 }
 
+/** Removes a template, clearing the default when it was the default. */
 export function deleteTemplate(state: TemplateState, id: string): TemplateState {
   const templates = state.templates.filter((template) => template.id !== id)
   const { defaultId, ...rest } = state
@@ -107,6 +117,7 @@ export function toggleDefaultTemplate(state: TemplateState, id: string): Templat
   return defaultId === id ? rest : { ...rest, defaultId: id }
 }
 
+/** Style of the default template, or undefined when no default is set. */
 export function defaultTemplateStyle(state: TemplateState): RectangleStyle | undefined {
   return state.templates.find((template) => template.id === state.defaultId)?.style
 }

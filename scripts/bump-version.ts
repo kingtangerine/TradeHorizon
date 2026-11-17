@@ -13,6 +13,7 @@ const root = projectRoot
 const read = (name: string) => readFileSync(join(root, name), 'utf8')
 const write = (name: string, text: string) => writeFileSync(join(root, name), text)
 
+/** The version after `current` for a bump kind ("major", "minor", "patch") or an exact "x.y.z"; throws on anything else. */
 export function nextVersion(current: string, kind: string): string {
   if (/^\d+\.\d+\.\d+$/.test(kind)) return kind
   const [major, minor, patch] = current.split('.').map(Number)
@@ -22,6 +23,7 @@ export function nextVersion(current: string, kind: string): string {
   throw new Error('Use: major | minor | patch | <x.y.z>')
 }
 
+/** An empty CHANGELOG.md section (Added / Changed / Fixed) for `version`, dated with `dateIso` (YYYY-MM-DD). */
 export function changelogStub(version: string, dateIso: string): string {
   return `## [${version}] - ${dateIso}\n\n### Added\n- \n\n### Changed\n- \n\n### Fixed\n- \n\n`
 }

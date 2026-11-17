@@ -10,6 +10,7 @@ import {
 } from '../market'
 import type { ExchangeId } from '../market/sources'
 
+/** A symbol the chart can show: a crypto pair or an index, with display details and price/volume precision. */
 export interface CryptoMarket {
   readonly symbol: string
   readonly baseAsset: string
@@ -52,6 +53,7 @@ function market(baseAsset: string, name: string, mark: string, pricePrecision: n
   }
 }
 
+/** Built-in USDT pairs, available before the exchange catalog has loaded. */
 export const CRYPTO_MARKETS: readonly CryptoMarket[] = [
   market('BTC', 'Bitcoin', '₿', 2, 5),
   market('ETH', 'Ethereum', 'Ξ', 2, 4),
@@ -65,6 +67,7 @@ export const CRYPTO_MARKETS: readonly CryptoMarket[] = [
   market('DOT', 'Polkadot', 'D', 3, 2),
 ] as const
 
+/** The market shown when nothing else is chosen (BTCUSDT). */
 export const DEFAULT_CRYPTO_MARKET = CRYPTO_MARKETS[0]
 
 interface IndexInfo {
@@ -75,6 +78,7 @@ interface IndexInfo {
   readonly unit: '%' | 'USD'
 }
 
+/** Labels, descriptions and units of the dominance and market-cap indices. */
 export const INDEX_INFO: Readonly<Record<IndexKey, IndexInfo>> = {
   btc: { label: 'BTC.D', description: 'Bitcoin dominance', mark: '₿', unit: '%' },
   eth: { label: 'ETH.D', description: 'Ethereum dominance', mark: 'Ξ', unit: '%' },
@@ -322,11 +326,13 @@ function restoreCatalogOnce(): void {
   if (cached) registerListings(cached.listings)
 }
 
+/** The market for a symbol, or the default market when the symbol is unknown. */
 export function getMarket(symbol: string): CryptoMarket {
   restoreCatalogOnce()
   return registry.get(symbol) ?? DEFAULT_CRYPTO_MARKET
 }
 
+/** Every known market: built-in pairs, indices and the loaded exchange catalog. */
 export function allMarkets(): CryptoMarket[] {
   restoreCatalogOnce()
   return [...registry.values()]
@@ -359,6 +365,10 @@ function isListing(item: unknown): item is BinanceSpotListing {
   )
 }
 
+/**
+ * Reloads the exchange catalog (server copy, else Binance and Bybit directly) unless the cached one is still fresh.
+ * Resolves true when it fetched new listings, false when the cache was used.
+ */
 export async function refreshMarketCatalog(fetcher?: MarketDataFetch, signal?: AbortSignal, nowMs = Date.now()): Promise<boolean> {
   restoreCatalogOnce()
   const cached = readCatalogCache()

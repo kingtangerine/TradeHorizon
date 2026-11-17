@@ -21,6 +21,7 @@ interface DrawingContextMenuProps {
   onClose(): void
 }
 
+/** The right-click menu of a drawing (or several selected drawings); closes on an outside click. */
 export function DrawingContextMenu({
   left,
   top,

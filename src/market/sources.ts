@@ -7,8 +7,10 @@ import type { MarketInterval } from './intervals'
 import type { Candle } from './types'
 import { PollingKlineSubscription, fetchVenueKlines, isPolledVenue, type PolledVenue } from './venues'
 
+/** Every exchange a market can come from; the "-futures" variants are USDT perpetuals. */
 export type ExchangeId = 'binance' | 'binance-futures' | 'bybit' | 'bybit-futures' | PolledVenue
 
+/** All ExchangeId values. */
 export const EXCHANGE_IDS: readonly ExchangeId[] = [
   'binance',
   'binance-futures',
@@ -31,6 +33,7 @@ export interface MarketSource {
   readonly apiSymbol?: string
 }
 
+/** A historical candle request: timeframe, count, and optional time bounds in ms epoch. */
 export interface KlineRequest {
   readonly interval: MarketInterval
   readonly limit?: number
@@ -39,6 +42,7 @@ export interface KlineRequest {
   readonly signal?: AbortSignal
 }
 
+/** Handle to a live candle feed: `stop()` ends it, `nudge(force)` replaces a dead (or, with force, any) connection. */
 export interface KlineStream {
   stop(): void
   nudge(force?: boolean): void
@@ -49,6 +53,7 @@ export function plainSymbol(market: MarketSource): string {
   return market.apiSymbol ?? exchangeSymbol(market.symbol.replace(/^[A-Z]+:/, ''))
 }
 
+/** Fetches historical candles, ascending, from whichever exchange the market trades on. Rejects with that venue's HTTP or parse errors. */
 export function fetchMarketKlines(market: MarketSource, request: KlineRequest): Promise<Candle[]> {
   const symbol = plainSymbol(market)
   const options = {
@@ -74,6 +79,7 @@ export function fetchMarketKlines(market: MarketSource, request: KlineRequest): 
   }
 }
 
+/** Timeframe and callbacks for a live candle feed. */
 export interface StreamOptions {
   readonly interval: MarketInterval
   onCandle(candle: Candle): void
@@ -81,6 +87,7 @@ export interface StreamOptions {
   onError?(error: Error): void
 }
 
+/** Starts a live candle feed on the market's exchange: WebSocket for Binance and Bybit, REST polling for the other venues. */
 export function subscribeMarketKlines(market: MarketSource, options: StreamOptions): KlineStream {
   const symbol = plainSymbol(market)
   const base = { symbol, interval: options.interval, onCandle: options.onCandle, onStatus: options.onStatus, onError: options.onError }

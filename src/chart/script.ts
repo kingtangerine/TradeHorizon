@@ -12,15 +12,20 @@
 // Values are numbers or series (one number per candle, NaN where there is none). Operators work on both:
 // + - * / %, comparisons (1 or 0), and / or / not, cond ? a : b, and x[1] for the previous candle's value.
 
+/** Most plot() lines one script may draw. */
 export const MAX_PLOTS = 8
+/** Most hline() levels one script may draw. */
 export const MAX_HLINES = 8
+/** Longest script source accepted, in characters. */
 export const MAX_SOURCE_LENGTH = 20_000
 
+/** A script input(): its title and default value. */
 export interface ScriptInput {
   readonly title: string
   readonly defaultValue: number
 }
 
+/** A parsed script: indicator() settings, its inputs and the statements to run per bar. */
 export interface CompiledScript {
   readonly title: string
   readonly overlay: boolean
@@ -29,22 +34,26 @@ export interface CompiledScript {
   readonly program: readonly Statement[]
 }
 
+/** One plotted line: style and one value per bar (NaN where there is none). */
 export interface ScriptPlot {
   readonly title: string
   readonly color: string
   readonly width: number
   readonly values: Float64Array
 }
+/** A horizontal level drawn by hline(). */
 export interface ScriptHline {
   readonly title: string
   readonly color: string
   readonly value: number
 }
+/** What running a script produces: its lines and levels. */
 export interface ScriptResult {
   readonly plots: readonly ScriptPlot[]
   readonly hlines: readonly ScriptHline[]
 }
 
+/** One candle as a script sees it; time in ms. */
 export interface ScriptBar {
   readonly timestamp: number
   readonly open: number
@@ -54,6 +63,7 @@ export interface ScriptBar {
   readonly volume?: number
 }
 
+/** A compile or run error in a user script; the message starts with the line number. */
 export class ScriptError extends Error {
   constructor(
     message: string,
@@ -145,6 +155,7 @@ type Node =
   | { type: 'history'; target: Node; offset: Node }
   | { type: 'call'; name: string; args: Node[]; named: Record<string, Node>; line: number; inputIndex?: number }
 
+/** One statement of a parsed script: an assignment or a bare expression such as plot(...). */
 export type Statement = { type: 'assign'; name: string; value: Node; line: number } | { type: 'expr'; value: Node; line: number }
 
 class Parser {
@@ -819,6 +830,7 @@ export function runScript(script: CompiledScript, bars: readonly ScriptBar[], in
   return { plots: context.plots, hlines: context.hlines }
 }
 
+/** Starter script shown to new users: an EMA cross. */
 export const EXAMPLE_SCRIPT = `// My script: two moving averages and where they cross.
 indicator("EMA cross", overlay=true)
 fastLength = input(12, "Fast length")
@@ -829,6 +841,7 @@ plot(fast, "Fast", color=#2962ff)
 plot(slow, "Slow", color=#ff6d00)
 `
 
+/** Short language reference lines shown in the script editor. */
 export const SCRIPT_HELP = [
   'Prices: open high low close volume hl2 hlc3 ohlc4, bar_index, time; close[1] is the previous candle',
   'Averages: sma ema rma wma vwma (source, length)',

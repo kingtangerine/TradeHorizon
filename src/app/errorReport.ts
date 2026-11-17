@@ -21,6 +21,7 @@ export function reportProblem(message: string, source: string): void {
   report(message, source)
 }
 
+/** Listens for uncaught errors and unhandled promise rejections and reports them to the server. Call once at startup. */
 export function installErrorReporting(): void {
   window.addEventListener('error', (event) => {
     report(

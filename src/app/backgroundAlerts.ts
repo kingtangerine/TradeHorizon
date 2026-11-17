@@ -3,8 +3,10 @@ import { getSessionToken } from './auth'
 // Alerts that reach you with TradeHorizon closed: the server watches prices and sends a web-push
 // notification through the browser's push service. This module turns that on and off for this device.
 
+/** Background alerts on this device: not possible, denied by the browser, not subscribed, or active. */
 export type PushStatus = 'unsupported' | 'blocked' | 'off' | 'on'
 
+/** An alert trigger recorded by the server. */
 export interface AlertEvent {
   readonly id: string
   readonly symbol: string
@@ -16,6 +18,7 @@ export interface AlertEvent {
   readonly everyTime?: boolean
 }
 
+/** Whether this browser has service workers, push and notifications. */
 export function pushSupported(): boolean {
   return 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window
 }
@@ -34,6 +37,7 @@ async function registration(): Promise<ServiceWorkerRegistration> {
   return (await navigator.serviceWorker.getRegistration()) ?? navigator.serviceWorker.register('/sw.js')
 }
 
+/** Current background-alert state of this device, without prompting the user. */
 export async function getPushStatus(): Promise<PushStatus> {
   if (!pushSupported()) return 'unsupported'
   if (Notification.permission === 'denied') return 'blocked'
@@ -45,6 +49,10 @@ export async function getPushStatus(): Promise<PushStatus> {
   }
 }
 
+/**
+ * Asks for notification permission and subscribes this device to server push.
+ * Returns the resulting status; throws with a user-facing message when the server cannot provide a key or rejects the device.
+ */
 export async function enablePush(): Promise<PushStatus> {
   if (!pushSupported()) return 'unsupported'
   const permission = await Notification.requestPermission()
@@ -93,6 +101,7 @@ export async function enablePush(): Promise<PushStatus> {
   return 'on'
 }
 
+/** Unsubscribes this device from push (also when offline) and returns the resulting status. */
 export async function disablePush(): Promise<PushStatus> {
   if (!pushSupported()) return 'unsupported'
   const subscription = await (await registration()).pushManager.getSubscription()

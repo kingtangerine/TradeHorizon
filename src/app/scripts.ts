@@ -3,6 +3,7 @@
 import { MAX_SOURCE_LENGTH } from '../chart/script'
 import { reportProblem } from './errorReport'
 
+/** A saved user script: its source plus a display name and last-edit time (ms since epoch). */
 export interface UserScript {
   readonly id: string
   readonly name: string
@@ -10,12 +11,15 @@ export interface UserScript {
   readonly updatedAtMs: number
 }
 
+/** localStorage key holding this user's scripts (synced with the account). */
 export function scriptsKey(userId: string): string {
   return `trade-horizon:user:${userId}:scripts:v1`
 }
 
+/** Most scripts a user can keep; extra entries are dropped when parsing. */
 export const MAX_SCRIPTS = 50
 
+/** Validates stored or synced data into a script list, dropping malformed or oversized entries; never throws. */
 export function parseScripts(value: unknown): UserScript[] {
   if (!Array.isArray(value)) return []
   return value
@@ -43,6 +47,7 @@ export function unreadableScriptsKey(userId: string): string {
   return `${scriptsKey(userId)}:unreadable`
 }
 
+/** Reads the user's scripts from localStorage; an unreadable value is kept under the ":unreadable" key, reported, and yields []. */
 export function loadScripts(userId: string): UserScript[] {
   let raw: string | null
   try {
@@ -68,6 +73,7 @@ export function loadScripts(userId: string): UserScript[] {
   return []
 }
 
+/** Stores the user's scripts in localStorage; silently does nothing when storage is full or blocked. */
 export function saveScripts(userId: string, scripts: readonly UserScript[]): void {
   try {
     localStorage.setItem(scriptsKey(userId), JSON.stringify(scripts))

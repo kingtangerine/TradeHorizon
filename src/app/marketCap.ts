@@ -1,6 +1,7 @@
 // Market capitalisation of the coin on the chart, from the server's cached CoinGecko list (top 500),
 // grouped into four tiers so a trader sees at a glance how big (and roughly how volatile) a coin is.
 
+/** Market data of one coin from CoinGecko: name, market cap and 24h volume in USD, and rank. */
 export interface MarketCapInfo {
   readonly name: string
   readonly marketCap: number
@@ -8,8 +9,10 @@ export interface MarketCapInfo {
   readonly volume24h: number
 }
 
+/** Size tier, from 1 (mega cap) to 4 (small cap). */
 export type CapTier = 1 | 2 | 3 | 4
 
+/** How a tier is shown: label, badge colour and a short risk description. */
 export interface CapTierInfo {
   readonly tier: CapTier
   readonly label: string
@@ -24,6 +27,7 @@ const TIERS: readonly CapTierInfo[] = [
   { tier: 4, label: 'Small cap', color: '#f23645', description: 'Under $1B. Thin liquidity and sharp swings: the highest risk.' },
 ]
 
+/** Tier for a market cap in USD. An unknown market cap counts as small cap. */
 export function capTier(marketCap: number | undefined): CapTierInfo {
   if (marketCap === undefined) return TIERS[3]
   if (marketCap >= 50e9) return TIERS[0]
@@ -32,6 +36,7 @@ export function capTier(marketCap: number | undefined): CapTierInfo {
   return TIERS[3]
 }
 
+/** USD amount with a T/B/M/K suffix and about three significant digits, e.g. "$1.23B". */
 export function formatUsdCompact(value: number): string {
   const units: Array<[number, string]> = [
     [1e12, 'T'],
@@ -53,6 +58,7 @@ export function coinSymbol(baseAsset: string): string {
   return baseAsset.toUpperCase().replace(/^(1000000|1000|1M)(?=[A-Z])/, '')
 }
 
+/** One coin as served by /api/cg/caps: symbol, name, market cap (USD), rank and 24h volume (USD). */
 export interface CapRow {
   s: string
   n: string

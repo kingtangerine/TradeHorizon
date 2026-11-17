@@ -60,6 +60,7 @@ export function ensureRevisions(data: Record<string, LegacyItem>): boolean {
   return changed
 }
 
+/** The highest revision among the items, or 0 when none has one. */
 export function latestRevision(data: Record<string, LegacyItem>): number {
   let rev = 0
   for (const item of Object.values(data)) if (typeof item?.rev === 'number' && item.rev > rev) rev = item.rev

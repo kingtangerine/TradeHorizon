@@ -1,3 +1,4 @@
+/** Thrown when an exchange payload has an unexpected shape; `payload` holds the offending value. */
 export class MarketDataParseError extends Error {
   readonly payload: unknown
 
@@ -8,6 +9,7 @@ export class MarketDataParseError extends Error {
   }
 }
 
+/** Thrown when a market-data HTTP request gets a non-2xx response (used for every venue despite the Binance wording). */
 export class MarketDataHttpError extends Error {
   readonly status: number
   readonly statusText: string
@@ -20,6 +22,7 @@ export class MarketDataHttpError extends Error {
   }
 }
 
+/** Thrown by LatestBinanceKlinesLoader when a newer load superseded this one; callers should ignore it. */
 export class StaleMarketDataRequestError extends Error {
   readonly generation: number
 
@@ -30,6 +33,7 @@ export class StaleMarketDataRequestError extends Error {
   }
 }
 
+/** Reported for WebSocket errors, unexpected stream messages and exchange-level API errors; `event` holds the raw cause. */
 export class MarketDataConnectionError extends Error {
   readonly event: unknown
 

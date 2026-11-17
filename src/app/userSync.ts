@@ -38,6 +38,7 @@ export function subscribeRemoteData(listener: RemoteDataListener): () => void {
 
 // --- Status (for the status bar and the sync check in the account window) -------------------------
 
+/** Current state of syncing, for the status bar and the sync check. */
 export interface SyncStatus {
   readonly state: 'off' | 'starting' | 'synced' | 'saving' | 'offline' | 'error'
   /** Items with changes this device has not uploaded yet. */
@@ -56,8 +57,10 @@ function setStatus(patch: Partial<SyncStatus>): void {
   for (const listener of statusListeners) listener(status)
 }
 
+/** The current sync status snapshot. */
 export const getSyncStatus = (): SyncStatus => status
 
+/** Calls `listener` on every sync status change; returns an unsubscribe function. */
 export function subscribeSyncStatus(listener: (status: SyncStatus) => void): () => void {
   statusListeners.add(listener)
   return () => {
@@ -82,6 +85,7 @@ const OUTDATED_SERVER =
 
 // --- Device name (shown next to each saved item, so you can tell which computer saved it) -----------
 
+/** This browser's identity for sync: a stable random id and an editable display name. */
 export interface DeviceInfo {
   readonly id: string
   readonly name: string
@@ -116,6 +120,7 @@ function guessDeviceName(): string {
   return `${os} · ${browser}`
 }
 
+/** This browser's device id and name, created and stored on first use (a fresh, unsaved one if storage is blocked). */
 export function getDevice(): DeviceInfo {
   try {
     const stored = JSON.parse(localStorage.getItem(DEVICE_KEY) ?? 'null') as Partial<DeviceInfo> | null
@@ -132,6 +137,7 @@ export function getDevice(): DeviceInfo {
   return device
 }
 
+/** Renames this device (up to 60 characters; blank restores the guessed name) and returns the updated info. */
 export function setDeviceName(name: string): DeviceInfo {
   const device = { ...getDevice(), name: name.trim().slice(0, 60) || guessDeviceName() }
   try {
@@ -512,6 +518,7 @@ export async function startUserSync(userId: string): Promise<void> {
   announce(changed)
 }
 
+/** Stops the running sync (polling, listeners, pending uploads) and sets the status to off; does nothing when not running. */
 export function stopUserSync(): void {
   stopActive?.()
 }

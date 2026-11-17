@@ -7,6 +7,7 @@ import { formatCompact, formatPrice } from './format'
 
 const REFRESH_MS = 30_000
 
+/** Funding rate with countdown, mark price and open interest for a perpetual `symbol`, refreshed every 30 seconds. */
 export function FuturesStatsRow({ symbol, baseAsset, precision }: { symbol: string; baseAsset: string; precision: number }) {
   const [stats, setStats] = useState<FuturesStats>()
   const [failed, setFailed] = useState(false)

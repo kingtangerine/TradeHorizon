@@ -43,6 +43,7 @@ function matchRank(item: CryptoMarket, needle: string): number {
   return -1
 }
 
+/** Markets matching the query, best first: exact symbol, base asset, then prefix and substring matches; all markets for an empty query. */
 export function matchMarkets(query: string, markets: readonly CryptoMarket[]): CryptoMarket[] {
   const needle = query
     .trim()
@@ -63,6 +64,7 @@ function badgeColor(item: CryptoMarket): string {
   return `hsl(${hash} 55% 42%)`
 }
 
+/** The symbol search window: filter markets by text, category and exchange and pick one with the mouse or keyboard. */
 export function SymbolSearch({ markets, current, onSelect, onClose, initialQuery }: SymbolSearchProps) {
   const [query, setQuery] = useState(initialQuery ?? current.symbol)
   const [category, setCategory] = useState<(typeof CATEGORIES)[number]>('All')

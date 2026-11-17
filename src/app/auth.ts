@@ -1,3 +1,4 @@
+/** The public profile of the signed-in account. */
 export interface AppUser {
   readonly id: string
   readonly email: string
@@ -71,6 +72,7 @@ async function request<T>(path: string, init: { method?: string; body?: unknown;
   return data as T
 }
 
+/** The bearer token of the stored session, or null when nobody is signed in. */
 export function getSessionToken(): string | null {
   return readSession()?.token ?? null
 }
@@ -97,6 +99,7 @@ export async function verifySession(): Promise<boolean> {
   }
 }
 
+/** Creates an account on the server and signs in. Throws with a user-facing message on invalid input or a server error. */
 export async function signUp(displayName: string, email: string, password: string, legacyId?: string): Promise<AppUser> {
   const normalizedEmail = email.trim().toLowerCase()
   const normalizedName = displayName.trim()
@@ -111,6 +114,7 @@ export async function signUp(displayName: string, email: string, password: strin
   return user
 }
 
+/** Signs in on the server, falling back to migrating a matching browser-only legacy account. Throws on failure. */
 export async function logIn(email: string, password: string): Promise<AppUser> {
   const normalizedEmail = email.trim().toLowerCase()
   try {
@@ -126,6 +130,7 @@ export async function logIn(email: string, password: string): Promise<AppUser> {
   }
 }
 
+/** Changes the signed-in user's password. Throws when the session has expired, the new password is too short, or the server refuses. */
 export async function changePassword(currentPassword: string, newPassword: string): Promise<void> {
   const session = readSession()
   if (!session) throw new Error('Your session has expired. Log in again.')
@@ -133,6 +138,7 @@ export async function changePassword(currentPassword: string, newPassword: strin
   await request('/api/auth/password', { method: 'POST', token: session.token, body: { currentPassword, newPassword } })
 }
 
+/** Signs out locally at once, then tells the server (ignored if it cannot be reached). */
 export async function logOut(): Promise<void> {
   const session = readSession()
   localStorage.removeItem(SESSION_KEY)

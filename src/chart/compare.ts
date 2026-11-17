@@ -1,9 +1,12 @@
 // Compare (TradingView's "Compare symbol"): other symbols drawn over the chart, starting from the same point at the
 // first candle on screen, so on the percent scale every line reads as its own % change over the visible period.
 
+/** Most compare symbols one chart can show. */
 export const MAX_COMPARE = 3
+/** Line colours for the compare symbols, in the order they were added. */
 export const COMPARE_COLORS = ['#ff9800', '#e91e63', '#00bcd4'] as const
 
+/** A compare symbol's candle: open time in ms and close price. */
 export interface CompareBar {
   readonly timestamp: number
   readonly close: number
@@ -58,6 +61,7 @@ export function compareChange(
   return first && last !== undefined ? ((last - first) / first) * 100 : undefined
 }
 
+/** Cleans saved compare symbols: keeps unique, plausible symbol strings, at most MAX_COMPARE; anything else gives []. */
 export function normalizeCompare(value: unknown): string[] {
   if (!Array.isArray(value)) return []
   return [...new Set(value.filter((item): item is string => typeof item === 'string' && /^[A-Z0-9.]{2,32}$/.test(item)))].slice(

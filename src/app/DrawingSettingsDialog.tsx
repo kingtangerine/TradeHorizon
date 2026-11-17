@@ -20,6 +20,7 @@ import { CloseIcon } from './Icons'
 // TradingView's drawing settings window (double-click a drawing, or Settings… in its menu): Style, Coordinates and
 // Visibility. Every change is a normal drawing update, so it syncs and can be undone.
 
+/** The tabs of the drawing settings window. */
 export type DrawingSettingsTab = 'style' | 'coordinates' | 'visibility'
 
 interface DrawingSettingsDialogProps {
@@ -61,6 +62,7 @@ const FILLED = new Set<Drawing['type']>(['rectangle', 'ellipse', 'parallelChanne
 const text = (value: unknown, fallback: string) => (typeof value === 'string' ? value : fallback)
 const num = (value: unknown, fallback: number) => (typeof value === 'number' && Number.isFinite(value) ? value : fallback)
 
+/** The drawing settings window; every edit is sent through onUpdate as a normal drawing change. */
 export function DrawingSettingsDialog({
   drawing,
   timeZone,

@@ -21,6 +21,7 @@ export type RequestHeaders = Record<string, string | string[] | undefined>
 /** The parts of fetch() the keep-alive uses, so tests can pass a small fake. */
 export type KeepAliveFetch = (url: string, init: RequestInit) => Promise<{ ok: boolean }>
 
+/** A fixed public URL to ping (otherwise learned from requests), whether to trust X-Forwarded headers, and the ping interval in ms. */
 export interface KeepAliveOptions {
   publicUrl?: string
   trustProxy?: boolean
@@ -29,12 +30,14 @@ export interface KeepAliveOptions {
   intervalMs?: number
 }
 
+/** The address being pinged and the last ping time (ms) and result. */
 export interface KeepAliveStatus {
   origin: string | null
   lastPingAtMs: number | null
   lastPingOk: boolean
 }
 
+/** Pings the public /healthz periodically so the host does not stop the idle app. */
 export interface KeepAlive {
   observe(req: { headers: RequestHeaders }): void
   start(): void
@@ -57,6 +60,7 @@ export function originOf(headers: RequestHeaders, trustProxy: boolean): string |
   return `${proto}://${host}`
 }
 
+/** Builds the keep-alive; it pings only after start() and once a public address is known. */
 export function createKeepAlive({
   publicUrl,
   trustProxy = true,
@@ -123,6 +127,7 @@ export function recordStart(dataDir: string, now = Date.now()): number[] {
   return starts
 }
 
+/** How many of the recorded start times (ms) are within the last 24 hours of `now`. */
 export function startsWithinDay(starts: number[], now = Date.now()): number {
   return starts.filter((value) => now - value < DAY_MS).length
 }

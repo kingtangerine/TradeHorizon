@@ -1,3 +1,4 @@
+/** Bar replay speeds: delay between bars in ms and the label shown. */
 export const REPLAY_SPEEDS = [
   { ms: 1000, label: '1x' },
   { ms: 500, label: '2x' },
@@ -5,6 +6,7 @@ export const REPLAY_SPEEDS = [
   { ms: 100, label: '10x' },
 ] as const
 
+/** Delay between replayed bars when a replay starts, in ms (2x). */
 export const DEFAULT_REPLAY_SPEED_MS = 500
 
 /**

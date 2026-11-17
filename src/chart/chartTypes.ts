@@ -1,9 +1,12 @@
 // Chart styles offered in the toolbar, as in TradingView. Bars, candles, hollow candles, line and area are drawn by
 // klinecharts itself; Heikin Ashi and baseline are drawn by our own series indicator (seriesOverlay.ts) over hidden candles.
 
+/** Chart styles in toolbar order. */
 export const CHART_TYPES = ['bars', 'candles', 'hollow', 'heikinAshi', 'line', 'area', 'baseline'] as const
+/** One of the chart styles in CHART_TYPES. */
 export type ChartType = (typeof CHART_TYPES)[number]
 
+/** Toolbar labels for each chart style. */
 export const CHART_TYPE_LABELS: Readonly<Record<ChartType, string>> = {
   bars: 'Bars',
   candles: 'Candles',
@@ -14,10 +17,12 @@ export const CHART_TYPE_LABELS: Readonly<Record<ChartType, string>> = {
   baseline: 'Baseline',
 }
 
+/** True when the value is a known chart style, e.g. when reading saved settings. */
 export function isChartType(value: unknown): value is ChartType {
   return typeof value === 'string' && (CHART_TYPES as readonly string[]).includes(value)
 }
 
+/** Open, high, low and close prices of one candle. */
 export interface OhlcBar {
   readonly open: number
   readonly high: number

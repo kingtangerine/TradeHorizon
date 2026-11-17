@@ -3,14 +3,17 @@
 import { getSupportedIndicators, registerIndicator } from 'klinecharts'
 import { scaledCompare, type CompareBar } from './compare'
 
+/** klinecharts indicator name of the compare lines. */
 export const COMPARE_INDICATOR_NAME = 'tradeHorizonCompare'
 
+/** One compare symbol as handed to the indicator in `extendData.series`. */
 export interface CompareSeries {
   readonly symbol: string
   readonly color: string
   readonly bars: readonly CompareBar[]
 }
 
+/** Registers the compare-lines indicator with klinecharts once; later calls do nothing. */
 export function registerCompareOverlay(): void {
   if (getSupportedIndicators().includes(COMPARE_INDICATOR_NAME)) return
   registerIndicator({

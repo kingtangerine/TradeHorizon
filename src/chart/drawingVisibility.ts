@@ -4,9 +4,12 @@ import type { DrawingStyle } from '../drawings'
 import type { MarketInterval } from '../market'
 import { FIB_LEVELS } from './geometry'
 
+/** Timeframe groups a drawing can be hidden on, as in TradingView's Visibility tab. */
 export const INTERVAL_GROUPS = ['minutes', 'hours', 'days', 'weeks', 'months'] as const
+/** One of the timeframe groups in INTERVAL_GROUPS. */
 export type IntervalGroup = (typeof INTERVAL_GROUPS)[number]
 
+/** Labels for the timeframe groups. */
 export const INTERVAL_GROUP_LABELS: Readonly<Record<IntervalGroup, string>> = {
   minutes: 'Minutes',
   hours: 'Hours',
@@ -15,6 +18,7 @@ export const INTERVAL_GROUP_LABELS: Readonly<Record<IntervalGroup, string>> = {
   months: 'Months',
 }
 
+/** The timeframe group an interval belongs to ("4h" is hours, "1M" months). */
 export function intervalGroup(interval: MarketInterval): IntervalGroup {
   if (interval.endsWith('M')) return 'months'
   if (interval.endsWith('w')) return 'weeks'
@@ -30,10 +34,12 @@ export function hiddenGroups(style: DrawingStyle | undefined): IntervalGroup[] {
   return INTERVAL_GROUPS.filter((group) => value.includes(group))
 }
 
+/** False when the drawing is hidden on the interval's timeframe group. */
 export function visibleOnInterval(style: DrawingStyle | undefined, interval: MarketInterval): boolean {
   return !hiddenGroups(style).includes(intervalGroup(interval))
 }
 
+/** Most custom levels a Fibonacci retracement keeps. */
 export const MAX_FIB_LEVELS = 16
 
 /** The retracement's levels: the stored ones, or TradingView's defaults. Sorted, unique, between -5 and 10. */
@@ -50,6 +56,7 @@ export function fibLevels(style: DrawingStyle | undefined): number[] {
 
 // --- Fibonacci retracement settings (TradingView's Style tab) ----------------------------------------------------
 
+/** One level row of a Fibonacci retracement: level `v`, hex colour `c`, and whether it is shown. */
 export interface FibLevelRow {
   /** The level (0.618 …). */
   readonly v: number
@@ -57,6 +64,7 @@ export interface FibLevelRow {
   readonly on: boolean
 }
 
+/** A Fibonacci retracement's style settings, read from its drawing style by fibSettings. */
 export interface FibSettings {
   readonly rows: readonly FibLevelRow[]
   /** The dashed line between the two points. */
@@ -103,6 +111,7 @@ export const TV_FIB_ROWS: readonly FibLevelRow[] = [
   { v: 4.764, c: '#089981', on: false },
 ]
 
+/** Most level rows a Fibonacci retracement keeps. */
 export const MAX_FIB_ROWS = 30
 const HEX_COLOR = /^#[0-9a-f]{6}$/i
 

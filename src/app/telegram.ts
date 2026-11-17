@@ -2,6 +2,7 @@ import { getSessionToken } from './auth'
 
 // Telegram alerts: the server runs a bot; this module links the signed-in account to a Telegram chat.
 
+/** What the server reports about Telegram alerts for the signed-in account. */
 export interface TelegramStatus {
   /** The server has a bot token. When false the whole feature stays hidden. */
   readonly configured: boolean
@@ -39,11 +40,13 @@ export async function startTelegramLink(): Promise<string> {
   return ((await response.json()) as { url: string }).url
 }
 
+/** Disconnects the account from its Telegram chats; throws with the server's message on failure. */
 export async function unlinkTelegram(): Promise<void> {
   const response = await fetch('/api/telegram/unlink', { method: 'POST', headers: authHeaders() })
   if (!response.ok) throw await failure(response, 'Could not disconnect Telegram.')
 }
 
+/** Asks the server to send a test message to the linked Telegram chats; throws with the server's message on failure. */
 export async function sendTelegramTest(): Promise<void> {
   const response = await fetch('/api/telegram/test', { method: 'POST', headers: authHeaders() })
   if (!response.ok) throw await failure(response, 'Could not send the test message.')

@@ -14,8 +14,10 @@ export interface ScriptInstance {
   readonly visible: boolean
 }
 
+/** Most user scripts one chart can show. */
 export const MAX_SCRIPT_INSTANCES = 10
 
+/** Cleans saved script instances: drops malformed or duplicate ones and keeps at most MAX_SCRIPT_INSTANCES. */
 export function normalizeScriptInstances(value: unknown): ScriptInstance[] {
   if (!Array.isArray(value)) return []
   const seen = new Set<string>()
@@ -46,15 +48,20 @@ export function normalizeScriptInstances(value: unknown): ScriptInstance[] {
     }))
 }
 
+/** Moving average type: simple or exponential. */
 export type MovingAverageKind = 'sma' | 'ema'
+/** VWAP line: anchored VWAP or the quarterly VWAP. */
 export type VwapKind = 'vwap' | 'qvwap'
+/** Dominance line: Bitcoin, Tether or altcoins. */
 export type DominanceKey = 'btc' | 'usdt' | 'alt'
 
+/** A moving average's on/off switch and its periods (in bars). */
 export interface MovingAverageSettings {
   readonly visible: boolean
   readonly periods: readonly number[]
 }
 
+/** Every indicator setting of one chart, as saved with the layout. */
 export interface IndicatorSettings {
   readonly sma: MovingAverageSettings
   readonly ema: MovingAverageSettings
@@ -71,9 +78,12 @@ export interface IndicatorSettings {
   readonly scripts: readonly ScriptInstance[]
 }
 
+/** Most periods one moving-average type can have at once. */
 export const MAX_MOVING_AVERAGE_PERIODS = 5
+/** Longest moving-average period allowed, in bars. */
 export const MAX_MOVING_AVERAGE_PERIOD = 500
 
+/** Indicator settings of a new chart: everything off, SMA 20 and EMA 12 ready to switch on. */
 export const DEFAULT_INDICATORS: IndicatorSettings = {
   sma: { visible: false, periods: [20] },
   ema: { visible: false, periods: [12] },
@@ -85,52 +95,62 @@ export const DEFAULT_INDICATORS: IndicatorSettings = {
   scripts: [],
 }
 
+/** Short labels for the moving-average types. */
 export const MOVING_AVERAGE_LABELS: Readonly<Record<MovingAverageKind, string>> = {
   sma: 'SMA',
   ema: 'EMA',
 }
 
+/** Line colours per moving-average type, one per period slot. */
 export const MOVING_AVERAGE_COLORS: Readonly<Record<MovingAverageKind, readonly string[]>> = {
   sma: ['#f7c948', '#26a69a', '#ab47bc', '#8d6e63', '#78909c'],
   ema: ['#2962ff', '#ff9800', '#e91e63', '#00bcd4', '#9ccc65'],
 }
 
+/** Line colours of the VWAP lines. */
 export const VWAP_COLORS: Readonly<Record<VwapKind, string>> = { vwap: '#e040fb', qvwap: '#26c6da' }
 
+/** Short labels of the dominance lines, also used as their indicator names. */
 export const DOMINANCE_LABELS: Readonly<Record<DominanceKey, string>> = {
   btc: 'BTC.D',
   usdt: 'USDT.D',
   alt: 'ALT.D',
 }
 
+/** Full names of the dominance lines. */
 export const DOMINANCE_DESCRIPTIONS: Readonly<Record<DominanceKey, string>> = {
   btc: 'Bitcoin dominance',
   usdt: 'Tether dominance',
   alt: 'Altcoin dominance',
 }
 
+/** Line colours of the dominance lines. */
 export const DOMINANCE_COLORS: Readonly<Record<DominanceKey, string>> = {
   btc: '#f7931a',
   usdt: '#26a69a',
   alt: '#7e57c2',
 }
 
+/** A period from user input or saved settings: a whole number from 1 to MAX_MOVING_AVERAGE_PERIOD, else undefined. */
 export function parsePeriod(value: unknown): number | undefined {
   const period = typeof value === 'string' ? Number(value) : value
   return typeof period === 'number' && Number.isInteger(period) && period >= 1 && period <= MAX_MOVING_AVERAGE_PERIOD ? period : undefined
 }
 
+/** Adds a period and switches the average on; unchanged when the period limit is reached. */
 export function addMovingAveragePeriod(settings: MovingAverageSettings, period: number): MovingAverageSettings {
   if (settings.periods.includes(period)) return { ...settings, visible: true }
   if (settings.periods.length >= MAX_MOVING_AVERAGE_PERIODS) return settings
   return { visible: true, periods: [...settings.periods, period].sort((a, b) => a - b) }
 }
 
+/** Removes a period; the average switches off when none are left. */
 export function removeMovingAveragePeriod(settings: MovingAverageSettings, period: number): MovingAverageSettings {
   const periods = settings.periods.filter((item) => item !== period)
   return { visible: periods.length > 0 && settings.visible, periods }
 }
 
+/** True when the average is switched on and has at least one period. */
 export function movingAverageActive(settings: MovingAverageSettings): boolean {
   return settings.visible && settings.periods.length > 0
 }
@@ -146,6 +166,7 @@ function normalizeMovingAverage(value: unknown, fallback: MovingAverageSettings)
   return { visible: candidate.visible === true && periods.length > 0, periods }
 }
 
+/** Validates saved indicator settings, falling back to the defaults for anything missing or malformed. */
 export function normalizeIndicators(value: unknown): IndicatorSettings {
   if (typeof value !== 'object' || value === null) return DEFAULT_INDICATORS
   const candidate = value as {

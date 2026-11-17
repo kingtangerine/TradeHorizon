@@ -24,6 +24,7 @@ export interface SendResult {
   readonly error?: string
 }
 
+/** Name for log lines and the pacing / retry limits described at createSendQueue. */
 export interface SendQueueOptions {
   readonly name: string
   readonly perSecond?: number
@@ -34,6 +35,7 @@ export interface SendQueueOptions {
   readonly now?: () => number
 }
 
+/** Counts of queued, sent, retried, failed and dropped messages, any pause in seconds, and the last error. */
 export interface SendQueueStatus {
   readonly pending: number
   readonly sent: number
@@ -44,6 +46,7 @@ export interface SendQueueStatus {
   readonly lastError: string | null
 }
 
+/** A paced, retrying queue: enqueue() resolves with how the message ended and never rejects. */
 export interface SendQueue {
   enqueue(key: SendKey, run: () => Promise<unknown>): Promise<SendResult>
   status(): SendQueueStatus

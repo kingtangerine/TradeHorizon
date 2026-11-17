@@ -43,6 +43,7 @@ export function zoneOffsetMinutes(timestamp: number, timeZone: string): number {
   return offset
 }
 
+/** Calendar fields of a moment in some time zone. */
 export interface LocalTime {
   readonly year: number
   /** 0 = January */
@@ -56,6 +57,7 @@ export interface LocalTime {
   readonly minuteOfDay: number
 }
 
+/** Calendar fields of a timestamp (ms) in an IANA time zone. */
 export function localTime(timestamp: number, timeZone: string): LocalTime {
   const shifted = new Date(timestamp + zoneOffsetMinutes(timestamp, timeZone) * 60_000)
   const hour = shifted.getUTCHours()
@@ -89,6 +91,7 @@ const STEPS: readonly Step[] = [
   ...[1, 2, 5, 10].map((size) => ({ unit: 'year' as const, size, approxMs: size * 365.25 * DAY_MS })),
 ]
 
+/** A label on the time axis, for the bar at `index`. */
 export interface TimeTick {
   readonly index: number
   readonly timestamp: number
@@ -97,6 +100,7 @@ export interface TimeTick {
   readonly level: number
 }
 
+/** Inputs for laying out time-axis labels. */
 export interface TickOptions {
   /** Pixels per bar. */
   readonly barSpacePx: number

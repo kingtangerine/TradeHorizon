@@ -2,15 +2,19 @@
 // helpers are shared: a layout stays a plain SavedLayout and the folder is a label layer on top.
 import { EMPTY_GROUPS, assignToGroup, createGroup, deleteGroup, parseGroups, renameGroup, type GroupState } from './groups'
 
+/** Folders of saved layouts and which layout is in which folder. */
 export type LayoutFolderState = GroupState
+/** No folders and no assignments. */
 export const EMPTY_LAYOUT_FOLDERS: LayoutFolderState = EMPTY_GROUPS
 
 export { assignToGroup as moveLayoutToFolder, deleteGroup as deleteFolder, renameGroup as renameFolder }
 
+/** localStorage key of this user's layout folders. */
 export function layoutFoldersKey(userId: string): string {
   return `trade-horizon:user:${userId}:layout-folders:v1`
 }
 
+/** Reads this user's layout folders from localStorage; empty when missing or unreadable. */
 export function loadLayoutFolders(userId: string): LayoutFolderState {
   try {
     return parseGroups(JSON.parse(localStorage.getItem(layoutFoldersKey(userId)) ?? 'null'))
@@ -19,6 +23,7 @@ export function loadLayoutFolders(userId: string): LayoutFolderState {
   }
 }
 
+/** Writes this user's layout folders to localStorage; storage errors are ignored. */
 export function saveLayoutFolders(userId: string, state: LayoutFolderState): void {
   try {
     localStorage.setItem(layoutFoldersKey(userId), JSON.stringify(state))
@@ -43,6 +48,7 @@ export function pruneFolderAssignments(state: LayoutFolderState, layoutIds: Iter
 /** Which layouts to show: `all`, those in no folder (`none`), or one folder's. */
 export type FolderFilter = 'all' | 'none' | string
 
+/** The layouts that match the folder filter, in their original order. */
 export function filterByFolder<T extends { readonly id: string }>(
   layouts: readonly T[],
   state: LayoutFolderState,
@@ -53,6 +59,7 @@ export function filterByFolder<T extends { readonly id: string }>(
   return layouts.filter((layout) => state.assignments[layout.id] === filter)
 }
 
+/** Number of layouts in each folder, keyed by folder id (folders with none are absent). */
 export function folderCounts(layouts: readonly { readonly id: string }[], state: LayoutFolderState): Record<string, number> {
   const counts: Record<string, number> = {}
   for (const layout of layouts) {

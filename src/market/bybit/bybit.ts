@@ -8,8 +8,11 @@ import { marketIdFor, normalizeBinanceSpotSymbol, type Candle } from '../types'
 // Bybit spot is used for USDT pairs that Binance does not list (for example ZETA).
 // Public market-data endpoints allow browser requests, so no proxy is needed.
 
+/** Bybit v5 public market-data REST base URL. */
 export const BYBIT_REST_ENDPOINT = 'https://api.bybit.com/v5/market'
+/** Bybit spot public WebSocket URL. */
 export const BYBIT_WS_ENDPOINT = 'wss://stream.bybit.com/v5/public/spot'
+/** Bybit USDT perpetual ("linear") public WebSocket URL. */
 export const BYBIT_LINEAR_WS_ENDPOINT = 'wss://stream.bybit.com/v5/public/linear'
 
 /** Spot pairs, or USDT perpetuals ("linear" contracts). */
@@ -74,6 +77,10 @@ function candleFrom(
   }
 }
 
+/**
+ * Parses a Bybit kline response (newest first) into ascending candles, final when closed before `nowMs`. Throws
+ * MarketDataParseError on a malformed payload.
+ */
 export function parseBybitRestKlines(payload: unknown, symbol: string, interval: MarketInterval, nowMs = Date.now()): Candle[] {
   const list = (payload as { result?: { list?: unknown } } | null)?.result?.list
   if (!Array.isArray(list)) throw new MarketDataParseError('Bybit klines payload has no list', payload)
@@ -183,6 +190,7 @@ export async function fetchBybitKlines(
   return bars.slice(-limit)
 }
 
+/** Downloads Bybit's spot instruments as catalog listings; throws MarketDataHttpError on a non-OK response. */
 export async function fetchBybitSpotListings(
   fetcher: MarketDataFetch = (input, init) => globalThis.fetch(input, init),
   signal?: AbortSignal,
@@ -195,6 +203,7 @@ export async function fetchBybitSpotListings(
   return parseBybitInstruments(await response.json())
 }
 
+/** Extracts trading USDT spot pairs, sorted by base asset; throws TypeError if the list is missing. */
 export function parseBybitInstruments(payload: unknown): BinanceSpotListing[] {
   const list = (payload as { result?: { list?: unknown } } | null)?.result?.list
   if (!Array.isArray(list)) throw new TypeError('Bybit instruments payload has no list')
@@ -221,6 +230,7 @@ export function parseBybitInstruments(payload: unknown): BinanceSpotListing[] {
   return listings.sort((a, b) => a.baseAsset.localeCompare(b.baseAsset))
 }
 
+/** Symbol, category (spot by default), interval and callbacks for a Bybit live candle feed. */
 export interface BybitKlineSubscriptionOptions {
   symbol: string
   category?: BybitCategory

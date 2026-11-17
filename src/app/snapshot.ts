@@ -4,12 +4,14 @@ import { localTime } from '../chart/timeAxis'
 import { formatPrice } from './format'
 import { candleChange, type LegendCandle } from './LegendValues'
 
+/** One piece of the snapshot header's value line, drawn in the given tone. */
 export interface SnapshotPart {
   readonly text: string
   /** 'label' for O/H/L/C, 'up'/'down' for coloured values. */
   readonly tone: 'label' | 'up' | 'down'
 }
 
+/** The chart canvas rendered as an image, plus the size and background needed to compose the snapshot. */
 export interface ChartPicture {
   /** PNG data URL from the chart (already at the screen's pixel ratio). */
   readonly url: string
@@ -19,6 +21,7 @@ export interface ChartPicture {
   readonly background: string
 }
 
+/** Everything needed to draw a chart snapshot: the chart picture and the header text. */
 export interface SnapshotInput {
   readonly chart: ChartPicture
   /** "BTC / USDT · 1h · Binance" */
@@ -123,6 +126,7 @@ export async function composeSnapshot(input: SnapshotInput): Promise<Blob> {
   })
 }
 
+/** Saves a blob to the user's downloads under the given file name via a temporary link. */
 export function downloadBlob(blob: Blob, fileName: string): void {
   const url = URL.createObjectURL(blob)
   const link = document.createElement('a')

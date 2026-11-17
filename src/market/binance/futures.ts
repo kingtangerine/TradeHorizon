@@ -5,10 +5,12 @@ import { MarketDataHttpError } from '../errors'
 import { precisionFromStep, type BinanceSpotListing } from './exchangeInfo'
 import type { MarketDataFetch } from './rest'
 
+/** Binance USDT-M futures exchangeInfo URL. */
 export const BINANCE_FUTURES_EXCHANGE_INFO = 'https://fapi.binance.com/fapi/v1/exchangeInfo'
 const PREMIUM_INDEX = 'https://fapi.binance.com/fapi/v1/premiumIndex'
 const OPEN_INTEREST = 'https://fapi.binance.com/fapi/v1/openInterest'
 
+/** Suffix that marks a perpetual in our symbols (BTCUSDT.P). */
 export const PERPETUAL_SUFFIX = '.P'
 
 /** The symbol Binance knows ("BTCUSDT.P" -> "BTCUSDT"). */
@@ -53,6 +55,7 @@ export function parseBinanceFuturesListings(payload: unknown): BinanceSpotListin
   return listings.sort((a, b) => a.baseAsset.localeCompare(b.baseAsset))
 }
 
+/** Downloads the USDT perpetual catalog; throws MarketDataHttpError on a non-OK response. */
 export async function fetchBinanceFuturesListings(
   fetcher: MarketDataFetch = (input, init) => globalThis.fetch(input, init),
   signal?: AbortSignal,
@@ -62,6 +65,7 @@ export async function fetchBinanceFuturesListings(
   return parseBinanceFuturesListings(await response.json())
 }
 
+/** Funding rate, next funding time (ms epoch), mark price and optional open interest of a perpetual. */
 export interface FuturesStats {
   /** Funding rate of the current period, as a fraction (0.0001 = 0.01%). */
   readonly fundingRate: number
@@ -71,6 +75,10 @@ export interface FuturesStats {
   readonly openInterest?: number
 }
 
+/**
+ * Fetches funding rate, mark price and open interest for a symbol (".P" suffix allowed). Throws
+ * MarketDataHttpError or TypeError if the premium index fails; open-interest failures are ignored.
+ */
 export async function fetchFuturesStats(symbol: string, signal?: AbortSignal): Promise<FuturesStats> {
   const plain = encodeURIComponent(exchangeSymbol(symbol))
   const [premium, interest] = await Promise.all([

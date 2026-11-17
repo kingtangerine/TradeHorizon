@@ -1,8 +1,12 @@
+/** Every chart timeframe the app supports, ascending, in Binance's interval codes ("1M" is one month). */
 export const MARKET_INTERVALS = ['1m', '3m', '5m', '15m', '30m', '1h', '2h', '4h', '6h', '8h', '12h', '1d', '3d', '1w', '1M'] as const
 
+/** A supported timeframe code such as "15m", "4h" or "1M". */
 export type MarketInterval = (typeof MARKET_INTERVALS)[number]
+/** The interval code sent to Binance; currently identical to MarketInterval. */
 export type BinanceKlineInterval = MarketInterval
 
+/** Display label, Binance code and fixed length of one timeframe. */
 export interface MarketIntervalSpec {
   label: string
   binanceInterval: BinanceKlineInterval
@@ -14,6 +18,7 @@ const MINUTE_MS = 60_000
 const HOUR_MS = 60 * MINUTE_MS
 const DAY_MS = 24 * HOUR_MS
 
+/** Spec of every supported timeframe. */
 export const MARKET_INTERVAL_SPECS: Readonly<Record<MarketInterval, MarketIntervalSpec>> = {
   '1m': { label: '1m', binanceInterval: '1m', durationMs: MINUTE_MS },
   '3m': { label: '3m', binanceInterval: '3m', durationMs: 3 * MINUTE_MS },
@@ -34,14 +39,17 @@ export const MARKET_INTERVAL_SPECS: Readonly<Record<MarketInterval, MarketInterv
 
 const INTERVAL_SET: ReadonlySet<string> = new Set(MARKET_INTERVALS)
 
+/** True when the value is one of MARKET_INTERVALS. */
 export function isMarketInterval(value: unknown): value is MarketInterval {
   return typeof value === 'string' && INTERVAL_SET.has(value)
 }
 
+/** The Binance kline interval code for a timeframe. */
 export function toBinanceKlineInterval(interval: MarketInterval): BinanceKlineInterval {
   return MARKET_INTERVAL_SPECS[interval].binanceInterval
 }
 
+/** Label, Binance code and duration (ms, null for months) of a timeframe. */
 export function getMarketIntervalSpec(interval: MarketInterval): MarketIntervalSpec {
   return MARKET_INTERVAL_SPECS[interval]
 }

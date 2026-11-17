@@ -16,6 +16,7 @@ export type SymbolGroups = { readonly [exchange: string]: readonly string[] | un
 
 /** The parts of a WebSocket the feed uses: Node's global WebSocket, or a stand-in in tests. */
 export type FeedSocket = Pick<WebSocket, 'readyState' | 'onopen' | 'onmessage' | 'onclose' | 'onerror' | 'send' | 'close'>
+/** A WebSocket class taking a URL (Node's global WebSocket, or a stand-in in tests). */
 export type FeedSocketConstructor = new (url: string) => FeedSocket
 
 /** A [symbol, price] pair read from a message; the symbol is checked to be a string before it is used. */
@@ -38,6 +39,7 @@ export type PriceProtocol = ProtocolBase &
 /** A parsed JSON message before its fields are checked. */
 type JsonFields = { readonly [field: string]: unknown }
 
+/** One exchange connection's state: connected, symbols subscribed, seconds since the last message, connected since (ms). */
 export interface StreamStatus {
   readonly connected: boolean
   readonly symbols: number
@@ -58,6 +60,7 @@ interface StreamOptions {
   readonly now: () => number
 }
 
+/** Where each live price goes, plus a WebSocket class, logging and clock that tests can replace. */
 export interface PriceFeedOptions {
   readonly onPrice: (symbol: string, price: number) => void
   readonly WebSocketImpl?: FeedSocketConstructor
@@ -65,11 +68,13 @@ export interface PriceFeedOptions {
   readonly now?: () => number
 }
 
+/** Connection state of the Binance and Bybit streams. */
 export interface PriceFeedStatus {
   readonly binance: StreamStatus
   readonly bybit: StreamStatus
 }
 
+/** Live prices from Binance and Bybit for the watched symbols, reconnecting by itself. */
 export interface PriceFeed {
   /** Symbols per exchange that should be live; other exchanges are ignored. */
   setSymbols(groups: SymbolGroups): void

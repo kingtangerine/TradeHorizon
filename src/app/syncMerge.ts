@@ -8,6 +8,7 @@
 // The base is not stored in full: a tree of short fingerprints is enough to tell "changed" from "unchanged",
 // which keeps it small next to the data itself.
 
+/** Compact record of a value's last common version: a fingerprint tree used to tell changed items from unchanged ones. */
 export interface Base {
   /** Fingerprint of the whole value. */
   readonly h: string
@@ -61,6 +62,7 @@ function entriesOf(value: unknown, kind: Kind): Array<[string, unknown]> {
   return []
 }
 
+/** Builds the fingerprint tree for a value, descending into id arrays, value arrays and objects up to a fixed depth. */
 export function baseOf(value: unknown, depth = 0): Base {
   const kind = kindOf(value)
   const h = fp(value)
@@ -75,6 +77,10 @@ function unify(local: Kind, remote: Kind): Kind | undefined {
   return undefined
 }
 
+/**
+ * Three-way merge of two parsed values against their common base, item by item for lists and objects.
+ * A plain value changed on both sides keeps the local edit; with no base, the server (remote) copy wins.
+ */
 export function merge(base: Base | undefined, local: unknown, remote: unknown): unknown {
   if (JSON.stringify(local) === JSON.stringify(remote)) return local
   if (base) {

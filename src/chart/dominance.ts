@@ -19,15 +19,18 @@ const WEIGHTS_CACHE_KEY = 'trade-horizon:dominance-weights:v2'
 const WEIGHTS_TTL_MS = 30 * 60 * 1000
 const PAGE_SIZE = 1000
 
+/** The dominance indicators the chart can show, in menu order. */
 export const DOMINANCE_KEYS: readonly DominanceKey[] = ['btc', 'usdt', 'alt']
 
 let inflightWeights: Promise<DominanceWeights> | undefined
 let registered = false
 
+/** klinecharts indicator name for a dominance line (its label, such as "BTC.D"). */
 export function dominanceIndicatorName(key: DominanceKey): string {
   return DOMINANCE_LABELS[key]
 }
 
+/** Registers the dominance line indicators with klinecharts once; their values are filled in by dominanceCalc. */
 export function registerDominanceIndicators(): void {
   if (registered) return
   registered = true
@@ -53,6 +56,7 @@ export function dominanceCalc(key: DominanceKey, rows: readonly DominanceRow[]) 
     })
 }
 
+/** Turns dominance rows into candles for one index, so it can be charted as its own symbol (volume is 0). */
 export function dominanceCandles(rows: readonly DominanceRow[], key: IndexKey): KLineData[] {
   return rows.map((row) => {
     const open = row.open[key]
@@ -122,6 +126,7 @@ export function loadDominanceWeights(): Promise<DominanceWeights> {
   return inflightWeights
 }
 
+/** One page of dominance history and whether older pages exist. */
 export interface DominancePage {
   rows: DominanceRow[]
   /** Prices at the moment the weights were captured; reuse it when paging further back. */
@@ -129,6 +134,10 @@ export interface DominancePage {
   hasMore: boolean
 }
 
+/**
+ * Fetches one page of Binance candles for the coins behind the dominance weights and computes dominance rows from them.
+ * Rejects only when the Bitcoin candles fail; other coins that fail are left out.
+ */
 export async function fetchDominancePage(
   weights: DominanceWeights,
   interval: MarketInterval,
