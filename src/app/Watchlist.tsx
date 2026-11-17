@@ -36,6 +36,7 @@ function formatPrice(value: number, market: CryptoMarket | undefined): string {
   return value.toLocaleString('en-US', { minimumFractionDigits: digits, maximumFractionDigits: digits })
 }
 
+/** The watchlist panel: lists, live prices and changes for their symbols, sorting, flags, and opening a symbol on the chart. */
 export function Watchlist({ state, findMarket, currentSymbol, onState, onOpen, onAdd, onClose }: WatchlistProps) {
   const list = activeList(state)
   const [quotes, setQuotes] = useState<Record<string, WatchQuote>>({})

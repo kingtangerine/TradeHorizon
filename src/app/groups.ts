@@ -1,24 +1,29 @@
 // User-defined folders for the object tree. Kept apart from the drawing model: a drawing
 // stays a pure market-space shape, and the grouping is just a label layer on top of it.
 
+/** A user-defined folder in the object tree. */
 export interface DrawingGroup {
   readonly id: string
   readonly name: string
   readonly collapsed?: boolean
 }
 
+/** All groups of a user and which drawings belong to each. */
 export interface GroupState {
   readonly groups: readonly DrawingGroup[]
   /** drawing id -> group id. Drawings without an entry are ungrouped. */
   readonly assignments: Readonly<Record<string, string>>
 }
 
+/** No groups and no assignments. */
 export const EMPTY_GROUPS: GroupState = { groups: [], assignments: {} }
 
+/** localStorage key of this user's drawing groups. */
 export function groupsKey(userId: string): string {
   return `trade-horizon:user:${userId}:groups:v1`
 }
 
+/** Reads stored groups, dropping invalid or duplicate groups and assignments to unknown groups. Never throws. */
 export function parseGroups(value: unknown): GroupState {
   if (typeof value !== 'object' || value === null) return EMPTY_GROUPS
   const raw = value as { groups?: unknown; assignments?: unknown }
@@ -40,6 +45,7 @@ export function parseGroups(value: unknown): GroupState {
   return { groups, assignments }
 }
 
+/** Reads this user's groups from localStorage; empty groups when missing or unreadable. */
 export function loadGroups(userId: string): GroupState {
   try {
     return parseGroups(JSON.parse(localStorage.getItem(groupsKey(userId)) ?? 'null'))
@@ -48,6 +54,7 @@ export function loadGroups(userId: string): GroupState {
   }
 }
 
+/** Writes this user's groups to localStorage; storage errors are ignored. */
 export function saveGroups(userId: string, state: GroupState): void {
   try {
     localStorage.setItem(groupsKey(userId), JSON.stringify(state))
@@ -60,14 +67,17 @@ function cleanName(name: string): string {
   return name.trim().slice(0, 40) || 'New group'
 }
 
+/** Adds a group (blank name becomes "New group", max 40 characters) and moves the given drawings into it. */
 export function createGroup(state: GroupState, name: string, drawingIds: readonly string[], id: string = crypto.randomUUID()): GroupState {
   return assignToGroup({ ...state, groups: [...state.groups, { id, name: cleanName(name) }] }, drawingIds, id)
 }
 
+/** Renames a group (blank name becomes "New group", max 40 characters). */
 export function renameGroup(state: GroupState, groupId: string, name: string): GroupState {
   return { ...state, groups: state.groups.map((group) => (group.id === groupId ? { ...group, name: cleanName(name) } : group)) }
 }
 
+/** Collapses or expands a group in the object tree. */
 export function toggleGroupCollapsed(state: GroupState, groupId: string): GroupState {
   return {
     ...state,

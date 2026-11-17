@@ -17,11 +17,14 @@ export const COINGECKO_API_ENDPOINT = 'https://api.coingecko.com/api/v3'
 
 /** Percentages: btc, eth, usdt, stable, alt. Dollar indices (in billions): total, total2, total3, others. */
 export type IndexKey = 'btc' | 'eth' | 'usdt' | 'stable' | 'alt' | 'total' | 'total2' | 'total3' | 'others'
+/** Every IndexKey. */
 export const INDEX_KEYS: readonly IndexKey[] = ['btc', 'eth', 'usdt', 'stable', 'alt', 'total', 'total2', 'total3', 'others']
 /** Kept for callers that only deal with the three original dominance lines. */
 export type DominanceComponent = 'btc' | 'usdt' | 'alt'
 
+/** Binance pair whose bars set the timeline of every dominance series. */
 export const BITCOIN_PRICE_SYMBOL = 'BTCUSDT'
+/** Binance pair that moves Ethereum's cap (ETH.D, TOTAL3). */
 export const ETHEREUM_PRICE_SYMBOL = 'ETHUSDT'
 /** Upper bound on Binance price series fetched per page (one request each). */
 export const MAX_TRACKED_SYMBOLS = 12
@@ -39,6 +42,7 @@ const PRICE_FOLLOWS: Readonly<Record<string, string>> = {
   'wrapped-beacon-eth': 'ETHUSDT',
 }
 
+/** Today's market caps in USD from CoinGecko, split into the parts that history is rebuilt from. */
 export interface DominanceWeights {
   fetchedAtMs: number
   totalCap: number
@@ -63,6 +67,7 @@ export interface DominanceWeights {
   }
 }
 
+/** One OHLC price bar as numbers, with a ms-epoch timestamp. */
 export interface PriceBar {
   timestamp: number
   open: number
@@ -71,6 +76,7 @@ export interface PriceBar {
   close: number
 }
 
+/** OHLC of every index for one bar: percentages for dominance keys, USD billions for cap indices. */
 export interface DominanceRow {
   timestamp: number
   open: Record<IndexKey, number>
@@ -87,6 +93,10 @@ function positive(value: unknown): number {
   return typeof value === 'number' && Number.isFinite(value) && value > 0 ? value : 0
 }
 
+/**
+ * Builds weights from CoinGecko's /global and /coins/markets payloads; only coins whose pair is in
+ * `availableSymbols` are price-tracked. Throws TypeError when the data is unusable or lacks Bitcoin or Tether.
+ */
 export function buildDominanceWeights(
   globalPayload: unknown,
   marketsPayload: unknown,
@@ -301,9 +311,11 @@ export function computeDominanceRows(
   })
 }
 
+/** Error message used when CoinGecko keeps rate-limiting or cannot be reached. */
 export const DOMINANCE_UNAVAILABLE_MESSAGE =
   "CoinGecko did not answer (rate limit or offline). Dominance needs today's market caps; try again in a minute."
 
+/** Optional cache proxy and abort signal for fetchDominanceWeights, plus injectable fetcher, sleep and clock for tests. */
 export interface FetchDominanceWeightsOptions {
   /** Our own cached copy of the CoinGecko data (e.g. "/api/cg"); tried first, CoinGecko directly is the fallback. */
   cachedBase?: string
@@ -316,6 +328,10 @@ export interface FetchDominanceWeightsOptions {
 const RETRY_DELAY_MS = 20_000
 const RETRIES = 2
 
+/**
+ * Fetches today's caps (own cache first, then CoinGecko) and builds the weights. A rate limit is retried twice,
+ * 20 s apart, then it throws with DOMINANCE_UNAVAILABLE_MESSAGE.
+ */
 export async function fetchDominanceWeights(
   availableSymbols: ReadonlySet<string>,
   options: FetchDominanceWeightsOptions = {},

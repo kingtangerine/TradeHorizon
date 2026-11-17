@@ -3,12 +3,14 @@
 import { getSupportedIndicators, registerIndicator } from 'klinecharts'
 import { VOLUME_HEIGHT_RATIO, volumeBarHeights } from './volumeBars'
 
+/** klinecharts indicator name of the volume bars. */
 export const VOLUME_OVERLAY_NAME = 'tradeHorizonVolume'
 /** The candle colour at 45% opacity, so volume follows the chart settings. */
 function faded(color: unknown, fallback: string): string {
   return typeof color === 'string' && /^#[0-9a-fA-F]{6}$/.test(color) ? `${color}73` : fallback
 }
 
+/** Registers the volume-bars indicator, drawn at the bottom of the price pane, once. */
 export function registerVolumeOverlay(): void {
   if (getSupportedIndicators().includes(VOLUME_OVERLAY_NAME)) return
   registerIndicator({

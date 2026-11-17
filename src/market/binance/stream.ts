@@ -3,12 +3,16 @@ import type { MarketInterval } from '../intervals'
 import { DEFAULT_BINANCE_SPOT_SYMBOL, normalizeBinanceSpotSymbol, type Candle } from '../types'
 import { parseBinanceWebSocketKline } from './parsers'
 
+/** Binance spot WebSocket base URL on the public market-data mirror. */
 export const BINANCE_MARKET_DATA_WS_ENDPOINT = 'wss://data-stream.binance.vision/ws'
 
+/** Binance USDT-M futures WebSocket base URL. */
 export const BINANCE_FUTURES_WS_ENDPOINT = 'wss://fstream.binance.com/ws'
 
+/** Lifecycle state of a live candle feed. */
 export type KlineStreamState = 'connecting' | 'open' | 'reconnecting' | 'stopped'
 
+/** Status event of a live feed: state, subscription generation, retry attempt, and delay before the next retry in ms. */
 export interface KlineStreamStatus {
   state: KlineStreamState
   generation: number
@@ -16,12 +20,14 @@ export interface KlineStreamStatus {
   retryInMs?: number
 }
 
+/** Exponential reconnect backoff: first and maximum delay in ms, and jitter as a fraction (0-1) of the delay. */
 export interface ReconnectPolicy {
   initialDelayMs: number
   maxDelayMs: number
   jitterRatio: number
 }
 
+/** The subset of the browser WebSocket the subscription uses, so tests can supply a fake. */
 export interface WebSocketConnection {
   /** 1 when open. Optional because test doubles do not have it. */
   readonly readyState?: number
@@ -32,13 +38,19 @@ export interface WebSocketConnection {
   close(code?: number, reason?: string): void
 }
 
+/** Opens a WebSocketConnection to a URL; injectable for tests. */
 export type WebSocketFactory = (url: string) => WebSocketConnection
 
+/** setTimeout/clearTimeout pair, injectable so tests control reconnect timing. */
 export interface TimerScheduler {
   setTimeout(callback: () => void, delayMs: number): unknown
   clearTimeout(handle: unknown): void
 }
 
+/**
+ * Symbol (default BTCUSDT), interval and callbacks for a Binance kline stream, plus injectable endpoint, socket
+ * factory, backoff, timers and randomness. Aborting `signal` stops it.
+ */
 export interface BinanceKlineSubscriptionOptions {
   symbol?: string
   interval: MarketInterval
@@ -86,6 +98,7 @@ function validateReconnectPolicy(policy: ReconnectPolicy): void {
   }
 }
 
+/** WebSocket URL of one symbol's kline stream, e.g. ".../ws/btcusdt@kline_1m"; throws TypeError for an invalid symbol. */
 export function binanceKlineStreamUrl(symbol: string, interval: MarketInterval, endpoint = BINANCE_MARKET_DATA_WS_ENDPOINT): string {
   const normalizedSymbol = normalizeBinanceSpotSymbol(symbol)
   return `${endpoint.replace(/\/$/, '')}/${normalizedSymbol.toLowerCase()}@kline_${interval}`
@@ -312,6 +325,7 @@ export class BinanceKlineSubscription {
   }
 }
 
+/** Creates a BinanceKlineSubscription, which connects immediately. */
 export function subscribeToBinanceKlines(options: BinanceKlineSubscriptionOptions): BinanceKlineSubscription {
   return new BinanceKlineSubscription(options)
 }

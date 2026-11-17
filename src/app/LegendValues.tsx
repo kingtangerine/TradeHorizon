@@ -15,6 +15,7 @@ export function useHoveredCandle(controller: KLineChartController | null): Hover
   return hover && !hover.latest ? hover : null
 }
 
+/** OHLC values (and optional volume) the legend shows for one candle. */
 export interface LegendCandle {
   readonly open: number
   readonly high: number
@@ -43,6 +44,7 @@ export function candleChange(candle: LegendCandle): { value: number; percent: nu
   return { value, percent: reference === 0 ? 0 : (value / reference) * 100 }
 }
 
+/** Open, high, low, close and change of the hovered candle, or the live one when nothing is hovered. */
 export function LegendOhlc({
   controller,
   quote,
@@ -85,6 +87,7 @@ export function LegendOhlc({
   )
 }
 
+/** Volume of the hovered candle, or the live volume when nothing is hovered, in compact form. */
 export function LegendVolume({ controller, quote }: { controller: KLineChartController | null; quote: ChartQuote | null }) {
   const hover = useHoveredCandle(controller)
   return <b>{formatCompact(hover ? hover.bar.volume : quote?.volume)}</b>

@@ -1,5 +1,6 @@
 import { conditionMet, isValidAlert, type AlertCondition, type AlertLineAnchors } from '../../server/alertRules.ts'
 
+/** Which side of the target price the alert waits for. */
 export type AlertDirection = 'above' | 'below'
 export type { AlertCondition } from '../../server/alertRules.ts'
 
@@ -41,6 +42,7 @@ function key(userId: string): string {
   return `trade-horizon:user:${userId}:alerts:v1`
 }
 
+/** Reads this user's alerts from localStorage, dropping invalid entries. Returns an empty list on any error. */
 export function loadAlerts(userId: string): PriceAlert[] {
   try {
     const value = JSON.parse(localStorage.getItem(key(userId)) ?? '[]') as unknown
@@ -50,18 +52,23 @@ export function loadAlerts(userId: string): PriceAlert[] {
   }
 }
 
+/** Writes this user's alerts to localStorage. */
 export function saveAlerts(userId: string, alerts: readonly PriceAlert[]): void {
   localStorage.setItem(key(userId), JSON.stringify(alerts))
 }
 
+/** Whether the alert condition is met at this price right now. */
 export function alertReached(alert: PriceAlert, price: number): boolean {
   return conditionMet(alert, price, Date.now())
 }
 
+/** Which alerts the side panel lists. */
 export type AlertFilter = 'active' | 'triggered' | 'all'
 
+/** Whether the alert has fired (it has a trigger time). */
 export const isTriggered = (alert: PriceAlert): boolean => typeof alert.triggeredAtMs === 'number'
 
+/** One symbol's alerts in the side panel. */
 export interface AlertGroup {
   readonly symbol: string
   readonly alerts: readonly PriceAlert[]

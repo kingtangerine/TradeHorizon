@@ -1,7 +1,9 @@
 import { registerIndicator, type KLineData } from 'klinecharts'
 import { VWAP_ANCHORS, computeVwap, type VwapAnchor } from './vwap'
 
+/** klinecharts indicator name of the anchored VWAP. */
 export const VWAP_INDICATOR_NAME = 'TH_VWAP'
+/** klinecharts indicator name of the quarterly VWAP. */
 export const QVWAP_INDICATOR_NAME = 'TH_QVWAP'
 
 let registered = false

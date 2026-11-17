@@ -7,9 +7,12 @@ import type { MarketDataFetch } from './binance/rest'
 import { getMarketIntervalSpec, type MarketInterval } from './intervals'
 import type { Candle, MarketId } from './types'
 
+/** Exchanges served by REST polling instead of a WebSocket (spot and USDT perpetuals). */
 export const POLLED_VENUES = ['okx', 'okx-futures', 'bitget', 'bitget-futures', 'gate', 'gate-futures'] as const
+/** One of POLLED_VENUES. */
 export type PolledVenue = (typeof POLLED_VENUES)[number]
 
+/** True when the exchange id is served by polling. */
 export function isPolledVenue(value: string): value is PolledVenue {
   return (POLLED_VENUES as readonly string[]).includes(value)
 }
@@ -73,6 +76,7 @@ function closeTime(openTimeMs: number, interval: MarketInterval): number {
   return Date.UTC(open.getUTCFullYear(), open.getUTCMonth() + 1, 1) - 1
 }
 
+/** Merges shorter candles into the given timeframe (weeks start Monday UTC, months by calendar), ascending. */
 export function groupRows(rows: readonly Row[], interval: MarketInterval): Row[] {
   const groups = new Map<number, Row[]>()
   for (const row of rows) {
@@ -274,6 +278,7 @@ const SOURCES: Readonly<Record<PolledVenue, VenueSource>> = {
   'gate-futures': gateSource(true),
 }
 
+/** A candle request for a polled venue; times are ms epoch and `limit` defaults to 500. */
 export interface VenueKlineOptions {
   readonly venue: PolledVenue
   /** The exchange's own symbol (BTC-USDT, BTC_USDT, BTCUSDT). */
@@ -362,6 +367,7 @@ export async function fetchVenueKlines(
   }))
 }
 
+/** Market, interval and callbacks for a PollingKlineSubscription. */
 export interface VenueSubscriptionOptions extends Omit<VenueKlineOptions, 'limit' | 'endTimeMs' | 'startTimeMs' | 'signal'> {
   onCandle(candle: Candle): void
   onStatus?(status: KlineStreamStatus): void
@@ -434,6 +440,7 @@ export class PollingKlineSubscription {
   }
 }
 
+/** 24h quote: last price, absolute change and change in percent. */
 export interface VenueQuote {
   readonly last: number
   readonly change: number

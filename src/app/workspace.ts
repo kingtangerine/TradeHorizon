@@ -3,6 +3,7 @@ import { isMarketInterval, type MarketInterval } from '../market'
 import { panesOf, parseSplit, type PaneSpec, type SplitCount, type TabSplit } from './panes'
 import { isChartType, type ChartType } from '../chart/chartTypes'
 
+/** One chart tab in the tab bar: a symbol (e.g. BTCUSDT) and interval, optionally tied to a saved layout. */
 export interface ChartTab {
   readonly id: string
   readonly symbol: string
@@ -13,6 +14,7 @@ export interface ChartTab {
   readonly split?: TabSplit
 }
 
+/** The user's open tabs and chart-wide settings, restored on the next visit. */
 export interface UserWorkspace {
   readonly tabs: readonly ChartTab[]
   readonly activeTabId: string
@@ -32,6 +34,7 @@ export interface UserWorkspace {
   readonly chartType?: Exclude<ChartType, 'candles'>
 }
 
+/** A named, saved set of chart tabs and settings from the layouts page; times are ms since epoch. */
 export interface SavedLayout {
   readonly id: string
   readonly name: string
@@ -45,10 +48,12 @@ export interface SavedLayout {
   readonly favorite?: boolean
 }
 
+/** Order for the saved layouts list: last modified, by name, or newest created. */
 export type LayoutSort = 'modified' | 'name' | 'created'
 
 const DEFAULT_INTERVAL: MarketInterval = '15m'
 
+/** A new layout with a single BTCUSDT tab; a blank name becomes "Untitled layout". */
 export function createLayout(name: string, nowMs: number): SavedLayout {
   const tabId = crypto.randomUUID()
   return {
@@ -63,6 +68,7 @@ export function createLayout(name: string, nowMs: number): SavedLayout {
   }
 }
 
+/** A copy of a layout with new layout and tab ids, named "<name> (copy)". */
 export function duplicateLayout(layout: SavedLayout, nowMs: number): SavedLayout {
   const idMap = new Map(layout.tabs.map((tab) => [tab.id, crypto.randomUUID()]))
   return {
@@ -78,6 +84,7 @@ export function duplicateLayout(layout: SavedLayout, nowMs: number): SavedLayout
   }
 }
 
+/** Symbol and interval of the layout's active tab and how many charts it shows, for list previews. */
 export function layoutSummary(layout: SavedLayout): { symbol: string; interval: MarketInterval; charts: number } {
   const tab = layout.tabs.find((item) => item.id === layout.activeTabId) ?? layout.tabs[0]
   return { symbol: tab.symbol, interval: tab.interval, charts: tab.split?.count ?? 1 }
@@ -95,6 +102,7 @@ export function moveTab<T extends { readonly id: string }>(tabs: readonly T[], i
   return next
 }
 
+/** Most charts a split tab can show, and so the most layouts that can be combined into one tab. */
 export const MAX_COMBINED_LAYOUTS = 4
 
 /** "BTCUSDT" -> "BTC". Pairs quoted in something else keep their full name. */
@@ -155,6 +163,7 @@ export function createSplitLayout(
   }
 }
 
+/** Layouts whose name or tab symbols contain the query, favorites first, then in the chosen order. */
 export function filterAndSortLayouts(layouts: readonly SavedLayout[], query: string, sort: LayoutSort): SavedLayout[] {
   const needle = query.trim().toLowerCase()
   const matches = needle
@@ -181,6 +190,7 @@ function defaultWorkspace(): UserWorkspace {
   }
 }
 
+/** Ties tabs that have no layout to the workspace's active layout; returns the same object when nothing changes. */
 export function adoptActiveLayout(workspace: UserWorkspace): UserWorkspace {
   const layoutId = workspace.activeLayoutId
   if (!layoutId || workspace.tabs.every((tab) => tab.layoutId)) return workspace
@@ -190,10 +200,12 @@ export function adoptActiveLayout(workspace: UserWorkspace): UserWorkspace {
   }
 }
 
+/** localStorage key holding this user's open tabs and chart settings (synced with the account). */
 export function workspaceKey(userId: string): string {
   return `trade-horizon:user:${userId}:workspace:v1`
 }
 
+/** localStorage key holding this user's saved layouts (synced with the account). */
 export function layoutsKey(userId: string): string {
   return `trade-horizon:user:${userId}:layouts:v1`
 }
@@ -223,6 +235,10 @@ function validCustomIntervals(value: unknown): MarketInterval[] {
     : []
 }
 
+/**
+ * Reads the user's workspace from localStorage, dropping invalid fields.
+ * Returns a fresh single-tab BTCUSDT workspace when nothing usable is stored.
+ */
 export function loadWorkspace(userId: string): UserWorkspace {
   try {
     const value = JSON.parse(localStorage.getItem(workspaceKey(userId)) ?? 'null') as Partial<UserWorkspace> | null
@@ -252,10 +268,12 @@ export function loadWorkspace(userId: string): UserWorkspace {
   }
 }
 
+/** Stores the user's workspace in localStorage; throws if storage is full or blocked. */
 export function saveWorkspace(userId: string, workspace: UserWorkspace): void {
   localStorage.setItem(workspaceKey(userId), JSON.stringify(workspace))
 }
 
+/** Reads the user's saved layouts from localStorage, skipping invalid ones; returns [] when missing or unreadable. */
 export function loadSavedLayouts(userId: string): SavedLayout[] {
   try {
     const value = JSON.parse(localStorage.getItem(layoutsKey(userId)) ?? '[]') as unknown
@@ -296,6 +314,7 @@ export function loadSavedLayouts(userId: string): SavedLayout[] {
   }
 }
 
+/** Stores the user's saved layouts in localStorage; throws if storage is full or blocked. */
 export function saveSavedLayouts(userId: string, layouts: readonly SavedLayout[]): void {
   localStorage.setItem(layoutsKey(userId), JSON.stringify(layouts))
 }

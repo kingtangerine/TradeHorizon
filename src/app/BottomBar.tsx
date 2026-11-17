@@ -15,6 +15,7 @@ interface BottomBarProps {
   onInterval(interval: MarketInterval): void
 }
 
+/** The date range buttons and Go to date under the chart; picking a range may also switch the timeframe. */
 export function BottomBar({ controller, interval, timeZone, onInterval }: BottomBarProps) {
   return (
     <>
@@ -139,6 +140,7 @@ function GoToDate({
   )
 }
 
+/** Percent and logarithmic scale toggles (clicking the active one returns to normal) and the fullscreen button. */
 export function ScaleToggles({ scaleMode, onScaleMode }: { scaleMode: ScaleMode; onScaleMode(mode: ScaleMode): void }) {
   const [fullscreen, setFullscreen] = useState(() => typeof document !== 'undefined' && !!document.fullscreenElement)
   useEffect(() => {

@@ -27,6 +27,7 @@ import { TV_FIB_ROWS } from './drawingVisibility'
  */
 export type ToolPlacement = 'onePoint' | 'twoPoint' | 'threePoint' | 'freehand' | 'position'
 
+/** How a drawing tool is shown in the toolbar and placed on the chart. */
 export interface DrawingToolSpec {
   readonly label: string
   readonly overlayName: string
@@ -50,6 +51,7 @@ const POSITION_STYLE: DrawingStyle = {
   riskPercent: 1,
 }
 
+/** Every drawing tool's label, overlay, placement, hint, shortcut and default style. */
 export const DRAWING_TOOLS: Readonly<Record<DrawingType, DrawingToolSpec>> = {
   trendLine: {
     label: 'Trend line',
@@ -265,6 +267,7 @@ export const TOOL_ORDER: readonly DrawingType[] = [
   'priceLabel',
 ]
 
+/** Number of anchors a drawing of this type stores (rectangle 8, positions and three-point tools 3, one-point tools 1). */
 export function anchorCountFor(type: DrawingType): number {
   if (type === 'rectangle') return 8
   const placement = DRAWING_TOOLS[type].placement

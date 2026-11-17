@@ -3,7 +3,9 @@
 import { getSupportedIndicators, registerIndicator, type KLineData } from 'klinecharts'
 import { baselineLevel, heikinAshi } from './chartTypes'
 
+/** klinecharts indicator name of the Heikin Ashi series. */
 export const HEIKIN_ASHI_NAME = 'tradeHorizonHeikinAshi'
+/** klinecharts indicator name of the baseline series. */
 export const BASELINE_NAME = 'tradeHorizonBaseline'
 
 const UP = '#089981'
@@ -21,6 +23,7 @@ function visibleSpan(chart: { getVisibleRange(): { from: number; to: number } },
   return [Math.max(0, Math.floor(range.from)), Math.min(length, Math.ceil(range.to))]
 }
 
+/** Registers the Heikin Ashi and baseline series indicators with klinecharts once each. */
 export function registerSeriesOverlays(): void {
   const supported = getSupportedIndicators()
   if (!supported.includes(HEIKIN_ASHI_NAME)) {

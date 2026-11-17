@@ -56,6 +56,7 @@ export interface TelegramMessage {
   text?: string
 }
 
+/** One update from Telegram getUpdates: its id (for the next offset) and the message, if any. */
 export interface TelegramUpdate {
   update_id: number
   message?: TelegramMessage
@@ -81,6 +82,7 @@ interface TelegramResponse {
   parameters?: { retry_after?: number }
 }
 
+/** Data folder for links, the bot token (the service is off without it), and replaceable API base, fetch, logging and clock. */
 export interface TelegramServiceOptions {
   dataDir: string
   token?: string
@@ -94,6 +96,7 @@ export interface TelegramServiceOptions {
 /** A caught value's fields, or none when it is not an object. */
 const errorInfo = (error: unknown): TelegramErrorInfo | undefined => (typeof error === 'object' && error !== null ? error : undefined)
 
+/** Escapes &, < and > for Telegram HTML messages. */
 export const escapeHtml = (text: unknown): string => String(text).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
 
 /** "/start abc", "/start@MyBot abc", "/stop" -> { command, arg }. Anything else is undefined. */
@@ -125,6 +128,7 @@ export function explainError(caught: unknown): string {
   return `Telegram request failed: ${error?.message ?? caught}${code ? ` (${code})` : ''}.`
 }
 
+/** The Telegram HTML text of an alert notification: a bell, the bold title and the body. */
 export function formatAlertMessage(payload: AlertPayload): string {
   return `🔔 <b>${escapeHtml(payload.title)}</b>\n${escapeHtml(payload.body)}`
 }
@@ -399,4 +403,5 @@ export function createTelegramService({
   }
 }
 
+/** The Telegram bot service created by createTelegramService. */
 export type TelegramService = ReturnType<typeof createTelegramService>

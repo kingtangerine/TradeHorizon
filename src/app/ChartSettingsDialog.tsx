@@ -26,6 +26,7 @@ const GRID_LABELS: Record<GridLines, string> = {
   none: 'None',
 }
 
+/** The chart settings window with Symbol, Canvas and Scales tabs; closes on Escape. */
 export function ChartSettingsDialog({ preferences, onPreferences, scaleMode, onScaleMode, onClose }: ChartSettingsDialogProps) {
   const [tab, setTab] = useState<Tab>('symbol')
   const appearance = preferences.appearance

@@ -39,6 +39,7 @@ function formatPositionNumber(value: number, digits = 2): string {
   return Number.isFinite(value) ? value.toLocaleString('en-US', { maximumFractionDigits: digits }) : '—'
 }
 
+/** Registers the basic drawing overlays (rectangle, positions, lines, ranges, Fibonacci, text, alert line) once each. */
 export function registerTradeHorizonOverlays(): void {
   const supported = new Set(getSupportedOverlays())
 

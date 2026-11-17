@@ -41,11 +41,13 @@ export interface Listing {
   volumePrecision?: number
 }
 
+/** Every tradable pair across exchanges, and when the list was fetched (ms). */
 export interface Catalog {
   fetchedAtMs: number
   listings: Listing[]
 }
 
+/** The folder for the cached catalog, plus fetch and logging (replaceable in tests). */
 export interface MarketServiceOptions {
   dataDir: string
   fetchImpl?: FetchLike
@@ -100,6 +102,7 @@ const SYMBOL = /^[A-Z0-9]{2,30}$/
 /** Pairs that trade on Binance Futures; the app lists them itself, but alerts need to know where they trade. */
 const FUTURES_SYMBOLS = new Set(['BTCDOMUSDT'])
 
+/** Decimal places implied by an exchange step size string ("0.0100" -> 2, "1" -> 0), or `fallback` when it cannot be read. */
 export function precisionFromStep(step: unknown, fallback: number): number {
   if (typeof step !== 'string') return fallback
   const value = Number(step)
@@ -219,6 +222,7 @@ interface CacheSlot<T> {
   inflight: Promise<T> | undefined
 }
 
+/** Serves cached exchange catalogs and CoinGecko market data to the app, loading the saved catalog from `dataDir` at once. */
 export function createMarketService({ dataDir, fetchImpl = (url, init) => fetch(url, init), log = console }: MarketServiceOptions) {
   const catalogFile = join(dataDir, 'catalog.json')
   let catalog: Catalog = { fetchedAtMs: 0, listings: [] }
@@ -369,4 +373,5 @@ export function createMarketService({ dataDir, fetchImpl = (url, init) => fetch(
   }
 }
 
+/** The market data service created by createMarketService. */
 export type MarketService = ReturnType<typeof createMarketService>

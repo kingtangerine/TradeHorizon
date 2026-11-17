@@ -11,6 +11,7 @@ interface Logger {
   warn?: (message: string) => void
 }
 
+/** The store to copy, the backup folder, how many copies to keep (default 14) and how often to back up in ms (default daily). */
 export interface BackupServiceOptions {
   /** Only the parts of the store a backup needs, so tests could pass a small fake. */
   store: Pick<Store, 'backup' | 'meta'>
@@ -28,6 +29,7 @@ export interface BackupCopy {
   createdAtMs: number
 }
 
+/** The backup folder's state for the admin page: copies kept, the newest one, and the last backup time and error. */
 export interface BackupStatus {
   dir: string
   keep: number
@@ -37,6 +39,7 @@ export interface BackupStatus {
   lastError: string | null
 }
 
+/** Makes and prunes database backups: run() now, runIfDue() when a day has passed, start()/stop() the daily timer. */
 export interface BackupService {
   run(): BackupCopy
   runIfDue(): void
@@ -50,6 +53,7 @@ const PREFIX = 'tradehorizon-'
 
 const fileStamp = (now: number) => new Date(now).toISOString().slice(0, 19).replace(/[-:]/g, '').replace('T', '-')
 
+/** Creates the backup folder if needed and returns the service; nothing is copied until run, runIfDue or start is called. */
 export function createBackupService({
   store,
   dir,

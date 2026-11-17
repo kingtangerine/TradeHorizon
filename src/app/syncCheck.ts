@@ -6,6 +6,7 @@ import { APP_VERSION } from '../version'
 // The sync check behind "Save & check sync" in the account window: compares every synced item on this device
 // with the server's copy (when it was saved, from which device, what it contains) and spells out what is wrong.
 
+/** Sync protocol version this client speaks; a server reporting another version is flagged as a problem. */
 export const SYNC_PROTOCOL = 2
 
 /** Compares "0.14.0"-style versions numerically. */
@@ -19,6 +20,7 @@ export function compareVersions(a: string, b: string): number {
   return 0
 }
 
+/** Human-readable names for the synced storage items, keyed by key suffix (e.g. "layouts:v1"). */
 export const ITEM_LABELS: Readonly<Record<string, string>> = {
   'layouts:v1': 'Saved layouts',
   'drawings:v1': 'Drawings',
@@ -32,6 +34,7 @@ export const ITEM_LABELS: Readonly<Record<string, string>> = {
   'theme:v1': 'Theme',
 }
 
+/** Short description of one copy (local or server) of a synced item. */
 export interface CopySummary {
   /** e.g. "20 layouts" */
   readonly text: string
@@ -40,6 +43,7 @@ export interface CopySummary {
   readonly ids?: readonly string[]
 }
 
+/** One synced item in the sync check: this device's copy, the server's copy, and whether they match. */
 export interface SyncCheckRow {
   readonly name: string
   readonly label: string
@@ -57,6 +61,7 @@ export interface SyncCheckRow {
   readonly onlyServer?: readonly string[]
 }
 
+/** Full result of a sync check, including the plain-language problems found. */
 export interface SyncCheckReport {
   readonly checkedAtMs: number
   readonly device: DeviceInfo
@@ -142,6 +147,10 @@ interface ServerDescription {
   items: Record<string, { rev: number; updatedAtMs: number; size: number; hash: string; by: string | null; byName: string | null }>
 }
 
+/**
+ * Compares every synced item on this device with the server's copy and lists what is wrong.
+ * Never throws: network failures are reported in `problems` (with no rows when the server is unreachable).
+ */
 export async function runSyncCheck(userId: string): Promise<SyncCheckReport> {
   const device = getDevice()
   const problems: string[] = []

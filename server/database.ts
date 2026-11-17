@@ -68,6 +68,7 @@ try {
 
 /** Bumped when the tables change; each step below runs once, in order, on databases older than it. */
 const SCHEMA_VERSION = 2
+/** SQL run to bring the database up to each schema version, keyed by that version. */
 export const MIGRATIONS: Record<number, string> = {
   1: `
     CREATE TABLE users (
@@ -172,6 +173,10 @@ function toItem(row: ItemRow | undefined): DataItem | undefined {
 
 const itemsOf = (rows: ItemRow[]): UserData => Object.fromEntries(rows.map((row) => [row.key, toItem(row)]))
 
+/**
+ * Opens (or creates) the SQLite database at `file`, applies pending migrations and returns the store; throws if the
+ * file is from a newer schema.
+ */
 export function openDatabase(file: string) {
   const db = new sqlite.DatabaseSync(file)
   // The one place where rows get their table's shape (R); SQLite itself only promises SQLite values.

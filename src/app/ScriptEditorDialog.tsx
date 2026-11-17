@@ -15,6 +15,7 @@ interface ScriptEditorDialogProps {
   onClose(): void
 }
 
+/** The script editor window for a new or existing user script; shows the first compile error and saves only valid code. */
 export function ScriptEditorDialog({ script, onSave, onClose }: ScriptEditorDialogProps) {
   const [name, setName] = useState(script?.name ?? '')
   const [source, setSource] = useState(script?.source ?? EXAMPLE_SCRIPT)

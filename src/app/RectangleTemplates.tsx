@@ -16,6 +16,7 @@ function rgba(hex: string, opacityPercent: number): string {
   return `rgba(${(value >> 16) & 255}, ${(value >> 8) & 255}, ${value & 255}, ${opacityPercent / 100})`
 }
 
+/** Templates button for rectangles: a popover to save the selected rectangle's look and apply or delete saved ones. */
 export function RectangleTemplates({ state, current, onApply, onChange }: RectangleTemplatesProps) {
   const [open, setOpen] = useState(false)
   const [name, setName] = useState('')

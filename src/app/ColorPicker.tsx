@@ -25,6 +25,7 @@ interface ColorPickerProps {
   none?: boolean
 }
 
+/** A colour swatch button that opens the palette popover, with an optional "No color" choice. */
 export function ColorPicker({ value, label, onChange, onNone, none = false }: ColorPickerProps) {
   const [open, setOpen] = useState(false)
   const [position, setPosition] = useState({ top: 0, left: 0 })

@@ -1,13 +1,17 @@
 import { cloneDrawing, parseDrawing, type Drawing } from './model'
 
+/** Version of the storage envelope around all drawings; older envelopes are upgraded through DOCUMENT_MIGRATIONS. */
 export const DRAWING_DOCUMENT_VERSION = 1 as const
+/** localStorage key the drawing document is saved under by default. */
 export const DEFAULT_DRAWING_STORAGE_KEY = 'trade-horizon:drawings'
 
+/** The envelope stored as JSON: a version number plus every drawing. */
 export interface DrawingDocumentV1 {
   readonly version: typeof DRAWING_DOCUMENT_VERSION
   readonly drawings: readonly Drawing[]
 }
 
+/** Synchronous persistence backend for DrawingStore: load all drawings, save the full list, or clear it. */
 export interface DrawingRepository {
   load(): readonly Drawing[]
   save(drawings: readonly Drawing[]): void
@@ -21,6 +25,7 @@ export interface KeyValueStorage {
   removeItem(key: string): void
 }
 
+/** Overrides for createLocalStorageDrawingRepository; defaults are the browser's localStorage and DEFAULT_DRAWING_STORAGE_KEY. */
 export interface LocalStorageDrawingRepositoryOptions {
   readonly storage?: KeyValueStorage
   readonly key?: string
@@ -57,6 +62,10 @@ function migrateDocument(value: unknown): unknown {
   return null
 }
 
+/**
+ * Migrates and validates a stored document. Invalid or duplicate-id drawings are dropped; returns null for an
+ * unknown or unmigratable envelope.
+ */
 export function parseDrawingDocument(value: unknown): DrawingDocumentV1 | null {
   const migrated = migrateDocument(value)
   if (!isRecord(migrated) || migrated.version !== DRAWING_DOCUMENT_VERSION) {

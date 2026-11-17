@@ -4,14 +4,18 @@ import { MARKET_INTERVALS, isMarketInterval, type MarketInterval } from '../mark
 // (its `symbol` and `interval`), so everything that already reads a tab keeps working; the other
 // panes live in `tab.split`.
 
+/** Number of charts a split tab can show. */
 export const SPLIT_COUNTS = [2, 3, 4] as const
+/** Number of charts in a split tab. */
 export type SplitCount = (typeof SPLIT_COUNTS)[number]
 
+/** What one pane of a split shows. */
 export interface PaneSpec {
   readonly symbol: string
   readonly interval: MarketInterval
 }
 
+/** The split layout of a chart tab. */
 export interface TabSplit {
   readonly count: SplitCount
   /** Panes 1 to count - 1; pane 0 is the tab's own symbol and interval. */
@@ -22,6 +26,7 @@ export interface TabSplit {
   readonly sync?: SplitSync
 }
 
+/** Which settings the panes of a split share. */
 export interface SplitSync {
   readonly symbol?: boolean
   readonly interval?: boolean
@@ -29,6 +34,7 @@ export interface SplitSync {
   readonly time?: boolean
 }
 
+/** Everything a split can sync, in display order. */
 export const SYNC_KEYS = ['symbol', 'interval', 'crosshair', 'time'] as const
 
 /** Changes one pane; a synced symbol or timeframe goes to every pane of the tab. */
@@ -45,6 +51,7 @@ export function withSyncedPaneChange<T extends PaneTab>(tab: T, index: number, c
   return next
 }
 
+/** Turns syncing of one setting on or off. Returns the tab unchanged when it is not split. */
 export function withSplitSync<T extends PaneTab>(tab: T, key: (typeof SYNC_KEYS)[number], on: boolean): T {
   if (!tab.split) return tab
   const sync = { ...tab.split.sync, [key]: on }
@@ -53,6 +60,7 @@ export function withSplitSync<T extends PaneTab>(tab: T, key: (typeof SYNC_KEYS)
   return { ...tab, split: Object.keys(sync).length > 0 ? { ...rest, sync } : rest }
 }
 
+/** The parts of a chart tab that the split view reads. */
 export interface PaneTab {
   readonly symbol: string
   readonly interval: MarketInterval
@@ -62,19 +70,23 @@ export interface PaneTab {
 /** Timeframes offered as defaults for new panes, shortest to longest. */
 const LADDER: readonly MarketInterval[] = ['5m', '15m', '1h', '4h', '1d']
 
+/** Number of charts the tab shows (1 when not split). */
 export function paneCount(tab: PaneTab): number {
   return tab.split?.count ?? 1
 }
 
+/** Index of the pane the toolbar acts on (0 when not split). */
 export function activePaneIndex(tab: PaneTab): number {
   return tab.split ? Math.min(tab.split.active, tab.split.count - 1) : 0
 }
 
+/** Symbol and timeframe of one pane; pane 0, or a missing pane, is the tab itself. */
 export function paneOf(tab: PaneTab, index: number): PaneSpec {
   if (index > 0 && tab.split?.panes[index - 1]) return tab.split.panes[index - 1]
   return { symbol: tab.symbol, interval: tab.interval }
 }
 
+/** Symbol and timeframe of every pane, pane 0 first. */
 export function panesOf(tab: PaneTab): PaneSpec[] {
   return Array.from({ length: paneCount(tab) }, (_, index) => paneOf(tab, index))
 }
@@ -111,6 +123,7 @@ export function withPaneCount<T extends PaneTab>(tab: T, count: 1 | SplitCount):
   return { ...tab, split: { count, panes, active: Math.min(tab.split?.active ?? 0, count - 1) } }
 }
 
+/** Makes another pane the active one. Returns the tab unchanged for an invalid or already active index. */
 export function withActivePane<T extends PaneTab>(tab: T, index: number): T {
   if (!tab.split || index === tab.split.active || index < 0 || index >= tab.split.count) return tab
   return { ...tab, split: { ...tab.split, active: index } }

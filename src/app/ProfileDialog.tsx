@@ -34,6 +34,7 @@ function formatDate(ms: number): string {
   return new Date(ms).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })
 }
 
+/** The account window: profile info, theme and chart preferences, password change, sync status, admin link and log out. */
 export function ProfileDialog({
   user,
   theme,

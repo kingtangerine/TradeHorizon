@@ -95,6 +95,7 @@ function barsBetween(chart: { getPeriod(): { type: string; span: number } | null
   return Math.round(Math.abs(to - from) / size)
 }
 
+/** Registers the Wave 3 drawing overlays (ray, channel, arrow, brush, Fib extension, pitchfork …) once each. */
 export function registerWave3Overlays(): void {
   const supported = new Set(getSupportedOverlays())
   const add = (name: string, template: Parameters<typeof registerOverlay>[0]) => {

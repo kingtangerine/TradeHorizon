@@ -29,6 +29,7 @@ const SORT_OPTIONS: ReadonlyArray<{ value: LayoutSort; label: string }> = [
 
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
 
+/** Short date for layout lists, like "5 Mar '26". */
 export function formatLayoutDate(valueMs: number): string {
   const date = new Date(valueMs)
   return `${date.getDate()} ${MONTHS[date.getMonth()]} '${String(date.getFullYear()).slice(-2)}`
@@ -52,6 +53,7 @@ interface SuperchartProps {
   onDelete(id: string): void
 }
 
+/** The saved layouts page: search, sort, folders, rename/duplicate/delete, and opening several layouts together. */
 export function Superchart({
   layouts,
   folders,

@@ -4,6 +4,7 @@
 import { getSupportedIndicators, registerIndicator, type IndicatorFigure, type IndicatorTemplate, type KLineData } from 'klinecharts'
 import { STUDIES, atr, bollinger, ichimoku, macd, rsi, stochRsi, supertrend, volumeProfile, type StudyType } from './studies'
 
+/** klinecharts indicator name of a study type. */
 export const studyIndicatorName = (type: StudyType) => `tradeHorizonStudy:${type}`
 
 type Row = Record<string, number | undefined>
@@ -274,6 +275,7 @@ function templates(): IndicatorTemplate<Row>[] {
   ]
 }
 
+/** Registers every study indicator with klinecharts, skipping ones already registered. */
 export function registerStudyIndicators(): void {
   const supported = getSupportedIndicators()
   for (const template of templates()) {

@@ -11,8 +11,10 @@
 // A `line` ({ t1, p1, t2, p2 }) makes the target follow a trend line (extended past its ends) instead of a level.
 // `frequency` 'everyTime' re-arms the alert once the condition is false again, at most once a minute.
 
+/** When an alert fires: the TradingView condition names described at the top of this file. */
 export type AlertCondition = 'crossing' | 'greater' | 'less' | 'enterChannel' | 'exitChannel' | 'movePercent'
 
+/** Two points that define a trend-line target: times in ms (t1, t2) and prices (p1, p2). */
 export interface AlertLineAnchors {
   readonly t1: number
   readonly p1: number
@@ -49,15 +51,20 @@ export interface AlertEvaluation {
   readonly state: AlertState
 }
 
+/** Every alert condition, in the order the app offers them. */
 export const ALERT_CONDITIONS: readonly AlertCondition[] = ['crossing', 'greater', 'less', 'enterChannel', 'exitChannel', 'movePercent']
+/** Least time in ms between two triggers of an 'everyTime' alert. */
 export const EVERY_TIME_COOLDOWN_MS = 60_000
+/** The time windows (ms) offered for movePercent alerts: 5 min, 15 min, 1 h, 4 h and 24 h. */
 export const MOVE_WINDOWS_MS: readonly number[] = [5 * 60_000, 15 * 60_000, 60 * 60_000, 4 * 3_600_000, 24 * 3_600_000]
+/** Longest custom alert message in characters; longer messages are cut. */
 export const MAX_MESSAGE_LENGTH = 200
 
 /** Number.isFinite as a type guard (it is true only for finite numbers). */
 const isFiniteNumber = (value: unknown): value is number => Number.isFinite(value)
 const isCondition = (value: unknown): value is AlertCondition => (ALERT_CONDITIONS as readonly unknown[]).includes(value)
 
+/** The alert's condition, or 'crossing' for older alerts without a valid one. */
 export function conditionOf(alert: { readonly condition?: unknown } | null | undefined): AlertCondition {
   return isCondition(alert?.condition) ? alert.condition : 'crossing'
 }
@@ -107,6 +114,7 @@ export function firesOnTransition(alert: AlertRuleFields): boolean {
   return conditionOf(alert) === 'crossing'
 }
 
+/** Whether the alert has an expiry time (ms) that has passed at `nowMs`. */
 export function isExpired(alert: Partial<AlertRuleFields> | undefined, nowMs: number): boolean {
   return isFiniteNumber(alert?.expiresAtMs) && nowMs > alert.expiresAtMs
 }

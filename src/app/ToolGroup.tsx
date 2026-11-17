@@ -18,6 +18,7 @@ interface ToolGroupProps {
   onCursor(): void
 }
 
+/** A tool-rail button for a group of drawing tools, with a fly-out listing the rest of the group. */
 export function ToolGroup({ label, tools, shown, activeTool, icons, disabled, onChoose, onCursor }: ToolGroupProps) {
   const [open, setOpen] = useState(false)
   const [position, setPosition] = useState<CSSProperties>()

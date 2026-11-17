@@ -1,3 +1,4 @@
+/** Risk and reward of a position: distances in price, amounts in account currency, percents relative to the entry. */
 export interface LongPositionMetrics {
   readonly riskDistance: number
   readonly targetDistance: number
@@ -9,6 +10,10 @@ export interface LongPositionMetrics {
   readonly stopPercent: number
 }
 
+/**
+ * Position size and risk/reward for an entry, target and stop, risking `riskPercent` % of the account. Works for shorts
+ * too, since only distances are used; zero risk distance gives 0 quantity and ratio.
+ */
 export function calculateLongPositionMetrics(
   entry: number,
   target: number,
@@ -34,6 +39,7 @@ export function calculateLongPositionMetrics(
   }
 }
 
+/** Position metrics with an extra DCA buy, sized by calculateDcaPositionMetrics. */
 export interface DcaPositionMetrics extends LongPositionMetrics {
   /** Quantity bought at the entry price. */
   readonly baseQuantity: number

@@ -4,6 +4,7 @@ import { getDevice, getSyncStatus, setDeviceName, subscribeSyncStatus, syncNow, 
 
 const time = (ms?: number) => (ms ? new Date(ms).toLocaleTimeString() : 'never')
 
+/** A one-line description of the sync state for the UI, e.g. "Saving 2 changes…". */
 export function syncStatusText(status: SyncStatus): string {
   switch (status.state) {
     case 'off':
@@ -21,6 +22,7 @@ export function syncStatusText(status: SyncStatus): string {
   }
 }
 
+/** The current sync status; re-renders the component whenever it changes. */
 export function useSyncStatus(): SyncStatus {
   return useSyncExternalStore(subscribeSyncStatus, getSyncStatus, getSyncStatus)
 }

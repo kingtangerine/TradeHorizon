@@ -1,6 +1,7 @@
 import { cloneDrawing, parseDrawing, type Anchor, type Drawing, type DrawingStyle } from './model'
 import type { DrawingRepository } from './persistence'
 
+/** Fields an update command may change; id, market, type and revision are always kept by the store. */
 export interface DrawingUpdate {
   readonly anchors?: readonly Anchor[]
   readonly style?: DrawingStyle
@@ -8,6 +9,7 @@ export interface DrawingUpdate {
   readonly hidden?: boolean
 }
 
+/** An undoable change to the drawing list, applied with DrawingStore.execute. */
 export type DrawingCommand =
   | { readonly kind: 'create'; readonly drawing: Drawing }
   | { readonly kind: 'update'; readonly id: string; readonly changes: DrawingUpdate }
@@ -15,22 +17,27 @@ export type DrawingCommand =
   /** Several changes as one undo step (moving or deleting a multi-selection). Fails as a whole if any part fails. */
   | { readonly kind: 'batch'; readonly commands: readonly DrawingCommand[] }
 
+/** Command that adds a drawing; it fails if the drawing is invalid or its id already exists. */
 export function createDrawing(drawing: Drawing): DrawingCommand {
   return { kind: 'create', drawing }
 }
 
+/** Command that merges changes into a drawing and bumps its revision; it fails if the id is unknown or the result is invalid. */
 export function updateDrawing(id: string, changes: DrawingUpdate): DrawingCommand {
   return { kind: 'update', id, changes }
 }
 
+/** Command that removes a drawing by id; it fails if the id is unknown. */
 export function deleteDrawing(id: string): DrawingCommand {
   return { kind: 'delete', id }
 }
 
+/** Groups commands into one undo step; a single command is returned unwrapped. */
 export function batchDrawings(commands: readonly DrawingCommand[]): DrawingCommand {
   return commands.length === 1 ? commands[0] : { kind: 'batch', commands }
 }
 
+/** Immutable view of the store that subscribers read. */
 export interface DrawingStoreSnapshot {
   readonly drawings: readonly Drawing[]
   readonly canUndo: boolean
@@ -39,6 +46,10 @@ export interface DrawingStoreSnapshot {
   readonly version: number
 }
 
+/**
+ * Construction options. `initialDrawings` takes precedence over the repository's contents; `historyLimit`
+ * (default 100) caps undo steps.
+ */
 export interface DrawingStoreOptions {
   readonly initialDrawings?: readonly Drawing[]
   readonly repository?: DrawingRepository
@@ -115,6 +126,11 @@ function applyCommand(drawings: readonly Drawing[], command: DrawingCommand): re
   }
 }
 
+/**
+ * In-memory source of truth for drawings, with undo/redo. Each successful command is saved to the repository and
+ * notifies subscribers; an invalid command returns false and changes nothing. The constructor throws on invalid
+ * initial drawings or a bad historyLimit.
+ */
 export class DrawingStore {
   private drawings: readonly Drawing[]
   private readonly repository?: DrawingRepository

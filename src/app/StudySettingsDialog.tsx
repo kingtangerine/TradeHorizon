@@ -14,6 +14,7 @@ interface StudySettingsDialogProps {
   onClose(): void
 }
 
+/** Settings window for one study's inputs and line colours; changes apply at once, and it can remove the study. */
 export function StudySettingsDialog({ study, onChange, onRemove, onClose }: StudySettingsDialogProps) {
   const definition = STUDIES[study.type]
   // Typed text is kept while editing so "1" on the way to "14" is not clamped straight away.

@@ -1,7 +1,10 @@
 // The version this copy of the app was built from. The number comes from package.json (bump it with
 // `npm run version:bump`), the build id is the git commit, and the date is when the bundle was built.
+/** App version from package.json, e.g. "0.11.0". */
 export const APP_VERSION: string = __APP_VERSION__
+/** Short git commit the bundle was built from. */
 export const APP_BUILD: string = __APP_BUILD__
+/** When the bundle was built, as an ISO date string. */
 export const APP_BUILT_AT: string = __APP_BUILT_AT__
 
 /** "v0.11.0" */

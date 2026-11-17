@@ -15,6 +15,7 @@ import type { AlertRuleFields, AlertState } from './alertRules.ts'
 import type { SymbolGroups } from './priceFeed.ts'
 import { VENUE_TICKERS } from './venues.ts'
 
+/** Key of the synced data item that holds a user's alerts. */
 export const ALERTS_KEY = 'alerts:v1'
 const POLL_MS = 10_000
 /** A live price older than this no longer counts: the symbol is fetched by polling until the feed catches up. */
@@ -69,6 +70,7 @@ export interface FetchResponse {
   readonly status?: number
   json(): Promise<unknown>
 }
+/** The fetch() signature price fetching uses, so tests can pass a fake. */
 export type FetchLike = (url: string, init: RequestInit) => Promise<FetchResponse>
 
 /** A JSON object from an exchange before its fields are checked. */
@@ -86,6 +88,7 @@ export interface AlertFeed {
   setSymbols(groups: SymbolGroups): void
 }
 
+/** Dependencies of createAlertService; fetching, notifying, the live feed and the clock can be replaced in tests. */
 export interface AlertServiceOptions {
   readonly store: AlertStore
   readonly exchangeOf: (symbol: string) => string | undefined
@@ -97,12 +100,14 @@ export interface AlertServiceOptions {
   readonly log?: ServiceLog
 }
 
+/** How many watched symbols there are, and how many of them get live prices or are polled. */
 export interface AlertWatchStatus {
   readonly symbols: number
   readonly live: number
   readonly polled: number
 }
 
+/** Checks active alerts against live and polled prices, marks them triggered in the stored data and sends notifications. */
 export interface AlertService {
   start(): void
   stop(): void
@@ -145,6 +150,7 @@ interface PushFailure {
   retryAfterMs?: number
 }
 
+/** Where push subscriptions and VAPID keys are kept (`dataDir`), the VAPID contact subject, and an optional sender for tests. */
 export interface PushServiceOptions {
   readonly dataDir: string
   readonly subject: string
@@ -152,6 +158,7 @@ export interface PushServiceOptions {
   readonly sender?: PushSender
 }
 
+/** Web push for alerts: stores browser subscriptions per user and sends notifications through a paced queue. */
 export interface PushService {
   readonly publicKey: string
   /** Returns an error message, or undefined on success. */
@@ -242,6 +249,7 @@ export function newlyTriggered(
     .map((alert) => ({ ...alert, triggeredAtMs: at(alert) }) as TriggeredAlert)
 }
 
+/** The notification for an alert that fired at `price`: title, body text, symbol and alert id. */
 export function alertPayload(alert: AlertRuleFields, price: number): AlertPayload {
   return {
     title: `${alert.symbol} alert`,
@@ -258,13 +266,16 @@ async function getJson(url: string, fetchImpl: FetchLike): Promise<unknown> {
   return response.json()
 }
 
-/** Latest prices for { exchange: symbols[] }. One failing exchange only drops its own symbols. */
 /** Our symbol -> the exchange's own one when nothing better is known ("BYBIT:BTCUSDT.P" -> "BTCUSDT"). */
 const plainApiSymbol = (symbol: string) =>
   String(symbol)
     .replace(/^[A-Z]+:/, '')
     .replace(/\.P$/, '')
 
+/**
+ * Latest prices for { exchange: symbols[] } from Binance and the other exchanges' tickers; one failing exchange only
+ * drops its own symbols.
+ */
 export async function fetchLastPrices(
   groups: SymbolGroups,
   fetchImpl: FetchLike = (url, init) => fetch(url, init),

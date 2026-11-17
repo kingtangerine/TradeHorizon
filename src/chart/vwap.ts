@@ -1,9 +1,12 @@
 // Volume-weighted average price. The running average restarts at the start of each anchor period (UTC),
 // so "VWAP" shows each day's average price paid, and "QVWAP" the average price paid since the start of the quarter.
 
+/** Periods the VWAP can restart on. */
 export const VWAP_ANCHORS = ['day', 'week', 'month', 'quarter', 'year'] as const
+/** One of the VWAP periods in VWAP_ANCHORS. */
 export type VwapAnchor = (typeof VWAP_ANCHORS)[number]
 
+/** Labels of the VWAP periods. */
 export const VWAP_ANCHOR_LABELS: Readonly<Record<VwapAnchor, string>> = {
   day: 'Day',
   week: 'Week',
@@ -12,6 +15,7 @@ export const VWAP_ANCHOR_LABELS: Readonly<Record<VwapAnchor, string>> = {
   year: 'Year',
 }
 
+/** One candle as the VWAP needs it; time in ms. Missing volume counts as 0. */
 export interface VwapBar {
   readonly timestamp: number
   readonly high: number

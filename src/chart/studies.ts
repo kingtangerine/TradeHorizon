@@ -1,9 +1,12 @@
 // The indicator library ("studies", TradingView's word): definitions, stored settings and the maths, all pure so it
 // can be tested without the chart. studyIndicators.ts registers them with klinecharts.
 
+/** The studies in the indicator library, in menu order. */
 export const STUDY_TYPES = ['rsi', 'macd', 'bb', 'stochRsi', 'atr', 'ichimoku', 'supertrend', 'volumeProfile'] as const
+/** One of the studies in STUDY_TYPES. */
 export type StudyType = (typeof STUDY_TYPES)[number]
 
+/** An adjustable study setting, with its default and allowed range. */
 export interface StudyParam {
   readonly label: string
   readonly default: number
@@ -13,12 +16,14 @@ export interface StudyParam {
   readonly step?: number
 }
 
+/** One output line of a study and its default colour. */
 export interface StudyLine {
   readonly key: string
   readonly label: string
   readonly color: string
 }
 
+/** How a study is described, set up and drawn. */
 export interface StudyDefinition {
   readonly type: StudyType
   readonly name: string
@@ -32,6 +37,7 @@ export interface StudyDefinition {
   readonly levels?: readonly number[]
 }
 
+/** Every study's name, pane, settings, lines and guide levels. */
 export const STUDIES: Readonly<Record<StudyType, StudyDefinition>> = {
   rsi: {
     type: 'rsi',
@@ -166,12 +172,15 @@ export interface Study {
   readonly visible: boolean
 }
 
+/** Most studies one chart can show. */
 export const MAX_STUDIES = 10
 
+/** True when the value is a known study type. */
 export function isStudyType(value: unknown): value is StudyType {
   return typeof value === 'string' && (STUDY_TYPES as readonly string[]).includes(value)
 }
 
+/** A new visible study with default settings and colours. */
 export function newStudy(type: StudyType, id: string): Study {
   const definition = STUDIES[type]
   return {
@@ -192,6 +201,7 @@ export function clampParam(param: StudyParam, value: number): number {
 
 const HEX = /^#[0-9a-fA-F]{6}$/
 
+/** Cleans saved studies: drops unknown or duplicate ones, clamps settings, fixes colours, keeps at most MAX_STUDIES. */
 export function normalizeStudies(value: unknown): Study[] {
   if (!Array.isArray(value)) return []
   const seen = new Set<string>()
@@ -227,6 +237,7 @@ export function studyLabel(study: Pick<Study, 'type' | 'params'>): string {
 // ---------------------------------------------------------------------------------------------------------------
 // Maths. Every function returns one entry per input bar; undefined until there is enough history.
 
+/** One candle as the study maths needs it. */
 export interface Bar {
   readonly open: number
   readonly high: number
@@ -261,6 +272,7 @@ function rma(values: Readonly<Series>, length: number): Series {
   return out
 }
 
+/** Exponential moving average seeded with the SMA of the first `length` values; undefined until then. Gaps are skipped. */
 export function ema(values: Readonly<Series>, length: number): Series {
   const out: Series = new Array(values.length).fill(undefined)
   const alpha = 2 / (length + 1)
@@ -285,6 +297,7 @@ export function ema(values: Readonly<Series>, length: number): Series {
   return out
 }
 
+/** Simple moving average over `length` values; undefined until enough history, restarting after a gap. */
 export function sma(values: Readonly<Series>, length: number): Series {
   const out: Series = new Array(values.length).fill(undefined)
   let sum = 0
@@ -304,6 +317,7 @@ export function sma(values: Readonly<Series>, length: number): Series {
   return out
 }
 
+/** RSI (0–100) with Wilder smoothing, as TradingView computes it; undefined until enough history. */
 export function rsi(closes: readonly number[], length: number): Series {
   const gains: Series = [undefined]
   const losses: Series = [undefined]
@@ -323,6 +337,7 @@ export function rsi(closes: readonly number[], length: number): Series {
   })
 }
 
+/** MACD line (fast EMA minus slow EMA), its signal EMA and the histogram; fields undefined until enough history. */
 export function macd(
   closes: readonly number[],
   fast: number,
@@ -342,6 +357,7 @@ export function macd(
   }))
 }
 
+/** Bollinger Bands: SMA basis and upper/lower bands `deviations` standard deviations away; empty until enough history. */
 export function bollinger(
   closes: readonly number[],
   length: number,
@@ -358,6 +374,7 @@ export function bollinger(
   })
 }
 
+/** Stochastic RSI: %K (smoothed stochastic of RSI) and %D (SMA of %K), 0–100; undefined until enough history. */
 export function stochRsi(
   closes: readonly number[],
   kSmoothing: number,
@@ -392,6 +409,7 @@ function trueRanges(bars: readonly Bar[]): number[] {
   )
 }
 
+/** Average True Range with Wilder smoothing, in price units; undefined until enough history. */
 export function atr(bars: readonly Bar[], length: number): Series {
   return rma(trueRanges(bars), length)
 }
@@ -470,6 +488,7 @@ export function supertrend(bars: readonly Bar[], atrLength: number, factor: numb
   return result
 }
 
+/** One price row of a volume profile: its price range and the up/down volume traded in it. */
 export interface ProfileRow {
   readonly low: number
   readonly high: number

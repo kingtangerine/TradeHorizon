@@ -3,8 +3,10 @@ import { DRAWING_SCHEMA_VERSION, expandRectangleAnchors, type Anchor, type Drawi
 import type { Candle } from '../market'
 import { DRAWING_TOOLS, anchorCountFor } from './tools'
 
+/** klinecharts overlay group id shared by all user drawings. */
 export const DRAWING_GROUP_ID = 'trade-horizon:drawings'
 
+/** Converts a candle (string prices, open time in ms) to klinecharts' numeric KLineData. */
 export function candleToKLineData(candle: Candle): KLineData {
   return {
     timestamp: candle.openTimeMs,
@@ -17,6 +19,7 @@ export function candleToKLineData(candle: Candle): KLineData {
   }
 }
 
+/** A number as a plain decimal string without exponent notation; non-finite values give "0". */
 export function decimalString(value: number): string {
   if (!Number.isFinite(value)) return '0'
   const direct = String(value)
@@ -30,6 +33,7 @@ export function decimalString(value: number): string {
     .replace(/\.0+$/, '')
 }
 
+/** The first `count` overlay points as drawing anchors, or null when there are too few or any is invalid. */
 export function overlayAnchors(overlay: Pick<Overlay, 'points'>, count = 2): readonly Anchor[] | null {
   if (overlay.points.length < count) return null
 
@@ -54,6 +58,7 @@ export function overlayAnchors(overlay: Pick<Overlay, 'points'>, count = 2): rea
   return anchors
 }
 
+/** Builds a drawing from a klinecharts overlay, keeping style and revision of `existing`; null when its points are invalid. */
 export function drawingFromOverlay(
   overlay: Overlay,
   marketId: string,
@@ -90,6 +95,7 @@ export function drawingFromOverlay(
   }
 }
 
+/** A drawing's anchors as klinecharts points (time in ms, numeric price). */
 export function drawingPoints(drawing: Drawing): Array<{ timestamp: number; value: number }> {
   return drawing.anchors.map((anchor) => ({
     timestamp: anchor.timeMs,

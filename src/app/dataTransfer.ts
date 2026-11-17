@@ -1,10 +1,13 @@
 // Backup and restore of one user's saved data (layouts, drawings, alerts, workspace, groups, theme)
 // as a JSON file, so work survives a server problem or can be moved between accounts.
 
+/** Marker stored in every backup file to recognise it. */
 export const BACKUP_FORMAT = 'trade-horizon-backup'
+/** Version of the backup file layout written by this app. */
 export const BACKUP_VERSION = 1
 const MAX_BACKUP_BYTES = 20_000_000
 
+/** Contents of a backup JSON file. */
 export interface BackupFile {
   readonly format: typeof BACKUP_FORMAT
   readonly version: number
@@ -18,6 +21,7 @@ function prefixFor(userId: string): string {
   return `trade-horizon:user:${userId}:`
 }
 
+/** Collects every localStorage entry of this user into a backup object (keys without the user prefix). */
 export function buildBackup(
   userId: string,
   account: { email: string; displayName: string },
@@ -41,6 +45,7 @@ export function buildBackup(
   }
 }
 
+/** Validates and reads a backup file, keeping only well-formed JSON entries. Throws a user-facing error when the file is not usable. */
 export function parseBackup(text: string): BackupFile {
   if (text.length > MAX_BACKUP_BYTES) throw new Error('This file is too large to be a TradeHorizon backup.')
   let value: unknown
@@ -88,6 +93,7 @@ export function restoreBackup(userId: string, backup: BackupFile, storage: Pick<
   return count
 }
 
+/** Download name for a backup, e.g. "tradehorizon-backup-2026-01-31.json" (UTC date). */
 export function backupFileName(nowMs = Date.now()): string {
   return `tradehorizon-backup-${new Date(nowMs).toISOString().slice(0, 10)}.json`
 }

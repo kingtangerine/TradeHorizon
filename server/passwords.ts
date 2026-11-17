@@ -7,11 +7,13 @@ const derive = (password: string, salt: Buffer) =>
     scrypt(password, salt, 64, (error, key) => (error ? fail(error) : ok(key)))
   })
 
+/** Hashes a password with scrypt and a random salt; returns "saltHex:keyHex". */
 export async function makeHash(password: string): Promise<string> {
   const salt = randomBytes(16)
   return `${salt.toString('hex')}:${(await derive(password, salt)).toString('hex')}`
 }
 
+/** Whether `password` matches a hash from makeHash (constant-time compare); false for a malformed hash. */
 export async function verifyHash(password: string, stored: string): Promise<boolean> {
   const [saltHex, keyHex] = String(stored).split(':')
   if (!saltHex || !keyHex) return false

@@ -3,14 +3,17 @@
 import { getSupportedIndicators, registerIndicator, type KLineData } from 'klinecharts'
 import { MAX_PLOTS, compileScript, runScript, type CompiledScript } from './script'
 
+/** klinecharts indicator name used for user scripts. */
 export const SCRIPT_INDICATOR_NAME = 'tradeHorizonScript'
 
+/** Style of one script line on the chart. */
 export interface ScriptPlotStyle {
   readonly title: string
   readonly color: string
   readonly width: number
 }
 
+/** What a script indicator carries in `extendData`: the source, chosen input values, line styles and levels. */
 export interface ScriptExtend {
   readonly source: string
   readonly inputs: readonly number[]
@@ -37,6 +40,7 @@ export function compiledScript(source: string): CompiledScript | Error {
 
 type Row = Record<string, number | undefined>
 
+/** Registers the user-script indicator with klinecharts once; a script that fails to compile or run draws nothing. */
 export function registerScriptIndicator(): void {
   if (getSupportedIndicators().includes(SCRIPT_INDICATOR_NAME)) return
   registerIndicator<Row>({

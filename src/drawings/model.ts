@@ -4,8 +4,10 @@
  */
 export type DecimalPrice = string
 
+/** Schema version stamped on every drawing; parseDrawing rejects any other value. */
 export const DRAWING_SCHEMA_VERSION = 1 as const
 
+/** Every drawing tool the chart supports, as stored in `Drawing.type`. */
 export const DRAWING_TYPES = [
   'trendLine',
   'ray',
@@ -30,29 +32,39 @@ export const DRAWING_TYPES = [
   'priceLabel',
 ] as const
 
+/** One of the drawing tool identifiers in DRAWING_TYPES. */
 export type DrawingType = (typeof DRAWING_TYPES)[number]
 
+/** Candle price fields an anchor can be magnet-snapped to. */
 export const SNAP_FIELDS = ['open', 'high', 'low', 'close'] as const
 
+/** The candle price field an anchor is snapped to. */
 export type SnapField = (typeof SNAP_FIELDS)[number]
 
+/** Scalar JSON value allowed inside a drawing's style. */
 export type JsonPrimitive = string | number | boolean | null
+/** Any JSON-serializable value; drawing styles are limited to this so they persist losslessly. */
 export type JsonValue = JsonPrimitive | readonly JsonValue[] | { readonly [key: string]: JsonValue }
+/** Free-form, JSON-only style bag of a drawing (colors, widths, labels), interpreted by the chart layer. */
 export type DrawingStyle = Readonly<Record<string, JsonValue>>
 
+/** Records that an anchor was snapped to a candle: that bar's open time (ms epoch) and which price field. */
 export interface AnchorSnapV1 {
   readonly barOpenMs: number
   readonly field: SnapField
 }
 
+/** A point in market space: time as ms epoch and price as a decimal string, optionally snapped to a candle. */
 export interface AnchorV1 {
   readonly timeMs: number
   readonly price: DecimalPrice
   readonly snap?: AnchorSnapV1
 }
 
+/** Alias of the current anchor schema version. */
 export type Anchor = AnchorV1
 
+/** A persisted drawing: its market, tool type, anchors, style, and a revision counter bumped on every update. */
 export interface DrawingV1 {
   readonly schemaVersion: typeof DRAWING_SCHEMA_VERSION
   readonly id: string
@@ -65,19 +77,23 @@ export interface DrawingV1 {
   readonly hidden?: boolean
 }
 
+/** Alias of the current drawing schema version. */
 export type Drawing = DrawingV1
 
 const DECIMAL_PATTERN = /^-?(?:0|[1-9]\d*)(?:\.\d+)?$/
 const FORBIDDEN_OBJECT_KEYS = new Set(['__proto__', 'constructor', 'prototype'])
 
+/** True for a plain decimal string such as "-12.5" (no exponent, no plus sign, no leading zeros). */
 export function isDecimalPrice(value: unknown): value is DecimalPrice {
   return typeof value === 'string' && DECIMAL_PATTERN.test(value)
 }
 
+/** True for a non-negative safe-integer timestamp in ms since epoch. */
 export function isTimestampMs(value: unknown): value is number {
   return typeof value === 'number' && Number.isSafeInteger(value) && value >= 0
 }
 
+/** True when the value is one of the DRAWING_TYPES identifiers. */
 export function isDrawingType(value: unknown): value is DrawingType {
   return typeof value === 'string' && (DRAWING_TYPES as readonly string[]).includes(value)
 }
@@ -170,6 +186,10 @@ function decimalString(value: number): string {
     .replace(/\.0+$/, '')
 }
 
+/**
+ * Expands two or more rectangle anchors into its 8 handle points (corners and edge midpoints), clockwise from
+ * top-left. Fewer than two anchors, or no finite price, returns a plain copy.
+ */
 export function expandRectangleAnchors(anchors: readonly AnchorV1[]): AnchorV1[] {
   if (anchors.length >= 2) {
     const times = anchors.map((a) => a.timeMs)
@@ -265,6 +285,7 @@ export function parseDrawing(value: unknown): DrawingV1 | null {
   }
 }
 
+/** Returns a sanitized deep copy via parseDrawing; throws TypeError if the drawing is invalid. */
 export function cloneDrawing(drawing: Drawing): Drawing {
   const parsed = parseDrawing(drawing)
   if (!parsed) {

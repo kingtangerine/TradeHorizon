@@ -41,6 +41,7 @@ export interface StoredItemInfo {
   counts: Partial<ItemCounts>
 }
 
+/** Free and total space of the disk holding the data folder, in bytes. */
 export interface DiskSpace {
   freeBytes: number
   totalBytes: number

@@ -1,6 +1,7 @@
 import type { Period } from 'klinecharts'
 import type { MarketInterval } from '../market'
 
+/** Timeframes shown as buttons in the toolbar. */
 export const DISPLAY_INTERVALS = ['1m', '5m', '15m', '1h', '4h', '1d'] as const satisfies readonly MarketInterval[]
 
 const PERIODS: Readonly<Record<MarketInterval, Period>> = {
@@ -21,10 +22,12 @@ const PERIODS: Readonly<Record<MarketInterval, Period>> = {
   '1M': { type: 'month', span: 1 },
 }
 
+/** The klinecharts period for a market interval. */
 export function intervalToPeriod(interval: MarketInterval): Period {
   return { ...PERIODS[interval] }
 }
 
+/** The market interval for a klinecharts period, or null when there is none. */
 export function periodToInterval(period: Period): MarketInterval | null {
   for (const [interval, candidate] of Object.entries(PERIODS) as Array<[MarketInterval, Period]>) {
     if (candidate.type === period.type && candidate.span === period.span) {

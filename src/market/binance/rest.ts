@@ -3,10 +3,13 @@ import { toBinanceKlineInterval, type MarketInterval } from '../intervals'
 import { DEFAULT_BINANCE_SPOT_SYMBOL, normalizeBinanceSpotSymbol, type Candle } from '../types'
 import { parseBinanceRestKlines } from './parsers'
 
+/** Binance spot klines URL on the public market-data mirror. */
 export const BINANCE_MARKET_DATA_REST_ENDPOINT = 'https://data-api.binance.vision/api/v3/klines'
 
+/** Binance USDT-M futures klines URL. */
 export const BINANCE_FUTURES_REST_ENDPOINT = 'https://fapi.binance.com/fapi/v1/klines'
 
+/** A klines request. Times are ms epoch; `limit` is 1-1000 (default 500); `symbol` defaults to BTCUSDT and `endpoint` to spot. */
 export interface FetchBinanceKlinesOptions {
   symbol?: string
   interval: MarketInterval
@@ -17,6 +20,7 @@ export interface FetchBinanceKlinesOptions {
   endpoint?: string
 }
 
+/** fetch-compatible function, injectable for tests. */
 export type MarketDataFetch = (input: string | URL, init?: RequestInit) => Promise<Response>
 
 function defaultFetch(input: string | URL, init?: RequestInit): Promise<Response> {
@@ -33,6 +37,10 @@ function validateOptionalTime(value: number | undefined, label: string): void {
   }
 }
 
+/**
+ * Fetches candles ascending by open time. Throws RangeError for bad options, MarketDataHttpError for a non-OK
+ * response and MarketDataParseError for a bad payload.
+ */
 export async function fetchBinanceKlines(options: FetchBinanceKlinesOptions, fetcher: MarketDataFetch = defaultFetch): Promise<Candle[]> {
   const symbol = normalizeBinanceSpotSymbol(options.symbol ?? DEFAULT_BINANCE_SPOT_SYMBOL)
   const limit = options.limit ?? 500
@@ -75,11 +83,13 @@ export async function fetchBinanceKlines(options: FetchBinanceKlinesOptions, fet
   return parseBinanceRestKlines(payload, { symbol, interval: options.interval })
 }
 
+/** Candles from LatestBinanceKlinesLoader.load, tagged with the request generation that produced them. */
 export interface LatestKlinesResult {
   generation: number
   candles: Candle[]
 }
 
+/** Candle fetcher used by LatestBinanceKlinesLoader. */
 export type BinanceKlineFetcher = (options: FetchBinanceKlinesOptions) => Promise<Candle[]>
 
 /**
