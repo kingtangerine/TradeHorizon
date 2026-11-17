@@ -355,6 +355,8 @@ function WorkspaceApp({ user, onLogout, onUserRefresh }: WorkspaceAppProps) {
   // A tab shows one chart or a split of 2 to 4. The active pane's symbol and timeframe drive the toolbar, tools and panels.
   const activePaneIdx = activePaneIndex(activeTab)
   const panes = useMemo(() => panesOf(activeTab), [activeTab])
+  // getMarket() reads the shared market catalog, which `markets` mirrors: look the panes up again when the catalog loads.
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- `markets` is that catalog-changed signal
   const paneMarkets = useMemo(() => panes.map((pane) => getMarket(pane.symbol)), [panes, markets])
   const paneTotal = panes.length
   const market = paneMarkets[activePaneIdx]
@@ -1247,9 +1249,13 @@ function WorkspaceApp({ user, onLogout, onUserRefresh }: WorkspaceAppProps) {
     return () => controller.abort()
   }, [])
 
+  // Reset the name field only when another layout is opened, not on every rename (that would fight the user's typing).
+  const layoutNameRef = useRef(currentLayout?.name ?? workspace.layoutName)
+  layoutNameRef.current = currentLayout?.name ?? workspace.layoutName
+  const currentLayoutId = currentLayout?.id
   useEffect(() => {
-    setLayoutDraftName(currentLayout?.name ?? workspace.layoutName)
-  }, [currentLayout?.id])
+    setLayoutDraftName(layoutNameRef.current)
+  }, [currentLayoutId])
 
   useEffect(() => saveWorkspace(user.id, workspace), [user.id, workspace])
   useEffect(() => saveSavedLayouts(user.id, savedLayouts), [savedLayouts, user.id])
@@ -3366,16 +3372,18 @@ function AuthScreen({ onAuthenticated }: { onAuthenticated(user: AppUser): void 
 export function App() {
   const [user, setUser] = useState<AppUser | null>(() => restoreSession())
   const [syncedUserId, setSyncedUserId] = useState<string>()
+  // Keyed on the id, not the user object: setUser() below replaces the object for the same account.
+  const userId = user?.id
   useEffect(() => {
-    if (!user) return
+    if (!userId) return
     let live = true
     void (async () => {
       // A browser that has synced this account before already holds a good copy, so open the workspace from it
       // right away (no loading screen when you come back to the app) and check with the server in the background.
       // A first visit on a new device waits for the server copy instead.
-      const returning = hasSyncedBefore(user.id)
-      if (returning) setSyncedUserId(user.id)
-      const sync = startUserSync(user.id)
+      const returning = hasSyncedBefore(userId)
+      if (returning) setSyncedUserId(userId)
+      const sync = startUserSync(userId)
       if (!(await verifySession())) {
         stopUserSync()
         if (live) setUser(null)
@@ -3384,12 +3392,12 @@ export function App() {
       if (live) setUser((current) => restoreSession() ?? current)
       await sync
       // Newer data from other devices is applied in place (subscribeRemoteData), so no reload is needed.
-      if (live && !returning) setSyncedUserId(user.id)
+      if (live && !returning) setSyncedUserId(userId)
     })()
     return () => {
       live = false
     }
-  }, [user?.id])
+  }, [userId])
   if (!user) return <AuthScreen onAuthenticated={setUser} />
   if (syncedUserId !== user.id)
     return (

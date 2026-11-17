@@ -87,6 +87,11 @@ export function CryptoChartSurface({
   magnetRef.current = magnet
   const chartTypeRef = useRef(chartType)
   chartTypeRef.current = chartType
+  // Read when the chart is (re)created; later changes reach the live chart through their own effects.
+  const intervalRef = useRef(interval)
+  intervalRef.current = interval
+  const volumeVisibleRef = useRef(volumeVisible)
+  volumeVisibleRef.current = volumeVisible
   callbacksRef.current = { onRuntimeState, onToolSettled, onSelectionChange }
   const alertRef = useRef({ alertLines, onAlertMove, onAlertDelete })
   alertRef.current = { alertLines, onAlertMove, onAlertDelete }
@@ -95,7 +100,7 @@ export function CryptoChartSurface({
     if (!hostRef.current) return
 
     try {
-      const controller = new KLineChartController(hostRef.current, interval, market, drawingStore, {
+      const controller = new KLineChartController(hostRef.current, intervalRef.current, market, drawingStore, {
         onRuntimeState: (state) => callbacksRef.current.onRuntimeState(state),
         onToolSettled: () => callbacksRef.current.onToolSettled(),
         onSelectionChange: (selected) => callbacksRef.current.onSelectionChange(selected),
@@ -105,7 +110,7 @@ export function CryptoChartSurface({
       })
       controller.setAlertLines(alertRef.current.alertLines ?? [])
       controllerRef.current = controller
-      controller.setVolumeVisible(volumeVisible)
+      controller.setVolumeVisible(volumeVisibleRef.current)
       controller.setIndicators(indicatorsRef.current)
       controller.setMagnet(magnetRef.current)
       controller.setChartType(chartTypeRef.current)
@@ -124,8 +129,8 @@ export function CryptoChartSurface({
         onControllerChange(null)
       }
     } catch (error) {
-      onRuntimeState({
-        interval,
+      callbacksRef.current.onRuntimeState({
+        interval: intervalRef.current,
         connection: 'error',
         quote: null,
         error: error instanceof Error ? error.message : 'The chart could not be started.',
