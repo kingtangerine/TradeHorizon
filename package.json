@@ -5,22 +5,22 @@
   "version": "0.28.0",
   "type": "module",
   "engines": {
-    "node": ">=22.13"
+    "node": ">=22.18"
   },
   "scripts": {
-    "dev": "node scripts/dev-all.mjs",
+    "dev": "node scripts/dev-all.ts",
     "dev:client": "vite",
-    "server": "node server/index.mjs",
-    "start": "node server/index.mjs",
-    "build": "tsc -b && vite build",
+    "server": "node server/index.ts",
+    "start": "node build/server/index.js",
+    "build": "tsc -b && vite build && tsc -p tsconfig.server.build.json",
     "test": "vitest run",
     "test:watch": "vitest",
     "preview": "vite preview",
-    "lint": "eslint .",
+    "lint": "eslint --flag unstable_native_nodejs_ts_config .",
     "check": "npm run lint && tsc -b && vitest run",
-    "version:bump": "node scripts/bump-version.mjs",
-    "user:list": "node scripts/user-admin.mjs list",
-    "user:password": "node scripts/user-admin.mjs password"
+    "version:bump": "node scripts/bump-version.ts",
+    "user:list": "node scripts/user-admin.ts list",
+    "user:password": "node scripts/user-admin.ts password"
   },
   "dependencies": {
     "klinecharts": "10.0.3",

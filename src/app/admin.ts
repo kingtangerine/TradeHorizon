@@ -1,6 +1,6 @@
 import { getSessionToken } from './auth'
 
-// Admin API (server/index.mjs, handleAdmin). The server decides who is an admin (TH_ADMIN_EMAILS).
+// Admin API (server/index.ts, handleAdmin). The server decides who is an admin (TH_ADMIN_EMAILS).
 
 export interface AdminCounts {
   readonly layouts: number

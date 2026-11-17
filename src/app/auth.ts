@@ -9,7 +9,7 @@ export interface AppUser {
   readonly mustChangePassword?: boolean
 }
 
-// Accounts live on the server (server/index.mjs) so they work from any device.
+// Accounts live on the server (server/index.ts) so they work from any device.
 // Only the session token and a cached copy of the public profile stay in this browser.
 const SESSION_KEY = 'trade-horizon:session:v2'
 const LEGACY_USERS_KEY = 'trade-horizon:users:v1'

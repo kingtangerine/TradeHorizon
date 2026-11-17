@@ -26,7 +26,7 @@
 ## Quick Start
 
 ### Prerequisites
-- Node.js (v18+)
+- Node.js 22.18 or newer (it runs the TypeScript server and scripts directly in development)
 - npm
 
 ### Installation & Run
@@ -51,7 +51,7 @@ npm run build
 
 ### Running in production
 
-`npm start` serves the built app and the API from one Node process. Settings come from environment variables, or from a `.env` file in the app folder (one `KEY=value` per line, git-ignored; environment variables win). On Plesk use the `.env` file: its Node.js panel does not always pass variables to the app.
+`npm run build` also compiles the TypeScript server to plain JavaScript in `build/`, and `npm start` (`node build/server/index.js`) serves the built app and the API from one Node process. On Plesk, set the Node.js **Application Startup File** to `build/server/index.js`. Settings come from environment variables, or from a `.env` file in the app folder (one `KEY=value` per line, git-ignored; environment variables win). On Plesk use the `.env` file: its Node.js panel does not always pass variables to the app.
 
 | Variable | Purpose |
 |---|---|
@@ -67,13 +67,14 @@ npm run build
 - **HTTPS is required** for the service worker, installing the app, and background alert notifications (browsers only allow them on HTTPS; `localhost` is exempt). Terminate TLS in nginx/Cloudflare and forward `X-Forwarded-For` and `X-Forwarded-Proto`.
 - `GET /healthz` returns `{"ok":true,...}` for uptime monitors.
 - The server caches Binance/Bybit coin lists and CoinGecko market caps for all users, and watches prices for **price alerts**, sending a web-push notification when one triggers (indices such as BTC.D are only evaluated while the app is open).
-- `server/data/` holds `tradehorizon.db` (SQLite: accounts, sessions and every user's synced data), `backups/` (daily copies of the database), `vapid.json` (push keys; losing it silently disconnects every device's notifications), `push.json`, `telegram.json` and `catalog.json`. Node.js 22.13 or newer is required (built-in SQLite).
+- `server/data/` holds `tradehorizon.db` (SQLite: accounts, sessions and every user's synced data), `backups/` (daily copies of the database), `vapid.json` (push keys; losing it silently disconnects every device's notifications), `push.json`, `telegram.json` and `catalog.json`. Node.js 22.18 or newer is required (built-in SQLite, TypeScript scripts).
 
 ### Updating the live server
 
 1. On your computer: commit and `git push`.
 2. On the server (Plesk: *Git* to pull, or SSH into the app folder): `git pull`, then **NPM install** (`npm ci`) and the build (`npm run build`).
-3. **Restart App** (Plesk Node.js page), open the site once, then check `/healthz`: `version` is the new one and `database` shows your accounts.
+3. First time after the move to TypeScript only: set the Application Startup File to `build/server/index.js` (it was `server/index.mjs`).
+4. **Restart App** (Plesk Node.js page), open the site once, then check `/healthz`: `version` is the new one and `database` shows your accounts.
 
 `server/data/` and `.env` are not in git, so pulling never touches them.
 
@@ -82,8 +83,8 @@ npm run build
 Simulate many users against a **test** copy of the server (never the live data folder):
 
 ```bash
-TH_DATA_DIR=/tmp/th-load PORT=8899 node server/index.mjs        # test server, its own empty data folder
-node scripts/loadtest.mjs --data-dir /tmp/th-load --base http://127.0.0.1:8899 --users 1000 --minutes 3
+TH_DATA_DIR=/tmp/th-load PORT=8899 node server/index.ts        # test server, its own empty data folder
+node scripts/loadtest.ts --data-dir /tmp/th-load --base http://127.0.0.1:8899 --users 1000 --minutes 3
 ```
 
 Each simulated user downloads its data once, checks for changes every 15 s, saves a 5 KB layouts item about every 45 s and a 60 KB drawings item about every 3 minutes. The report lists response times per kind of request (typical, 95%, 99%, worst) and errors. On the live server watch *Responsiveness* on the admin page (or `eventLoopDelayMs` in `/healthz`): a few ms is healthy, hundreds of ms mean it is not keeping up. Running the test on the live machine takes CPU from real users: do it at a quiet time.
