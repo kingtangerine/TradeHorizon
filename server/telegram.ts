@@ -105,12 +105,21 @@ export function parseCommand(text: unknown): ParsedCommand | undefined {
 /** A Telegram or network error as a sentence that says what to fix. */
 export function explainError(caught: unknown): string {
   const error = errorInfo(caught)
-  if (error?.status === 401 || error?.status === 404) return 'Telegram rejected the bot token (it is wrong or was revoked). Copy the current token from @BotFather into TH_TELEGRAM_TOKEN and restart the app.'
-  if (error?.status === 409) return 'Another process is reading this bot\'s messages: the same token runs on two servers, or the app runs twice. Only one may use the token.'
+  if (error?.status === 401 || error?.status === 404)
+    return 'Telegram rejected the bot token (it is wrong or was revoked). Copy the current token from @BotFather into TH_TELEGRAM_TOKEN and restart the app.'
+  if (error?.status === 409)
+    return "Another process is reading this bot's messages: the same token runs on two servers, or the app runs twice. Only one may use the token."
   if (error?.status === 429) return 'Telegram is rate-limiting this bot; it retries automatically.'
   const code = error?.cause?.code ?? error?.code
-  if (code === 'ENOTFOUND' || code === 'EAI_AGAIN') return `This server cannot look up api.telegram.org (DNS ${code}). Check the server's DNS settings.`
-  if (code === 'ECONNREFUSED' || code === 'ECONNRESET' || code === 'ETIMEDOUT' || code === 'UND_ERR_CONNECT_TIMEOUT' || error?.name === 'TimeoutError') {
+  if (code === 'ENOTFOUND' || code === 'EAI_AGAIN')
+    return `This server cannot look up api.telegram.org (DNS ${code}). Check the server's DNS settings.`
+  if (
+    code === 'ECONNREFUSED' ||
+    code === 'ECONNRESET' ||
+    code === 'ETIMEDOUT' ||
+    code === 'UND_ERR_CONNECT_TIMEOUT' ||
+    error?.name === 'TimeoutError'
+  ) {
     return `This server cannot reach api.telegram.org (${code ?? 'timeout'}). A firewall or the hosting provider is probably blocking outgoing HTTPS to Telegram.`
   }
   return `Telegram request failed: ${error?.message ?? caught}${code ? ` (${code})` : ''}.`
@@ -124,7 +133,15 @@ export function formatAlertMessage(payload: AlertPayload): string {
  * @param userName userId -> display name (for the greeting), or undefined when unknown
  * @param fetchImpl injectable for tests
  */
-export function createTelegramService({ dataDir, token, apiBase = API, userName = () => undefined, fetchImpl = (url, init) => fetch(url, init), log = console, now = () => Date.now() }: TelegramServiceOptions) {
+export function createTelegramService({
+  dataDir,
+  token,
+  apiBase = API,
+  userName = () => undefined,
+  fetchImpl = (url, init) => fetch(url, init),
+  log = console,
+  now = () => Date.now(),
+}: TelegramServiceOptions) {
   const file = join(dataDir, 'telegram.json')
   const enabled = typeof token === 'string' && TOKEN_FORMAT.test(token)
   if (token && !enabled) log.warn?.('[telegram] TH_TELEGRAM_TOKEN does not look like a bot token, so Telegram alerts are off.')
@@ -132,7 +149,11 @@ export function createTelegramService({ dataDir, token, apiBase = API, userName 
   /** links: userId -> [{ chatId, name, linkedAtMs }]; offset: next getUpdates offset */
   let state: TelegramState = { links: {}, offset: 0 }
   if (existsSync(file)) {
-    try { state = { links: {}, offset: 0, ...(JSON.parse(readFileSync(file, 'utf8')) as Partial<TelegramState>) } } catch { /* start empty */ }
+    try {
+      state = { links: {}, offset: 0, ...(JSON.parse(readFileSync(file, 'utf8')) as Partial<TelegramState>) }
+    } catch {
+      /* start empty */
+    }
   }
   const persist = () => {
     writeFileSync(`${file}.tmp`, JSON.stringify(state))
@@ -169,7 +190,8 @@ export function createTelegramService({ dataDir, token, apiBase = API, userName 
     return payload.result as T
   }
 
-  const reply = (chatId: number, text: string) => call<unknown>('sendMessage', { chat_id: chatId, text, parse_mode: 'HTML', disable_web_page_preview: true })
+  const reply = (chatId: number, text: string) =>
+    call<unknown>('sendMessage', { chat_id: chatId, text, parse_mode: 'HTML', disable_web_page_preview: true })
 
   function dropChat(chatId: number) {
     let changed = false
@@ -203,24 +225,36 @@ export function createTelegramService({ dataDir, token, apiBase = API, userName 
         codes.delete(command.arg!) // entry was found under this code, so it is set
         link(entry.userId, chat.id, name)
         const account = userName(entry.userId)
-        await reply(chat.id, `✅ <b>Connected${account ? ` to ${escapeHtml(account)}'s TradeHorizon account` : ''}.</b>\nYou will get a message here whenever one of your price alerts triggers.\n\nSend /stop to disconnect.`)
+        await reply(
+          chat.id,
+          `✅ <b>Connected${account ? ` to ${escapeHtml(account)}'s TradeHorizon account` : ''}.</b>\nYou will get a message here whenever one of your price alerts triggers.\n\nSend /stop to disconnect.`,
+        )
         return
       }
-      await reply(chat.id, command.arg
-        ? '⚠️ This link has expired or was already used. Open TradeHorizon, go to Alerts and press Connect Telegram again.'
-        : 'Hi! I send your TradeHorizon price alerts.\nOpen TradeHorizon, go to Alerts and press <b>Connect Telegram</b> to link this chat.')
+      await reply(
+        chat.id,
+        command.arg
+          ? '⚠️ This link has expired or was already used. Open TradeHorizon, go to Alerts and press Connect Telegram again.'
+          : 'Hi! I send your TradeHorizon price alerts.\nOpen TradeHorizon, go to Alerts and press <b>Connect Telegram</b> to link this chat.',
+      )
       return
     }
     if (command.command === 'stop') {
       const removed = dropChat(chat.id)
-      await reply(chat.id, removed ? '🔕 Disconnected. You will not get alerts here any more.' : 'This chat is not connected to a TradeHorizon account.')
+      await reply(
+        chat.id,
+        removed ? '🔕 Disconnected. You will not get alerts here any more.' : 'This chat is not connected to a TradeHorizon account.',
+      )
       return
     }
     if (command.command === 'help' || command.command === 'status') {
       const linked = Object.values(state.links).some((list) => list.some((item) => item.chatId === chat.id))
-      await reply(chat.id, linked
-        ? '✅ This chat is connected. Price alerts you create in TradeHorizon arrive here.\n/stop – disconnect'
-        : 'Not connected yet. Open TradeHorizon, go to Alerts and press <b>Connect Telegram</b>.')
+      await reply(
+        chat.id,
+        linked
+          ? '✅ This chat is connected. Price alerts you create in TradeHorizon arrive here.\n/stop – disconnect'
+          : 'Not connected yet. Open TradeHorizon, go to Alerts and press <b>Connect Telegram</b>.',
+      )
     }
   }
 
@@ -232,10 +266,18 @@ export function createTelegramService({ dataDir, token, apiBase = API, userName 
       await call('deleteWebhook', {}).catch(() => undefined)
       log.log?.(`[telegram] bot @${botUsername} is ready`)
     }
-    const updates = await call<TelegramUpdate[]>('getUpdates', { offset: state.offset, timeout: POLL_SECONDS, allowed_updates: ['message'] }, (POLL_SECONDS + 15) * 1000)
+    const updates = await call<TelegramUpdate[]>(
+      'getUpdates',
+      { offset: state.offset, timeout: POLL_SECONDS, allowed_updates: ['message'] },
+      (POLL_SECONDS + 15) * 1000,
+    )
     for (const update of updates) {
       state.offset = update.update_id + 1
-      try { await handleMessage(update.message) } catch (error) { log.warn?.(`[telegram] could not answer a message: ${errorInfo(error)?.message}`) }
+      try {
+        await handleMessage(update.message)
+      } catch (error) {
+        log.warn?.(`[telegram] could not answer a message: ${errorInfo(error)?.message}`)
+      }
     }
     if (updates.length > 0) persist()
     return updates.length
@@ -258,7 +300,10 @@ export function createTelegramService({ dataDir, token, apiBase = API, userName 
         }
         log.warn?.(`[telegram] ${problem}`)
         delayMs = Math.min(60_000, delayMs ? delayMs * 2 : 3000)
-        await new Promise((resolve) => { const timer = setTimeout(resolve, delayMs); timer.unref?.() })
+        await new Promise((resolve) => {
+          const timer = setTimeout(resolve, delayMs)
+          timer.unref?.()
+        })
       }
     }
   }
@@ -268,20 +313,46 @@ export function createTelegramService({ dataDir, token, apiBase = API, userName 
     botUsername: () => botUsername,
     /** For /healthz: whether the bot works, and if not, why (never includes the token). */
     diagnostics() {
-      if (!token) return { state: 'off', problem: 'TH_TELEGRAM_TOKEN is not set for this Node process. Put TH_TELEGRAM_TOKEN=<token> in a .env file in the app folder (next to package.json), or set it as an environment variable, then restart the app.' }
-      if (!enabled) return { state: 'off', problem: 'TH_TELEGRAM_TOKEN is set but does not look like a bot token (expected digits, a colon, then 30+ letters/digits; check for extra quotes or spaces).' }
+      if (!token)
+        return {
+          state: 'off',
+          problem:
+            'TH_TELEGRAM_TOKEN is not set for this Node process. Put TH_TELEGRAM_TOKEN=<token> in a .env file in the app folder (next to package.json), or set it as an environment variable, then restart the app.',
+        }
+      if (!enabled)
+        return {
+          state: 'off',
+          problem:
+            'TH_TELEGRAM_TOKEN is set but does not look like a bot token (expected digits, a colon, then 30+ letters/digits; check for extra quotes or spaces).',
+        }
       if (botUsername && !problem) return { state: 'ready', bot: `@${botUsername}`, pollingSinceMs: startedPollingAtMs ?? null }
-      return { state: problem ? 'error' : 'starting', bot: botUsername ? `@${botUsername}` : null, problem: problem ?? 'Contacting Telegram… reload in a few seconds.' }
+      return {
+        state: problem ? 'error' : 'starting',
+        bot: botUsername ? `@${botUsername}` : null,
+        problem: problem ?? 'Contacting Telegram… reload in a few seconds.',
+      }
     },
-    start() { if (enabled) void loop() },
-    stop() { stopped = true; stopSignal.abort(); queue.stop() },
+    start() {
+      if (enabled) void loop()
+    },
+    stop() {
+      stopped = true
+      stopSignal.abort()
+      queue.stop()
+    },
     queueStatus: () => queue.status(),
     pollOnce,
     handleMessage,
 
     status(userId: string) {
       const chats = state.links[userId] ?? []
-      return { configured: enabled, ready: Boolean(botUsername), botUsername, linked: chats.length > 0, chats: chats.map(({ name }) => ({ name })) }
+      return {
+        configured: enabled,
+        ready: Boolean(botUsername),
+        botUsername,
+        linked: chats.length > 0,
+        chats: chats.map(({ name }) => ({ name })),
+      }
     },
 
     /** A one-time link the user opens in Telegram. Undefined until the bot has answered getMe. */
@@ -307,17 +378,23 @@ export function createTelegramService({ dataDir, token, apiBase = API, userName 
     async send(userId: string, payload: AlertPayload) {
       if (!enabled) return []
       const text = formatAlertMessage(payload)
-      return Promise.all((state.links[userId] ?? []).map(({ chatId }) => queue.enqueue(chatId, async () => {
-        try {
-          await reply(chatId, text)
-        } catch (caught) {
-          const error = errorInfo(caught) ?? {}
-          // The chat blocked the bot or no longer exists: forget it. Other 400s will not succeed on a retry either.
-          if (error.status === 403 || (error.status === 400 && /chat not found/i.test(String(error.message)))) { dropChat(chatId); error.permanent = true }
-          else if (error.status === 400 || error.status === 401 || error.status === 404) error.permanent = true
-          throw caught
-        }
-      })))
+      return Promise.all(
+        (state.links[userId] ?? []).map(({ chatId }) =>
+          queue.enqueue(chatId, async () => {
+            try {
+              await reply(chatId, text)
+            } catch (caught) {
+              const error = errorInfo(caught) ?? {}
+              // The chat blocked the bot or no longer exists: forget it. Other 400s will not succeed on a retry either.
+              if (error.status === 403 || (error.status === 400 && /chat not found/i.test(String(error.message)))) {
+                dropChat(chatId)
+                error.permanent = true
+              } else if (error.status === 400 || error.status === 401 || error.status === 404) error.permanent = true
+              throw caught
+            }
+          }),
+        ),
+      )
     },
   }
 }

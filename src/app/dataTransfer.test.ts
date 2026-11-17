@@ -4,16 +4,20 @@ import { buildBackup, parseBackup, restoreBackup } from './dataTransfer'
 function fakeStorage(entries: Record<string, string>) {
   const map = new Map(Object.entries(entries))
   return {
-    get length() { return map.size },
+    get length() {
+      return map.size
+    },
     key: (index: number) => [...map.keys()][index] ?? null,
     getItem: (key: string) => map.get(key) ?? null,
-    setItem: (key: string, value: string) => { map.set(key, value) },
+    setItem: (key: string, value: string) => {
+      map.set(key, value)
+    },
     map,
   }
 }
 
 describe('data backup', () => {
-  it('exports only the signed-in user\'s data, without the prefix', () => {
+  it("exports only the signed-in user's data, without the prefix", () => {
     const storage = fakeStorage({
       'trade-horizon:user:u1:layouts:v1': '[]',
       'trade-horizon:user:u1:drawings:v1': '{"a":1}',

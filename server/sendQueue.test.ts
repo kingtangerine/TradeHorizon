@@ -2,16 +2,24 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { createSendQueue } from './sendQueue.ts'
 
 const quiet = { log() {}, warn() {} }
-beforeEach(() => { vi.useFakeTimers() })
-afterEach(() => { vi.useRealTimers() })
+beforeEach(() => {
+  vi.useFakeTimers()
+})
+afterEach(() => {
+  vi.useRealTimers()
+})
 
-const settle = async (ms: number) => { await vi.advanceTimersByTimeAsync(ms) }
+const settle = async (ms: number) => {
+  await vi.advanceTimersByTimeAsync(ms)
+}
 
 describe('send queue', () => {
   it('keeps the global pace and the gap per key', async () => {
     const queue = createSendQueue({ name: 'test', perSecond: 2, perKeyGapMs: 1000, log: quiet })
     const startedAt: Array<[string, number]> = []
-    const run = (label: string) => async () => { startedAt.push([label, Date.now()]) }
+    const run = (label: string) => async () => {
+      startedAt.push([label, Date.now()])
+    }
     const t0 = Date.now()
     for (const label of ['a1', 'a2', 'b1', 'c1', 'd1']) void queue.enqueue(label[0], run(label))
     await settle(0)
@@ -46,8 +54,12 @@ describe('send queue', () => {
 
   it('retries passing errors with growing pauses, gives up after the last attempt, and never retries permanent errors', async () => {
     const queue = createSendQueue({ name: 'test', maxAttempts: 3, log: quiet })
-    const flaky = vi.fn(async () => { throw new Error('network down') })
-    const blocked = vi.fn(async () => { throw Object.assign(new Error('bot was blocked'), { permanent: true }) })
+    const flaky = vi.fn(async () => {
+      throw new Error('network down')
+    })
+    const blocked = vi.fn(async () => {
+      throw Object.assign(new Error('bot was blocked'), { permanent: true })
+    })
     const flakyResult = queue.enqueue('a', flaky)
     const blockedResult = queue.enqueue('b', blocked)
     await settle(0)

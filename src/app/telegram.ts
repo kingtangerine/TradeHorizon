@@ -18,7 +18,7 @@ function authHeaders(): Record<string, string> {
 }
 
 async function failure(response: Response, fallback: string): Promise<Error> {
-  const { error } = await response.json().catch(() => ({ error: undefined })) as { error?: string }
+  const { error } = (await response.json().catch(() => ({ error: undefined }))) as { error?: string }
   return new Error(error ?? fallback)
 }
 
@@ -26,7 +26,7 @@ async function failure(response: Response, fallback: string): Promise<Error> {
 export async function getTelegramStatus(): Promise<TelegramStatus | undefined> {
   try {
     const response = await fetch('/api/telegram/status', { headers: authHeaders() })
-    return response.ok ? await response.json() as TelegramStatus : undefined
+    return response.ok ? ((await response.json()) as TelegramStatus) : undefined
   } catch {
     return undefined
   }

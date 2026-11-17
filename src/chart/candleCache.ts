@@ -23,9 +23,14 @@ const keyFor = (marketId: string, interval: string) => `${marketId}|${interval}`
 
 function openDb(): Promise<IDBDatabase> {
   return new Promise((resolve, reject) => {
-    if (typeof indexedDB === 'undefined') { reject(new Error('IndexedDB unavailable')); return }
+    if (typeof indexedDB === 'undefined') {
+      reject(new Error('IndexedDB unavailable'))
+      return
+    }
     const request = indexedDB.open(DB_NAME, 1)
-    request.onupgradeneeded = () => { request.result.createObjectStore(STORE, { keyPath: 'key' }) }
+    request.onupgradeneeded = () => {
+      request.result.createObjectStore(STORE, { keyPath: 'key' })
+    }
     request.onsuccess = () => resolve(request.result)
     request.onerror = () => reject(request.error)
   })
@@ -42,7 +47,7 @@ function wrap<T>(request: IDBRequest<T>): Promise<T> {
 export async function loadCachedBars(marketId: string, interval: string): Promise<KLineData[] | null> {
   try {
     const db = await openDb()
-    const entry = await wrap(db.transaction(STORE).objectStore(STORE).get(keyFor(marketId, interval))) as Entry | undefined
+    const entry = (await wrap(db.transaction(STORE).objectStore(STORE).get(keyFor(marketId, interval)))) as Entry | undefined
     db.close()
     if (!entry || !Array.isArray(entry.bars) || entry.bars.length === 0) return null
     return entry.bars.map(([timestamp, open, high, low, close, volume]) => ({ timestamp, open, high, low, close, volume }))
@@ -61,7 +66,7 @@ export function saveCachedBars(marketId: string, interval: string, bars: readonl
       const store = db.transaction(STORE, 'readwrite').objectStore(STORE)
       store.put({ key: keyFor(marketId, interval), savedAtMs: Date.now(), bars: rows } satisfies Entry)
       // Keep only the most recently saved series.
-      const all = await wrap(store.getAll()) as Entry[]
+      const all = (await wrap(store.getAll())) as Entry[]
       if (all.length > MAX_SERIES) {
         for (const stale of all.sort((a, b) => a.savedAtMs - b.savedAtMs).slice(0, all.length - MAX_SERIES)) store.delete(stale.key)
       }

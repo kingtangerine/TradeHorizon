@@ -1,15 +1,24 @@
 // Minimal types for the parts of the `web-push` package that server/alerts.ts uses (the package ships none).
 declare module 'web-push' {
-  interface VapidKeys { publicKey: string, privateKey: string }
+  interface VapidKeys {
+    publicKey: string
+    privateKey: string
+  }
 
   interface PushSubscription {
     endpoint: string
-    keys: { p256dh: string, auth: string }
+    keys: { p256dh: string; auth: string }
   }
 
-  interface RequestOptions { TTL?: number }
+  interface RequestOptions {
+    TTL?: number
+  }
 
-  interface SendResult { statusCode: number, body: string, headers: Record<string, string> }
+  interface SendResult {
+    statusCode: number
+    body: string
+    headers: Record<string, string>
+  }
 
   interface WebPush {
     generateVAPIDKeys(): VapidKeys

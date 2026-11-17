@@ -27,7 +27,9 @@ export function ScriptEditorDialog({ script, onSave, onClose }: ScriptEditorDial
   }, [source])
 
   useEffect(() => {
-    const escape = (event: KeyboardEvent) => { if (event.key === 'Escape') onClose() }
+    const escape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') onClose()
+    }
     globalThis.addEventListener('keydown', escape)
     return () => globalThis.removeEventListener('keydown', escape)
   }, [onClose])
@@ -36,16 +38,37 @@ export function ScriptEditorDialog({ script, onSave, onClose }: ScriptEditorDial
   const error = result instanceof Error ? result.message : undefined
   const save = (addToChart: boolean) => {
     const compiled = compiledScript(source)
-    if (compiled instanceof Error) { setChecked(source); return }
-    onSave({ id: script?.id ?? crypto.randomUUID(), name: name.trim() || compiled.title || 'My script', source, updatedAtMs: Date.now() }, addToChart)
+    if (compiled instanceof Error) {
+      setChecked(source)
+      return
+    }
+    onSave(
+      { id: script?.id ?? crypto.randomUUID(), name: name.trim() || compiled.title || 'My script', source, updatedAtMs: Date.now() },
+      addToChart,
+    )
   }
 
   return createPortal(
     <div className="modal-backdrop" role="presentation" onMouseDown={onClose}>
-      <section className="script-editor" role="dialog" aria-modal="true" aria-label="Script editor" onMouseDown={(event) => event.stopPropagation()}>
+      <section
+        className="script-editor"
+        role="dialog"
+        aria-modal="true"
+        aria-label="Script editor"
+        onMouseDown={(event) => event.stopPropagation()}
+      >
         <header>
-          <input className="script-name" value={name} maxLength={60} placeholder={result instanceof Error ? 'Script name' : result.title} aria-label="Script name" onChange={(event) => setName(event.target.value)} />
-          <button type="button" className="object-icon-button" aria-label="Close" onClick={onClose}><CloseIcon /></button>
+          <input
+            className="script-name"
+            value={name}
+            maxLength={60}
+            placeholder={result instanceof Error ? 'Script name' : result.title}
+            aria-label="Script name"
+            onChange={(event) => setName(event.target.value)}
+          />
+          <button type="button" className="object-icon-button" aria-label="Close" onClick={onClose}>
+            <CloseIcon />
+          </button>
         </header>
         <div className="script-editor-body">
           <textarea
@@ -63,23 +86,40 @@ export function ScriptEditorDialog({ script, onSave, onClose }: ScriptEditorDial
               const start = target.selectionStart
               const next = `${source.slice(0, start)}  ${source.slice(target.selectionEnd)}`
               setSource(next)
-              requestAnimationFrame(() => { target.selectionStart = target.selectionEnd = start + 2 })
+              requestAnimationFrame(() => {
+                target.selectionStart = target.selectionEnd = start + 2
+              })
             }}
           />
           <aside className="script-help">
             <strong>Reference</strong>
-            <ul>{SCRIPT_HELP.map((line) => <li key={line}>{line}</li>)}</ul>
-            <button type="button" className="small-button" onClick={() => setSource(EXAMPLE_SCRIPT)}>Load the example</button>
+            <ul>
+              {SCRIPT_HELP.map((line) => (
+                <li key={line}>{line}</li>
+              ))}
+            </ul>
+            <button type="button" className="small-button" onClick={() => setSource(EXAMPLE_SCRIPT)}>
+              Load the example
+            </button>
           </aside>
         </div>
         <footer>
           <span className={error ? 'script-status error' : 'script-status'} role="status">
-            {error ?? (result instanceof Error ? '' : `OK · ${result.overlay ? 'drawn on the candles' : 'in its own pane'}${result.inputs.length ? ` · inputs: ${result.inputs.map((input) => input.title).join(', ')}` : ''}`)}
+            {error ??
+              (result instanceof Error
+                ? ''
+                : `OK · ${result.overlay ? 'drawn on the candles' : 'in its own pane'}${result.inputs.length ? ` · inputs: ${result.inputs.map((input) => input.title).join(', ')}` : ''}`)}
           </span>
           <span className="chart-settings-inline">
-            <button type="button" onClick={onClose}>Cancel</button>
-            <button type="button" disabled={!!error} onClick={() => save(false)}>Save</button>
-            <button type="button" className="primary" disabled={!!error} onClick={() => save(true)}>Save and add to chart</button>
+            <button type="button" onClick={onClose}>
+              Cancel
+            </button>
+            <button type="button" disabled={!!error} onClick={() => save(false)}>
+              Save
+            </button>
+            <button type="button" className="primary" disabled={!!error} onClick={() => save(true)}>
+              Save and add to chart
+            </button>
           </span>
         </footer>
       </section>
@@ -103,7 +143,9 @@ export function ScriptSettingsDialog({ instance, onChange, onEdit, onRemove, onC
   const [drafts, setDrafts] = useState(() => inputs.map((input, index) => String(instance.inputs[index] ?? input.defaultValue)))
 
   useEffect(() => {
-    const escape = (event: KeyboardEvent) => { if (event.key === 'Escape') onClose() }
+    const escape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') onClose()
+    }
     globalThis.addEventListener('keydown', escape)
     return () => globalThis.removeEventListener('keydown', escape)
   }, [onClose])
@@ -111,16 +153,24 @@ export function ScriptSettingsDialog({ instance, onChange, onEdit, onRemove, onC
   const commit = (index: number, text: string) => {
     const value = Number(text)
     if (!Number.isFinite(value)) return
-    const next = inputs.map((input, position) => (position === index ? value : instance.inputs[position] ?? input.defaultValue))
+    const next = inputs.map((input, position) => (position === index ? value : (instance.inputs[position] ?? input.defaultValue)))
     onChange({ ...instance, inputs: next })
   }
 
   return createPortal(
     <div className="modal-backdrop" role="presentation" onMouseDown={onClose}>
-      <section className="chart-settings-dialog study-settings-dialog" role="dialog" aria-modal="true" aria-label={`${instance.name} settings`} onMouseDown={(event) => event.stopPropagation()}>
+      <section
+        className="chart-settings-dialog study-settings-dialog"
+        role="dialog"
+        aria-modal="true"
+        aria-label={`${instance.name} settings`}
+        onMouseDown={(event) => event.stopPropagation()}
+      >
         <header>
           <strong>{instance.name}</strong>
-          <button type="button" className="object-icon-button" aria-label="Close" onClick={onClose}><CloseIcon /></button>
+          <button type="button" className="object-icon-button" aria-label="Close" onClick={onClose}>
+            <CloseIcon />
+          </button>
         </header>
         <div className="chart-settings-panel">
           {compiled instanceof Error && <p className="chart-settings-note error">{compiled.message}</p>}
@@ -134,23 +184,37 @@ export function ScriptSettingsDialog({ instance, onChange, onEdit, onRemove, onC
                 step="any"
                 className="study-input"
                 value={drafts[index]}
-                onChange={(event) => setDrafts((current) => current.map((item, position) => (position === index ? event.target.value : item)))}
+                onChange={(event) =>
+                  setDrafts((current) => current.map((item, position) => (position === index ? event.target.value : item)))
+                }
                 onBlur={(event) => commit(index, event.target.value)}
-                onKeyDown={(event) => { if (event.key === 'Enter') commit(index, (event.target as HTMLInputElement).value) }}
+                onKeyDown={(event) => {
+                  if (event.key === 'Enter') commit(index, (event.target as HTMLInputElement).value)
+                }}
               />
             </label>
           ))}
           <label className="chart-settings-row">
             <span>Visible</span>
-            <input type="checkbox" checked={instance.visible} onChange={(event) => onChange({ ...instance, visible: event.target.checked })} />
+            <input
+              type="checkbox"
+              checked={instance.visible}
+              onChange={(event) => onChange({ ...instance, visible: event.target.checked })}
+            />
           </label>
         </div>
         <footer>
           <span className="chart-settings-inline">
-            <button type="button" onClick={onEdit}>Edit script</button>
-            <button type="button" onClick={onRemove}>Remove</button>
+            <button type="button" onClick={onEdit}>
+              Edit script
+            </button>
+            <button type="button" onClick={onRemove}>
+              Remove
+            </button>
           </span>
-          <button type="button" className="primary" onClick={onClose}>Done</button>
+          <button type="button" className="primary" onClick={onClose}>
+            Done
+          </button>
         </footer>
       </section>
     </div>,

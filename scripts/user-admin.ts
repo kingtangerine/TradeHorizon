@@ -15,11 +15,16 @@ const dataDir = process.env.TH_DATA_DIR ?? join(root, 'server', 'data')
 const databaseFile = join(dataDir, 'tradehorizon.db')
 
 const [command, argument] = process.argv.slice(2)
-const fail: (message: string) => never = (message) => { console.error(message); process.exit(1) }
+const fail: (message: string) => never = (message) => {
+  console.error(message)
+  process.exit(1)
+}
 const date = (ms: number | null | undefined) => (ms ? new Date(ms).toISOString().slice(0, 16).replace('T', ' ') : 'never')
 
 if (!existsSync(databaseFile)) {
-  fail(`No database at ${databaseFile}. Start the app once (it creates the database and moves old JSON accounts into it), then run this again.`)
+  fail(
+    `No database at ${databaseFile}. Start the app once (it creates the database and moves old JSON accounts into it), then run this again.`,
+  )
 }
 const { openDatabase } = await import('../server/database.ts')
 const store = openDatabase(databaseFile)
@@ -30,11 +35,15 @@ try {
     const users = store.users.all()
     console.log(`${users.length} account(s) in ${databaseFile}`)
     for (const user of users) {
-      console.log(`${admins.has(user.email) ? '[admin] ' : ''}${user.email}  "${user.displayName}"  joined ${date(user.createdAtMs)}  last active ${date(user.lastSeenAtMs)}`)
+      console.log(
+        `${admins.has(user.email) ? '[admin] ' : ''}${user.email}  "${user.displayName}"  joined ${date(user.createdAtMs)}  last active ${date(user.lastSeenAtMs)}`,
+      )
     }
     if (admins.size === 0) console.log('No admin emails are set: add TH_ADMIN_EMAILS=you@example.com to .env and restart the app.')
   } else if (command === 'password') {
-    const email = String(argument ?? '').trim().toLowerCase()
+    const email = String(argument ?? '')
+      .trim()
+      .toLowerCase()
     if (!email) fail('Usage: npm run user:password -- someone@example.com')
     const user = store.users.byEmail(email)
     if (!user) fail(`No account for ${email}. "npm run user:list" shows every account.`)

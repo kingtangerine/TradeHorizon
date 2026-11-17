@@ -18,7 +18,18 @@ export interface ChartContextMenuProps {
 }
 
 /** TradingView-style menu on right-click in the chart: go live, alert at the clicked price, settings. */
-export function ChartContextMenu({ left, top, price, pricePrecision, quoteAsset, live, onGoLive, onAddAlert, onOpenSettings, onClose }: ChartContextMenuProps) {
+export function ChartContextMenu({
+  left,
+  top,
+  price,
+  pricePrecision,
+  quoteAsset,
+  live,
+  onGoLive,
+  onAddAlert,
+  onOpenSettings,
+  onClose,
+}: ChartContextMenuProps) {
   const menuRef = useRef<HTMLDivElement>(null)
   const [position, setPosition] = useState({ left, top })
 
@@ -35,8 +46,12 @@ export function ChartContextMenu({ left, top, price, pricePrecision, quoteAsset,
 
   useEffect(() => {
     menuRef.current?.querySelector<HTMLButtonElement>('button:not(:disabled)')?.focus()
-    const outside = (event: Event) => { if (!(event.target instanceof Node && menuRef.current?.contains(event.target))) onClose() }
-    const key = (event: KeyboardEvent) => { if (event.key === 'Escape') onClose() }
+    const outside = (event: Event) => {
+      if (!(event.target instanceof Node && menuRef.current?.contains(event.target))) onClose()
+    }
+    const key = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') onClose()
+    }
     window.addEventListener('pointerdown', outside, true)
     window.addEventListener('wheel', outside, true)
     window.addEventListener('keydown', key)
@@ -51,10 +66,12 @@ export function ChartContextMenu({ left, top, price, pricePrecision, quoteAsset,
     }
   }, [onClose])
 
-  const run = (action: () => void) => () => { onClose(); action() }
-  const priceText = price === null
-    ? null
-    : price.toLocaleString('en-US', { minimumFractionDigits: pricePrecision, maximumFractionDigits: pricePrecision })
+  const run = (action: () => void) => () => {
+    onClose()
+    action()
+  }
+  const priceText =
+    price === null ? null : price.toLocaleString('en-US', { minimumFractionDigits: pricePrecision, maximumFractionDigits: pricePrecision })
 
   return (
     <div
@@ -64,17 +81,32 @@ export function ChartContextMenu({ left, top, price, pricePrecision, quoteAsset,
       style={{ left: position.left, top: position.top }}
       onContextMenu={(event) => event.preventDefault()}
     >
-      <button type="button" role="menuitem" disabled={live} onClick={run(onGoLive)} title={live ? 'Already showing the latest candles' : undefined}>
+      <button
+        type="button"
+        role="menuitem"
+        disabled={live}
+        onClick={run(onGoLive)}
+        title={live ? 'Already showing the latest candles' : undefined}
+      >
         <TargetIcon /> Go live
       </button>
       <button
         type="button"
         role="menuitem"
         disabled={price === null}
-        onClick={run(() => { if (price !== null) onAddAlert(price) })}
+        onClick={run(() => {
+          if (price !== null) onAddAlert(price)
+        })}
         title={price === null ? 'Right-click on the price chart to set an alert at that price' : undefined}
       >
-        <BellIcon /> {priceText ? <>Add alert at <b>{priceText}</b> <small>{quoteAsset}</small></> : 'Add alert'}
+        <BellIcon />{' '}
+        {priceText ? (
+          <>
+            Add alert at <b>{priceText}</b> <small>{quoteAsset}</small>
+          </>
+        ) : (
+          'Add alert'
+        )}
       </button>
       <span className="chart-context-separator" role="separator" />
       <button type="button" role="menuitem" onClick={run(onOpenSettings)}>

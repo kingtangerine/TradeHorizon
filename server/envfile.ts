@@ -18,7 +18,7 @@ export function parseEnv(text: string): Record<string, string> {
 }
 
 /** Copies settings from the file into `env` unless already set there. Returns the names it found (never values). */
-export function loadEnvFile(path: string, env: Record<string, string | undefined> = process.env): { found: boolean, keys: string[] } {
+export function loadEnvFile(path: string, env: Record<string, string | undefined> = process.env): { found: boolean; keys: string[] } {
   if (!existsSync(path)) return { found: false, keys: [] }
   const values = parseEnv(readFileSync(path, 'utf8'))
   for (const [key, value] of Object.entries(values)) {

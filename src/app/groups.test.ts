@@ -1,13 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import {
-  EMPTY_GROUPS,
-  assignToGroup,
-  createGroup,
-  deleteGroup,
-  parseGroups,
-  renameGroup,
-  toggleGroupCollapsed,
-} from './groups'
+import { EMPTY_GROUPS, assignToGroup, createGroup, deleteGroup, parseGroups, renameGroup, toggleGroupCollapsed } from './groups'
 
 describe('drawing groups', () => {
   it('creates a group holding the chosen drawings', () => {
@@ -40,7 +32,11 @@ describe('drawing groups', () => {
 
   it('drops invalid stored data', () => {
     const parsed = parseGroups({
-      groups: [{ id: 'g1', name: 'ok' }, { id: 'g1', name: 'dup' }, { id: 3, name: 'bad' }],
+      groups: [
+        { id: 'g1', name: 'ok' },
+        { id: 'g1', name: 'dup' },
+        { id: 3, name: 'bad' },
+      ],
       assignments: { a: 'g1', b: 'missing', c: 5 },
     })
     expect(parsed.groups).toEqual([{ id: 'g1', name: 'ok' }])

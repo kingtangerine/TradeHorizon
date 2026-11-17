@@ -9,7 +9,8 @@ import { readFileSync } from 'node:fs'
  */
 function serviceWorker(): Plugin {
   const entry = 'src/sw/sw.ts'
-  const compile = async () => (await transformWithEsbuild(readFileSync(entry, 'utf8'), entry, { loader: 'ts', format: 'esm', target: 'es2022' })).code
+  const compile = async () =>
+    (await transformWithEsbuild(readFileSync(entry, 'utf8'), entry, { loader: 'ts', format: 'esm', target: 'es2022' })).code
   return {
     name: 'trade-horizon-service-worker',
     configureServer(server) {
@@ -31,7 +32,9 @@ const { version } = JSON.parse(readFileSync(new URL('./package.json', import.met
 /** Short git commit of this build, so a running copy can be matched to the code it came from. */
 function gitCommit(): string {
   try {
-    return execSync('git rev-parse --short HEAD', { stdio: ['ignore', 'pipe', 'ignore'] }).toString().trim()
+    return execSync('git rev-parse --short HEAD', { stdio: ['ignore', 'pipe', 'ignore'] })
+      .toString()
+      .trim()
   } catch {
     return 'unknown'
   }

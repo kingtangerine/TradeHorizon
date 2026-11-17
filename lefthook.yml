@@ -4,3 +4,10 @@ pre-commit:
     secrets:
       # Blocks the commit if a staged change contains a secret.
       run: gitleaks git --pre-commit --staged --redact --no-banner
+    format:
+      # Staged files must already be formatted (`npm run format` fixes them).
+      glob: '*.{ts,tsx,js,json,css,html,yml,yaml}'
+      run: npx prettier --check {staged_files}
+    lint:
+      glob: '*.{ts,tsx}'
+      run: npx eslint --flag unstable_native_nodejs_ts_config --max-warnings 0 {staged_files}

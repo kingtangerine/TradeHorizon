@@ -33,10 +33,7 @@ export interface Device {
 
 /** What decideWrite says about a device's write. */
 export type WriteDecision =
-  | { status: 'outdated' }
-  | { status: 'conflict', item: DataItem }
-  | { status: 'ok', item: DataItem }
-  | { status: 'store' }
+  { status: 'outdated' } | { status: 'conflict'; item: DataItem } | { status: 'ok'; item: DataItem } | { status: 'store' }
 
 /** The answer to a device's write, once it has been stored if it had to be. */
 export type WriteResult = Exclude<WriteDecision, { status: 'store' }>
@@ -75,7 +72,13 @@ export function itemsSince(data: UserData, since = 0): UserData {
 }
 
 /** Stores a value as a new revision (no checks: used by the server itself, e.g. when an alert fires). */
-export function storeValue(data: UserData, key: string, value: string, now = Date.now(), by: Device = { id: 'server', name: 'TradeHorizon server' }): DataItem {
+export function storeValue(
+  data: UserData,
+  key: string,
+  value: string,
+  now = Date.now(),
+  by: Device = { id: 'server', name: 'TradeHorizon server' },
+): DataItem {
   const item: DataItem = { value, updatedAtMs: now, rev: latestRevision(data) + 1, by: by.id, byName: by.name }
   data[key] = item
   return item
@@ -87,7 +90,14 @@ export function storeValue(data: UserData, key: string, value: string, now = Dat
  * - `conflict`: the item changed since `baseRev`; `item` is the current copy to merge with
  * - `outdated`: no `baseRev`, i.e. a tab still running the app from before revisions; refused so it cannot overwrite newer data
  */
-export function writeValue(data: UserData, key: string, value: string, baseRev: unknown, now = Date.now(), by: Device = { id: 'unknown', name: 'Unknown device' }): WriteResult {
+export function writeValue(
+  data: UserData,
+  key: string,
+  value: string,
+  baseRev: unknown,
+  now = Date.now(),
+  by: Device = { id: 'unknown', name: 'Unknown device' },
+): WriteResult {
   const decision = decideWrite(data[key], value, baseRev)
   if (decision.status !== 'store') return decision
   return { status: 'ok', item: storeValue(data, key, value, now, by) }
@@ -110,7 +120,7 @@ export function decideWrite(current: DataItem | undefined, value: string, baseRe
 
 /** The device a write came from, as sent by the app ({ id, name }); anything odd is replaced. */
 export function deviceFrom(raw: unknown): Device {
-  const value = raw as { id?: unknown, name?: unknown } | null | undefined // each field is checked below
+  const value = raw as { id?: unknown; name?: unknown } | null | undefined // each field is checked below
   const id = typeof value?.id === 'string' && /^[\w-]{6,64}$/.test(value.id) ? value.id : 'unknown'
   const name = typeof value?.name === 'string' && value.name.trim() ? value.name.trim().slice(0, 60) : 'Unknown device'
   return { id, name }
@@ -128,12 +138,17 @@ export function fingerprint(text: string): string {
 
 /** What the server holds for a user, without the values: for the app's sync check. */
 export function describeData(data: UserData): Record<string, ItemDescription> {
-  return Object.fromEntries(Object.entries(data).map(([key, item]): [string, ItemDescription] => [key, {
-    rev: item.rev,
-    updatedAtMs: item.updatedAtMs,
-    size: item.value.length,
-    hash: fingerprint(item.value),
-    by: item.by ?? null,
-    byName: item.byName ?? null,
-  }]))
+  return Object.fromEntries(
+    Object.entries(data).map(([key, item]): [string, ItemDescription] => [
+      key,
+      {
+        rev: item.rev,
+        updatedAtMs: item.updatedAtMs,
+        size: item.value.length,
+        hash: fingerprint(item.value),
+        by: item.by ?? null,
+        byName: item.byName ?? null,
+      },
+    ]),
+  )
 }

@@ -2,12 +2,28 @@ import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { ALERTS_KEY, alertReached, createAlertService, createPushService, fetchLastPrices, newlyTriggered, parseActiveAlerts } from './alerts.ts'
+import {
+  ALERTS_KEY,
+  alertReached,
+  createAlertService,
+  createPushService,
+  fetchLastPrices,
+  newlyTriggered,
+  parseActiveAlerts,
+} from './alerts.ts'
 import type { AlertPayload, AlertStore, PushSender, StoredAlert, WebPushSubscription } from './alerts.ts'
-import { createMarketService, mergeListings, parseBinanceFuturesListings, parseBinanceListings, parseBybitListings, precisionFromStep } from './markets.ts'
+import {
+  createMarketService,
+  mergeListings,
+  parseBinanceFuturesListings,
+  parseBinanceListings,
+  parseBybitListings,
+  precisionFromStep,
+} from './markets.ts'
 
 // Overrides may be malformed on purpose (the shape checks are under test), so they are typed loosely.
-const alert = (overrides: Partial<Record<keyof StoredAlert, unknown>> = {}) => ({ id: 'a1', symbol: 'BTCUSDT', targetPrice: 100, direction: 'above', enabled: true, createdAtMs: 1, ...overrides }) as StoredAlert
+const alert = (overrides: Partial<Record<keyof StoredAlert, unknown>> = {}) =>
+  ({ id: 'a1', symbol: 'BTCUSDT', targetPrice: 100, direction: 'above', enabled: true, createdAtMs: 1, ...overrides }) as StoredAlert
 
 /** In-memory stand-in for the server's per-user data. */
 function fakeStore(initial: Record<string, string>) {
@@ -16,7 +32,9 @@ function fakeStore(initial: Record<string, string>) {
     values,
     listUserIds: () => Object.keys(values),
     getAlertsValue: (userId: string) => values[userId],
-    setAlertsValue: (userId: string, value: string) => { values[userId] = value },
+    setAlertsValue: (userId: string, value: string) => {
+      values[userId] = value
+    },
   }
 }
 
@@ -33,7 +51,9 @@ function service({ store, prices, exchangeOf = () => 'binance' }: ServiceSetup) 
     store,
     exchangeOf,
     fetchPrices: async () => new Map(Object.entries(queue.shift() ?? {})),
-    notify: async (userId, payload) => { notifications.push({ userId, ...payload }) },
+    notify: async (userId, payload) => {
+      notifications.push({ userId, ...payload })
+    },
     now: () => 5000,
     log: { warn() {} },
   })
@@ -65,7 +85,13 @@ describe('alert rules', () => {
 describe('server-side alerts', () => {
   it('fires when the price crosses the target and marks the stored alert as triggered', async () => {
     const store = fakeStore({ u1: JSON.stringify([alert(), alert({ id: 'a2', symbol: 'ETHUSDT', targetPrice: 5000 })]) })
-    const { instance, notifications } = service({ store, prices: [{ BTCUSDT: 90, ETHUSDT: 3000 }, { BTCUSDT: 101, ETHUSDT: 3100 }] })
+    const { instance, notifications } = service({
+      store,
+      prices: [
+        { BTCUSDT: 90, ETHUSDT: 3000 },
+        { BTCUSDT: 101, ETHUSDT: 3100 },
+      ],
+    })
     await instance.tick() // baseline prices
     expect(notifications).toHaveLength(0)
     await instance.tick() // BTC crosses 100
@@ -107,7 +133,11 @@ describe('server-side alerts', () => {
 
   it('ignores symbols the server cannot price (indices) and picks up edits', async () => {
     const store = fakeStore({ u1: JSON.stringify([alert({ symbol: 'BTC.D' })]) })
-    const { instance, notifications } = service({ store, prices: [{}, {}], exchangeOf: (symbol) => (symbol === 'BTC.D' ? undefined : 'binance') })
+    const { instance, notifications } = service({
+      store,
+      prices: [{}, {}],
+      exchangeOf: (symbol) => (symbol === 'BTC.D' ? undefined : 'binance'),
+    })
     await instance.tick()
     expect(notifications).toHaveLength(0)
     instance.updateUserAlerts('u1', JSON.stringify([]))
@@ -121,7 +151,13 @@ describe('price fetching', () => {
     const fetchImpl = async (url: string) => {
       urls.push(String(url))
       if (String(url).includes('bybit')) throw new Error('down')
-      return { ok: true, json: async () => [{ symbol: 'BTCUSDT', price: '100.5' }, { symbol: 'ETHUSDT', price: 'bad' }] }
+      return {
+        ok: true,
+        json: async () => [
+          { symbol: 'BTCUSDT', price: '100.5' },
+          { symbol: 'ETHUSDT', price: 'bad' },
+        ],
+      }
     }
     const prices = await fetchLastPrices({ binance: ['BTCUSDT', 'ETHUSDT'], bybit: ['ZETAUSDT'] }, fetchImpl)
     expect([...prices]).toEqual([['BTCUSDT', 100.5]])
@@ -131,18 +167,34 @@ describe('price fetching', () => {
 
 describe('push subscriptions', () => {
   const dirs: string[] = []
-  afterEach(() => { for (const dir of dirs.splice(0)) rmSync(dir, { recursive: true, force: true }) })
+  afterEach(() => {
+    for (const dir of dirs.splice(0)) rmSync(dir, { recursive: true, force: true })
+  })
 
   // generateVAPIDKeys is ignored by the service (it always uses web-push's own); the tests pass it anyway.
-  function push(sender: PushSender & { readonly generateVAPIDKeys?: unknown } = { setVapidDetails: vi.fn(), sendNotification: vi.fn(async () => {}), generateVAPIDKeys: undefined }) {
+  function push(
+    sender: PushSender & { readonly generateVAPIDKeys?: unknown } = {
+      setVapidDetails: vi.fn(),
+      sendNotification: vi.fn(async () => {}),
+      generateVAPIDKeys: undefined,
+    },
+  ) {
     const dir = mkdtempSync(join(tmpdir(), 'th-push-'))
     dirs.push(dir)
-    return { dir, sender, service: createPushService({ dataDir: dir, subject: 'https://example.com', log: { log() {}, warn() {} }, sender }) }
+    return {
+      dir,
+      sender,
+      service: createPushService({ dataDir: dir, subject: 'https://example.com', log: { log() {}, warn() {} }, sender }),
+    }
   }
   const sub = (endpoint: string) => ({ endpoint, keys: { p256dh: 'k', auth: 'a' } })
 
   it('accepts browser push services only', () => {
-    const { service } = push({ setVapidDetails() {}, sendNotification: async () => {}, generateVAPIDKeys: () => ({ publicKey: 'pub', privateKey: 'priv' }) })
+    const { service } = push({
+      setVapidDetails() {},
+      sendNotification: async () => {},
+      generateVAPIDKeys: () => ({ publicKey: 'pub', privateKey: 'priv' }),
+    })
     expect(service.subscribe('u1', sub('https://fcm.googleapis.com/fcm/send/abc'))).toBeUndefined()
     expect(service.subscribe('u1', sub('https://updates.push.services.mozilla.com/wpush/v2/x'))).toBeUndefined()
     expect(service.subscribe('u1', sub('https://internal.example.com/hook'))).toBe('Unsupported push service.')
@@ -155,7 +207,11 @@ describe('push subscriptions', () => {
     const sendNotification = vi.fn(async (subscription: WebPushSubscription) => {
       if (subscription.endpoint.endsWith('/gone')) throw Object.assign(new Error('gone'), { statusCode: 410 })
     })
-    const { service } = push({ setVapidDetails() {}, sendNotification, generateVAPIDKeys: () => ({ publicKey: 'pub', privateKey: 'priv' }) })
+    const { service } = push({
+      setVapidDetails() {},
+      sendNotification,
+      generateVAPIDKeys: () => ({ publicKey: 'pub', privateKey: 'priv' }),
+    })
     service.subscribe('u1', sub('https://fcm.googleapis.com/fcm/send/one'))
     service.subscribe('u1', sub('https://fcm.googleapis.com/fcm/send/one'))
     service.subscribe('u1', sub('https://fcm.googleapis.com/fcm/send/gone'))
@@ -178,7 +234,13 @@ describe('market catalog parsing', () => {
   it('keeps trading USDT and BTC pairs, and lets Bybit add only what Binance lacks', () => {
     const binance = parseBinanceListings({
       symbols: [
-        { symbol: 'ETHUSDT', baseAsset: 'ETH', quoteAsset: 'USDT', status: 'TRADING', filters: [{ filterType: 'PRICE_FILTER', tickSize: '0.01' }] },
+        {
+          symbol: 'ETHUSDT',
+          baseAsset: 'ETH',
+          quoteAsset: 'USDT',
+          status: 'TRADING',
+          filters: [{ filterType: 'PRICE_FILTER', tickSize: '0.01' }],
+        },
         { symbol: 'ETHBTC', baseAsset: 'ETH', quoteAsset: 'BTC', status: 'TRADING', filters: [] },
         { symbol: 'ETHEUR', baseAsset: 'ETH', quoteAsset: 'EUR', status: 'TRADING', filters: [] },
         { symbol: 'OLDUSDT', baseAsset: 'OLD', quoteAsset: 'USDT', status: 'BREAK', filters: [] },
@@ -187,10 +249,12 @@ describe('market catalog parsing', () => {
     expect(binance.map((item) => item.symbol)).toEqual(['ETHUSDT', 'ETHBTC'])
     expect(binance.find((item) => item.symbol === 'ETHBTC')?.quoteAsset).toBe('BTC')
     const bybit = parseBybitListings({
-      result: { list: [
-        { symbol: 'ETHUSDT', baseCoin: 'ETH', quoteCoin: 'USDT', status: 'Trading' },
-        { symbol: 'ZETAUSDT', baseCoin: 'ZETA', quoteCoin: 'USDT', status: 'Trading', priceFilter: { tickSize: '0.00001' } },
-      ] },
+      result: {
+        list: [
+          { symbol: 'ETHUSDT', baseCoin: 'ETH', quoteCoin: 'USDT', status: 'Trading' },
+          { symbol: 'ZETAUSDT', baseCoin: 'ZETA', quoteCoin: 'USDT', status: 'Trading', priceFilter: { tickSize: '0.00001' } },
+        ],
+      },
     })
     const merged = mergeListings(binance, bybit)
     expect(merged.map((item) => item.symbol)).toEqual(['ETHUSDT', 'ETHBTC', 'ZETAUSDT'])
@@ -222,7 +286,9 @@ describe('alerts triggered by a device with the app open', () => {
     const { instance, notifications } = service({ store, prices: [] })
     instance.relayTriggered('u1', untriggered, triggered())
     instance.relayTriggered('u1', untriggered, triggered()) // the same upload again (retry)
-    expect(notifications).toEqual([{ userId: 'u1', title: 'BTCUSDT alert', body: 'Crossing up 100: price 101.', symbol: 'BTCUSDT', alertId: 'a1', price: 101 }])
+    expect(notifications).toEqual([
+      { userId: 'u1', title: 'BTCUSDT alert', body: 'Crossing up 100: price 101.', symbol: 'BTCUSDT', alertId: 'a1', price: 101 },
+    ])
     instance.stop()
   })
 
@@ -241,14 +307,29 @@ describe('alerts triggered by a device with the app open', () => {
 
 describe('perpetual futures', () => {
   it('lists USDT perpetuals as XXXUSDT.P and routes them to Binance Futures', () => {
-    const listings = parseBinanceFuturesListings({ symbols: [
-      { symbol: 'ETHUSDT', baseAsset: 'ETH', quoteAsset: 'USDT', status: 'TRADING', contractType: 'PERPETUAL', filters: [{ filterType: 'PRICE_FILTER', tickSize: '0.01' }] },
-      { symbol: 'ETHUSDT_261225', baseAsset: 'ETH', quoteAsset: 'USDT', status: 'TRADING', contractType: 'CURRENT_QUARTER' },
-    ] })
+    const listings = parseBinanceFuturesListings({
+      symbols: [
+        {
+          symbol: 'ETHUSDT',
+          baseAsset: 'ETH',
+          quoteAsset: 'USDT',
+          status: 'TRADING',
+          contractType: 'PERPETUAL',
+          filters: [{ filterType: 'PRICE_FILTER', tickSize: '0.01' }],
+        },
+        { symbol: 'ETHUSDT_261225', baseAsset: 'ETH', quoteAsset: 'USDT', status: 'TRADING', contractType: 'CURRENT_QUARTER' },
+      ],
+    })
     expect(listings.map((item) => item.symbol)).toEqual(['ETHUSDT.P'])
     const dir = mkdtempSync(join(tmpdir(), 'th-markets-'))
     try {
-      const service = createMarketService({ dataDir: dir, fetchImpl: async () => { throw new Error('offline') }, log: {} })
+      const service = createMarketService({
+        dataDir: dir,
+        fetchImpl: async () => {
+          throw new Error('offline')
+        },
+        log: {},
+      })
       expect(service.exchangeOf('SOLUSDT.P')).toBe('binance-futures')
       expect(service.exchangeOf('BTCDOMUSDT')).toBe('binance-futures')
       expect(service.exchangeOf('bad.P')).toBeUndefined()

@@ -22,7 +22,11 @@ export interface LoopLagMonitor {
   tick(): void
 }
 
-export function createLoopLagMonitor({ intervalMs = 100, windowMs = 60_000, now = () => performance.now() }: LoopLagOptions = {}): LoopLagMonitor {
+export function createLoopLagMonitor({
+  intervalMs = 100,
+  windowMs = 60_000,
+  now = () => performance.now(),
+}: LoopLagOptions = {}): LoopLagMonitor {
   const size = Math.ceil(windowMs / intervalMs)
   const samples = new Float64Array(size)
   let count = 0
@@ -44,7 +48,9 @@ export function createLoopLagMonitor({ intervalMs = 100, windowMs = 60_000, now 
       timer = setInterval(tick, intervalMs)
       timer.unref?.()
     },
-    stop() { clearInterval(timer) },
+    stop() {
+      clearInterval(timer)
+    },
     /** Delay in ms over the last minute: typical (p50), worst 1% (p99) and worst. */
     status() {
       if (count === 0) return { p50: 0, p99: 0, max: 0 }

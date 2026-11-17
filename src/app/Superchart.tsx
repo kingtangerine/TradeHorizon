@@ -80,7 +80,8 @@ export function Superchart({
   const [folderDraft, setFolderDraft] = useState('')
   const [confirmDeleteFolder, setConfirmDeleteFolder] = useState(false)
   // A folder deleted elsewhere (or on another device) falls back to showing everything.
-  const filter: FolderFilter = folderFilter === 'all' || folderFilter === 'none' || folders.groups.some((folder) => folder.id === folderFilter) ? folderFilter : 'all'
+  const filter: FolderFilter =
+    folderFilter === 'all' || folderFilter === 'none' || folders.groups.some((folder) => folder.id === folderFilter) ? folderFilter : 'all'
   const counts = useMemo(() => folderCounts(layouts, folders), [layouts, folders])
   const unfiledCount = layouts.length - Object.values(counts).reduce((sum, count) => sum + count, 0)
   const activeFolder = folders.groups.find((folder) => folder.id === filter)
@@ -111,12 +112,15 @@ export function Superchart({
     [pickedIds, layouts],
   )
   const autoName = picked.length >= 2 ? defaultSplitName(combinedPanes(picked)) : ''
-  const stopCombining = () => { setCombining(false); setPickedIds([]); setSplitName('') }
-  const togglePick = (id: string) => setPickedIds((current) => (
-    current.includes(id)
-      ? current.filter((item) => item !== id)
-      : current.length >= MAX_COMBINED_LAYOUTS ? current : [...current, id]
-  ))
+  const stopCombining = () => {
+    setCombining(false)
+    setPickedIds([])
+    setSplitName('')
+  }
+  const togglePick = (id: string) =>
+    setPickedIds((current) =>
+      current.includes(id) ? current.filter((item) => item !== id) : current.length >= MAX_COMBINED_LAYOUTS ? current : [...current, id],
+    )
 
   useEffect(() => {
     const closePopovers = (event: MouseEvent) => {
@@ -148,12 +152,7 @@ export function Superchart({
           <h1 id="superchart-page-title">Supercharts</h1>
           <label className="superchart-search">
             <SearchIcon />
-            <input
-              value={query}
-              placeholder="Search"
-              aria-label="Search layouts"
-              onChange={(event) => setQuery(event.target.value)}
-            />
+            <input value={query} placeholder="Search" aria-label="Search layouts" onChange={(event) => setQuery(event.target.value)} />
           </label>
           <button type="button" className="superchart-pill-button" onClick={onNewChart}>
             <PlusIcon /> New chart
@@ -187,7 +186,10 @@ export function Superchart({
                     aria-checked={sort === option.value}
                     className={sort === option.value ? 'selected' : ''}
                     key={option.value}
-                    onClick={() => { setSort(option.value); setSortOpen(false) }}
+                    onClick={() => {
+                      setSort(option.value)
+                      setSortOpen(false)
+                    }}
                   >
                     {option.label}
                   </button>
@@ -198,10 +200,16 @@ export function Superchart({
         </header>
 
         <div className="folder-bar" role="tablist" aria-label="Layout folders">
-          <button type="button" role="tab" aria-selected={filter === 'all'} className={filter === 'all' ? 'folder-chip active' : 'folder-chip'} onClick={() => setFolderFilter('all')}>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={filter === 'all'}
+            className={filter === 'all' ? 'folder-chip active' : 'folder-chip'}
+            onClick={() => setFolderFilter('all')}
+          >
             All <small>{layouts.length}</small>
           </button>
-          {folders.groups.map((folder) => (
+          {folders.groups.map((folder) =>
             renamingFolderId === folder.id ? (
               <input
                 key={folder.id}
@@ -229,10 +237,16 @@ export function Superchart({
               >
                 <FolderIcon /> {folder.name} <small>{counts[folder.id] ?? 0}</small>
               </button>
-            )
-          ))}
+            ),
+          )}
           {unfiledCount > 0 && folders.groups.length > 0 && (
-            <button type="button" role="tab" aria-selected={filter === 'none'} className={filter === 'none' ? 'folder-chip active' : 'folder-chip'} onClick={() => setFolderFilter('none')}>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={filter === 'none'}
+              className={filter === 'none' ? 'folder-chip active' : 'folder-chip'}
+              onClick={() => setFolderFilter('none')}
+            >
               No folder <small>{unfiledCount}</small>
             </button>
           )}
@@ -258,13 +272,24 @@ export function Superchart({
           )}
           {activeFolder && renamingFolderId !== activeFolder.id && (
             <span className="folder-actions" data-popover>
-              <button type="button" onClick={() => { setRenamingFolderId(activeFolder.id); setFolderDraft(activeFolder.name) }}>Rename</button>
+              <button
+                type="button"
+                onClick={() => {
+                  setRenamingFolderId(activeFolder.id)
+                  setFolderDraft(activeFolder.name)
+                }}
+              >
+                Rename
+              </button>
               <button
                 type="button"
                 className="danger"
                 title="Layouts in the folder are kept"
                 onClick={() => {
-                  if (!confirmDeleteFolder) { setConfirmDeleteFolder(true); return }
+                  if (!confirmDeleteFolder) {
+                    setConfirmDeleteFolder(true)
+                    return
+                  }
                   setConfirmDeleteFolder(false)
                   setFolderFilter('all')
                   onFoldersChange(deleteFolder(folders, activeFolder.id))
@@ -288,24 +313,41 @@ export function Superchart({
             const renaming = renamingId === layout.id
             const position = pickedIds.indexOf(layout.id)
             const full = combining && position < 0 && pickedIds.length >= MAX_COMBINED_LAYOUTS
-            const cardClass = ['layout-card', layout.id === activeLayoutId ? 'current' : '', position >= 0 ? 'picked' : '', full ? 'pick-disabled' : ''].filter(Boolean).join(' ')
+            const cardClass = [
+              'layout-card',
+              layout.id === activeLayoutId ? 'current' : '',
+              position >= 0 ? 'picked' : '',
+              full ? 'pick-disabled' : '',
+            ]
+              .filter(Boolean)
+              .join(' ')
             return (
               <article className={cardClass} key={layout.id}>
                 <button
                   type="button"
                   className="layout-card-open"
-                  aria-label={combining ? `${position >= 0 ? 'Remove' : 'Add'} ${layout.name} ${position >= 0 ? 'from' : 'to'} the split view` : `Open ${layout.name}`}
+                  aria-label={
+                    combining
+                      ? `${position >= 0 ? 'Remove' : 'Add'} ${layout.name} ${position >= 0 ? 'from' : 'to'} the split view`
+                      : `Open ${layout.name}`
+                  }
                   aria-pressed={combining ? position >= 0 : undefined}
                   disabled={full}
                   onClick={() => (combining ? togglePick(layout.id) : onOpen(layout))}
-                  onMouseDown={(event) => { if (event.button === 1) event.preventDefault() }}
+                  onMouseDown={(event) => {
+                    if (event.button === 1) event.preventDefault()
+                  }}
                   onAuxClick={(event) => {
                     if (event.button !== 1 || combining) return
                     event.preventDefault()
                     onOpenInBackground(layout)
                   }}
                 />
-                {combining && <span className={position >= 0 ? 'layout-card-pick on' : 'layout-card-pick'} aria-hidden="true">{position >= 0 ? position + 1 : ''}</span>}
+                {combining && (
+                  <span className={position >= 0 ? 'layout-card-pick on' : 'layout-card-pick'} aria-hidden="true">
+                    {position >= 0 ? position + 1 : ''}
+                  </span>
+                )}
                 <button
                   type="button"
                   className={layout.favorite ? 'layout-card-star active' : 'layout-card-star'}
@@ -334,9 +376,17 @@ export function Superchart({
                   <strong className="layout-card-name">{layout.name}</strong>
                 )}
                 <span className="layout-card-meta">
-                  {summary.charts > 1 && <b className="layout-card-split" title={`${summary.charts} charts`}><SplitIcon count={summary.charts} /> {summary.charts}</b>}
+                  {summary.charts > 1 && (
+                    <b className="layout-card-split" title={`${summary.charts} charts`}>
+                      <SplitIcon count={summary.charts} /> {summary.charts}
+                    </b>
+                  )}
                   {summary.symbol}, {summary.interval} • {formatLayoutDate(layout.updatedAtMs)}
-                  {folders.assignments[layout.id] && filter === 'all' && <b className="layout-card-folder" title="Folder"><FolderIcon /> {folders.groups.find((folder) => folder.id === folders.assignments[layout.id])?.name}</b>}
+                  {folders.assignments[layout.id] && filter === 'all' && (
+                    <b className="layout-card-folder" title="Folder">
+                      <FolderIcon /> {folders.groups.find((folder) => folder.id === folders.assignments[layout.id])?.name}
+                    </b>
+                  )}
                   {layout.id === activeLayoutId && <em>Current</em>}
                 </span>
 
@@ -346,15 +396,38 @@ export function Superchart({
                     className="layout-card-more"
                     aria-label={`Actions for ${layout.name}`}
                     aria-expanded={menuId === layout.id}
-                    onClick={() => { setMenuId(menuId === layout.id ? undefined : layout.id); setConfirmDeleteId(undefined) }}
+                    onClick={() => {
+                      setMenuId(menuId === layout.id ? undefined : layout.id)
+                      setConfirmDeleteId(undefined)
+                    }}
                   >
                     <MoreVerticalIcon />
                   </button>
                   {menuId === layout.id && (
                     <div className="superchart-menu" role="menu">
-                      <button type="button" role="menuitem" onClick={() => { setMenuId(undefined); onOpen(layout) }}>Open</button>
-                      <button type="button" role="menuitem" onClick={() => { setMenuId(undefined); onOpenInBackground(layout, true) }}>Open in new tab</button>
-                      <button type="button" role="menuitem" onClick={() => startRename(layout)}>Rename</button>
+                      <button
+                        type="button"
+                        role="menuitem"
+                        onClick={() => {
+                          setMenuId(undefined)
+                          onOpen(layout)
+                        }}
+                      >
+                        Open
+                      </button>
+                      <button
+                        type="button"
+                        role="menuitem"
+                        onClick={() => {
+                          setMenuId(undefined)
+                          onOpenInBackground(layout, true)
+                        }}
+                      >
+                        Open in new tab
+                      </button>
+                      <button type="button" role="menuitem" onClick={() => startRename(layout)}>
+                        Rename
+                      </button>
                       <div className="menu-label">Move to folder</div>
                       {folders.groups.map((folder) => (
                         <button
@@ -363,13 +436,25 @@ export function Superchart({
                           aria-checked={folders.assignments[layout.id] === folder.id}
                           className={folders.assignments[layout.id] === folder.id ? 'selected' : ''}
                           key={folder.id}
-                          onClick={() => { setMenuId(undefined); onFoldersChange(moveLayoutToFolder(folders, [layout.id], folder.id)) }}
+                          onClick={() => {
+                            setMenuId(undefined)
+                            onFoldersChange(moveLayoutToFolder(folders, [layout.id], folder.id))
+                          }}
                         >
                           {folder.name}
                         </button>
                       ))}
                       {folders.assignments[layout.id] && (
-                        <button type="button" role="menuitem" onClick={() => { setMenuId(undefined); onFoldersChange(moveLayoutToFolder(folders, [layout.id], undefined)) }}>No folder</button>
+                        <button
+                          type="button"
+                          role="menuitem"
+                          onClick={() => {
+                            setMenuId(undefined)
+                            onFoldersChange(moveLayoutToFolder(folders, [layout.id], undefined))
+                          }}
+                        >
+                          No folder
+                        </button>
                       )}
                       <button
                         type="button"
@@ -383,13 +468,25 @@ export function Superchart({
                         + New folder…
                       </button>
                       <div className="menu-separator" />
-                      <button type="button" role="menuitem" onClick={() => { setMenuId(undefined); onDuplicate(layout.id) }}>Make a copy</button>
+                      <button
+                        type="button"
+                        role="menuitem"
+                        onClick={() => {
+                          setMenuId(undefined)
+                          onDuplicate(layout.id)
+                        }}
+                      >
+                        Make a copy
+                      </button>
                       <button
                         type="button"
                         role="menuitem"
                         className="danger"
                         onClick={() => {
-                          if (confirmDeleteId !== layout.id) { setConfirmDeleteId(layout.id); return }
+                          if (confirmDeleteId !== layout.id) {
+                            setConfirmDeleteId(layout.id)
+                            return
+                          }
                           setMenuId(undefined)
                           setConfirmDeleteId(undefined)
                           onDelete(layout.id)
@@ -419,7 +516,13 @@ export function Superchart({
                 {picked.map((layout, index) => {
                   const summary = layoutSummary(layout)
                   return (
-                    <button type="button" className="combine-chip" key={layout.id} onClick={() => togglePick(layout.id)} aria-label={`Remove ${layout.name}`}>
+                    <button
+                      type="button"
+                      className="combine-chip"
+                      key={layout.id}
+                      onClick={() => togglePick(layout.id)}
+                      aria-label={`Remove ${layout.name}`}
+                    >
                       <b>{index + 1}</b> {shortSymbol(summary.symbol)} {summary.interval} <CloseIcon />
                     </button>
                   )
@@ -446,7 +549,9 @@ export function Superchart({
               >
                 Open split view
               </button>
-              <button type="button" className="combine-cancel" onClick={stopCombining}>Cancel</button>
+              <button type="button" className="combine-cancel" onClick={stopCombining}>
+                Cancel
+              </button>
             </div>
           </div>
         )}
@@ -455,7 +560,9 @@ export function Superchart({
           <p className="superchart-empty">
             {layouts.length === 0
               ? 'No saved layouts yet. Create one, or use Save in the chart toolbar.'
-              : query.trim() ? `No layouts match “${query.trim()}”.` : 'No layouts in this folder yet. Use ⋮ on a layout and pick Move to folder.'}
+              : query.trim()
+                ? `No layouts match “${query.trim()}”.`
+                : 'No layouts in this folder yet. Use ⋮ on a layout and pick Move to folder.'}
           </p>
         )}
       </div>

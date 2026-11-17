@@ -5,13 +5,17 @@ import { MAX_PLOTS, compileScript, runScript, type CompiledScript } from './scri
 
 export const SCRIPT_INDICATOR_NAME = 'tradeHorizonScript'
 
-export interface ScriptPlotStyle { readonly title: string, readonly color: string, readonly width: number }
+export interface ScriptPlotStyle {
+  readonly title: string
+  readonly color: string
+  readonly width: number
+}
 
 export interface ScriptExtend {
   readonly source: string
   readonly inputs: readonly number[]
   readonly plots: readonly ScriptPlotStyle[]
-  readonly hlines: ReadonlyArray<{ value: number, color: string }>
+  readonly hlines: ReadonlyArray<{ value: number; color: string }>
 }
 
 const cache = new Map<string, CompiledScript | Error>()
@@ -20,7 +24,11 @@ const cache = new Map<string, CompiledScript | Error>()
 export function compiledScript(source: string): CompiledScript | Error {
   let entry = cache.get(source)
   if (!entry) {
-    try { entry = compileScript(source) } catch (error) { entry = error instanceof Error ? error : new Error(String(error)) }
+    try {
+      entry = compileScript(source)
+    } catch (error) {
+      entry = error instanceof Error ? error : new Error(String(error))
+    }
     if (cache.size > 50) cache.clear()
     cache.set(source, entry)
   }

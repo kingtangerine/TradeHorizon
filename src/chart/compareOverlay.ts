@@ -32,7 +32,10 @@ export function registerCompareOverlay(): void {
         ctx.beginPath()
         let drawing = false
         values.forEach((value, offset) => {
-          if (value === undefined) { drawing = false; return }
+          if (value === undefined) {
+            drawing = false
+            return
+          }
           const x = xAxis.convertToPixel(from + offset)
           const y = yAxis.convertToPixel(value)
           if (drawing) ctx.lineTo(x, y)

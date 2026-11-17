@@ -197,7 +197,11 @@ export function CandlesIcon(props: IconProps) {
 }
 
 export function LineChartIcon(props: IconProps) {
-  return <IconBase {...props}><path d="m3 17 5-6 4 3 4-7 5 4" /></IconBase>
+  return (
+    <IconBase {...props}>
+      <path d="m3 17 5-6 4 3 4-7 5 4" />
+    </IconBase>
+  )
 }
 
 export function ReplayIcon(props: IconProps) {
@@ -210,11 +214,19 @@ export function ReplayIcon(props: IconProps) {
 }
 
 export function PlayIcon(props: IconProps) {
-  return <IconBase {...props}><path d="M8 5v14l11-7L8 5Z" /></IconBase>
+  return (
+    <IconBase {...props}>
+      <path d="M8 5v14l11-7L8 5Z" />
+    </IconBase>
+  )
 }
 
 export function PauseIcon(props: IconProps) {
-  return <IconBase {...props}><path d="M8 5v14M16 5v14" /></IconBase>
+  return (
+    <IconBase {...props}>
+      <path d="M8 5v14M16 5v14" />
+    </IconBase>
+  )
 }
 
 export function StepForwardIcon(props: IconProps) {
@@ -246,21 +258,36 @@ export function StarIcon({ filled, ...props }: IconProps & { filled?: boolean })
 export function MoreVerticalIcon(props: IconProps) {
   return (
     <IconBase {...props} fill="currentColor" stroke="none">
-      <circle cx="12" cy="5" r="1.7" /><circle cx="12" cy="12" r="1.7" /><circle cx="12" cy="19" r="1.7" />
+      <circle cx="12" cy="5" r="1.7" />
+      <circle cx="12" cy="12" r="1.7" />
+      <circle cx="12" cy="19" r="1.7" />
     </IconBase>
   )
 }
 
 export function SortIcon(props: IconProps) {
-  return <IconBase {...props}><path d="M7 20V5m0 0L3.5 8.5M7 5l3.5 3.5M13 7h8M13 12h6M13 17h4" /></IconBase>
+  return (
+    <IconBase {...props}>
+      <path d="M7 20V5m0 0L3.5 8.5M7 5l3.5 3.5M13 7h8M13 12h6M13 17h4" />
+    </IconBase>
+  )
 }
 
 export function SearchIcon(props: IconProps) {
-  return <IconBase {...props}><circle cx="11" cy="11" r="7" /><path d="m20 20-4-4" /></IconBase>
+  return (
+    <IconBase {...props}>
+      <circle cx="11" cy="11" r="7" />
+      <path d="m20 20-4-4" />
+    </IconBase>
+  )
 }
 
 export function PlusIcon(props: IconProps) {
-  return <IconBase {...props}><path d="M12 5v14M5 12h14" /></IconBase>
+  return (
+    <IconBase {...props}>
+      <path d="M12 5v14M5 12h14" />
+    </IconBase>
+  )
 }
 
 export function PencilLockIcon(props: IconProps) {
@@ -407,51 +434,107 @@ export function SplitIcon({ count, ...props }: IconProps & { count: number }) {
       <rect x="3" y="4" width="18" height="16" rx="1.5" />
       {count >= 2 && <line x1="12" y1="4" x2="12" y2="20" />}
       {count === 3 && <line x1="12" y1="12" x2="21" y2="12" />}
-      {count >= 4 && <><line x1="3" y1="12" x2="21" y2="12" /></>}
+      {count >= 4 && (
+        <>
+          <line x1="3" y1="12" x2="21" y2="12" />
+        </>
+      )}
     </IconBase>
   )
 }
 
 export function ExtendedLineIcon(props: IconProps) {
-  return <IconBase {...props}><path d="M2 19 22 5" /><circle cx="8" cy="15" r="1.7" /><circle cx="16" cy="9" r="1.7" /></IconBase>
+  return (
+    <IconBase {...props}>
+      <path d="M2 19 22 5" />
+      <circle cx="8" cy="15" r="1.7" />
+      <circle cx="16" cy="9" r="1.7" />
+    </IconBase>
+  )
 }
 
 export function HorizontalRayIcon(props: IconProps) {
-  return <IconBase {...props}><path d="M6 12h16" /><circle cx="5" cy="12" r="1.7" /></IconBase>
+  return (
+    <IconBase {...props}>
+      <path d="M6 12h16" />
+      <circle cx="5" cy="12" r="1.7" />
+    </IconBase>
+  )
 }
 
 export function ParallelChannelIcon(props: IconProps) {
-  return <IconBase {...props}><path d="M3 15 15 5M9 19 21 9" /><path d="M6 17 18 7" strokeDasharray="2 2" /></IconBase>
+  return (
+    <IconBase {...props}>
+      <path d="M3 15 15 5M9 19 21 9" />
+      <path d="M6 17 18 7" strokeDasharray="2 2" />
+    </IconBase>
+  )
 }
 
 export function ArrowIcon(props: IconProps) {
-  return <IconBase {...props}><path d="M4 20 19 5M11 5h8v8" /></IconBase>
+  return (
+    <IconBase {...props}>
+      <path d="M4 20 19 5M11 5h8v8" />
+    </IconBase>
+  )
 }
 
 export function BrushIcon(props: IconProps) {
-  return <IconBase {...props}><path d="M3 17c3-1 4-6 7-6s2 5 5 5 4-6 6-8" /></IconBase>
+  return (
+    <IconBase {...props}>
+      <path d="M3 17c3-1 4-6 7-6s2 5 5 5 4-6 6-8" />
+    </IconBase>
+  )
 }
 
 export function FibExtensionIcon(props: IconProps) {
-  return <IconBase {...props}><path d="M4 18 9 8l5 6" strokeDasharray="2 2" /><path d="M13 5h8M13 10h8M13 15h8M13 20h8" /></IconBase>
+  return (
+    <IconBase {...props}>
+      <path d="M4 18 9 8l5 6" strokeDasharray="2 2" />
+      <path d="M13 5h8M13 10h8M13 15h8M13 20h8" />
+    </IconBase>
+  )
 }
 
 export function PitchforkIcon(props: IconProps) {
-  return <IconBase {...props}><path d="M3 13 21 13M8 6 21 6M8 20 21 20M8 6v14" /><circle cx="3" cy="13" r="1.5" /></IconBase>
+  return (
+    <IconBase {...props}>
+      <path d="M3 13 21 13M8 6 21 6M8 20 21 20M8 6v14" />
+      <circle cx="3" cy="13" r="1.5" />
+    </IconBase>
+  )
 }
 
 export function EllipseIcon(props: IconProps) {
-  return <IconBase {...props}><ellipse cx="12" cy="12" rx="9" ry="6" /></IconBase>
+  return (
+    <IconBase {...props}>
+      <ellipse cx="12" cy="12" rx="9" ry="6" />
+    </IconBase>
+  )
 }
 
 export function DateRangeIcon(props: IconProps) {
-  return <IconBase {...props}><path d="M5 4v16M19 4v16M7 12h10M14 9l3 3-3 3" /></IconBase>
+  return (
+    <IconBase {...props}>
+      <path d="M5 4v16M19 4v16M7 12h10M14 9l3 3-3 3" />
+    </IconBase>
+  )
 }
 
 export function DatePriceRangeIcon(props: IconProps) {
-  return <IconBase {...props}><rect x="4" y="5" width="16" height="14" rx="1" /><path d="M12 7v10M6 12h12" /></IconBase>
+  return (
+    <IconBase {...props}>
+      <rect x="4" y="5" width="16" height="14" rx="1" />
+      <path d="M12 7v10M6 12h12" />
+    </IconBase>
+  )
 }
 
 export function PriceLabelIcon(props: IconProps) {
-  return <IconBase {...props}><path d="M4 7h11l5 5-5 5H4Z" /><path d="M2 20l3-3" /></IconBase>
+  return (
+    <IconBase {...props}>
+      <path d="M4 7h11l5 5-5 5H4Z" />
+      <path d="M2 20l3-3" />
+    </IconBase>
+  )
 }

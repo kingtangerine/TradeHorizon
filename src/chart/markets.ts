@@ -34,13 +34,7 @@ export interface CryptoMarket {
   readonly pair: string
 }
 
-function market(
-  baseAsset: string,
-  name: string,
-  mark: string,
-  pricePrecision: number,
-  volumePrecision = 4,
-): CryptoMarket {
+function market(baseAsset: string, name: string, mark: string, pricePrecision: number, volumePrecision = 4): CryptoMarket {
   const symbol = `${baseAsset}USDT`
   return {
     symbol,
@@ -134,25 +128,84 @@ export const BTCDOM_MARKET: CryptoMarket = {
 }
 
 const COIN_NAMES: Readonly<Record<string, string>> = {
-  TRX: 'TRON', POL: 'Polygon', MATIC: 'Polygon', LTC: 'Litecoin', BCH: 'Bitcoin Cash',
-  SHIB: 'Shiba Inu', UNI: 'Uniswap', ATOM: 'Cosmos', XLM: 'Stellar', ETC: 'Ethereum Classic',
-  NEAR: 'NEAR Protocol', FIL: 'Filecoin', APT: 'Aptos', ARB: 'Arbitrum', OP: 'Optimism',
-  SUI: 'Sui', INJ: 'Injective', AAVE: 'Aave', MKR: 'Maker', ALGO: 'Algorand', VET: 'VeChain',
-  ICP: 'Internet Computer', HBAR: 'Hedera', TON: 'Toncoin', PEPE: 'Pepe', WIF: 'dogwifhat',
-  FET: 'Fetch.ai', RENDER: 'Render', GRT: 'The Graph', SAND: 'The Sandbox', MANA: 'Decentraland',
-  AXS: 'Axie Infinity', THETA: 'Theta Network', EOS: 'EOS', XTZ: 'Tezos', NEO: 'NEO',
-  USDC: 'USD Coin', FDUSD: 'First Digital USD', TUSD: 'TrueUSD', DAI: 'Dai', JASMY: 'JasmyCoin',
-  GRASS: 'Grass', ZETA: 'ZetaChain', BONK: 'Bonk', FLOKI: 'FLOKI', SEI: 'Sei', TIA: 'Celestia',
-  LDO: 'Lido DAO', CRV: 'Curve DAO', SNX: 'Synthetix', COMP: 'Compound', RUNE: 'THORChain',
-  KAVA: 'Kava', EGLD: 'MultiversX', FTM: 'Fantom', S: 'Sonic', ENA: 'Ethena', WLD: 'Worldcoin',
-  JUP: 'Jupiter', PYTH: 'Pyth Network', ONDO: 'Ondo', PENDLE: 'Pendle', TAO: 'Bittensor',
-  IMX: 'Immutable', GALA: 'Gala', CHZ: 'Chiliz', ENJ: 'Enjin Coin', ZEC: 'Zcash', DASH: 'Dash',
-  XMR: 'Monero', IOTA: 'IOTA', QTUM: 'Qtum', ZIL: 'Zilliqa', ONE: 'Harmony', OG: 'OG Fan Token',
+  TRX: 'TRON',
+  POL: 'Polygon',
+  MATIC: 'Polygon',
+  LTC: 'Litecoin',
+  BCH: 'Bitcoin Cash',
+  SHIB: 'Shiba Inu',
+  UNI: 'Uniswap',
+  ATOM: 'Cosmos',
+  XLM: 'Stellar',
+  ETC: 'Ethereum Classic',
+  NEAR: 'NEAR Protocol',
+  FIL: 'Filecoin',
+  APT: 'Aptos',
+  ARB: 'Arbitrum',
+  OP: 'Optimism',
+  SUI: 'Sui',
+  INJ: 'Injective',
+  AAVE: 'Aave',
+  MKR: 'Maker',
+  ALGO: 'Algorand',
+  VET: 'VeChain',
+  ICP: 'Internet Computer',
+  HBAR: 'Hedera',
+  TON: 'Toncoin',
+  PEPE: 'Pepe',
+  WIF: 'dogwifhat',
+  FET: 'Fetch.ai',
+  RENDER: 'Render',
+  GRT: 'The Graph',
+  SAND: 'The Sandbox',
+  MANA: 'Decentraland',
+  AXS: 'Axie Infinity',
+  THETA: 'Theta Network',
+  EOS: 'EOS',
+  XTZ: 'Tezos',
+  NEO: 'NEO',
+  USDC: 'USD Coin',
+  FDUSD: 'First Digital USD',
+  TUSD: 'TrueUSD',
+  DAI: 'Dai',
+  JASMY: 'JasmyCoin',
+  GRASS: 'Grass',
+  ZETA: 'ZetaChain',
+  BONK: 'Bonk',
+  FLOKI: 'FLOKI',
+  SEI: 'Sei',
+  TIA: 'Celestia',
+  LDO: 'Lido DAO',
+  CRV: 'Curve DAO',
+  SNX: 'Synthetix',
+  COMP: 'Compound',
+  RUNE: 'THORChain',
+  KAVA: 'Kava',
+  EGLD: 'MultiversX',
+  FTM: 'Fantom',
+  S: 'Sonic',
+  ENA: 'Ethena',
+  WLD: 'Worldcoin',
+  JUP: 'Jupiter',
+  PYTH: 'Pyth Network',
+  ONDO: 'Ondo',
+  PENDLE: 'Pendle',
+  TAO: 'Bittensor',
+  IMX: 'Immutable',
+  GALA: 'Gala',
+  CHZ: 'Chiliz',
+  ENJ: 'Enjin Coin',
+  ZEC: 'Zcash',
+  DASH: 'Dash',
+  XMR: 'Monero',
+  IOTA: 'IOTA',
+  QTUM: 'Qtum',
+  ZIL: 'Zilliqa',
+  ONE: 'Harmony',
+  OG: 'OG Fan Token',
 }
 
-const registry = new Map<string, CryptoMarket>(
-  [...CRYPTO_MARKETS, BTCDOM_MARKET, ...DOMINANCE_MARKETS].map((item) => [item.symbol, item]),
-)
+const registry = new Map<string, CryptoMarket>([...CRYPTO_MARKETS, BTCDOM_MARKET, ...DOMINANCE_MARKETS].map((item) => [item.symbol, item]))
 // v5: every exchange (Binance, Bybit, OKX, Bitget, Gate; spot and perpetuals), stored compactly: ~10,000 pairs.
 const CATALOG_CACHE_KEY = 'trade-horizon:markets:v5'
 const CATALOG_TTL_MS = 12 * 60 * 60 * 1000
@@ -160,11 +213,16 @@ let cacheRestored = false
 
 /** Exchange names as the symbol search and the chart show them. */
 export const VENUE_NAMES: Readonly<Record<ExchangeId, string>> = {
-  binance: 'Binance', 'binance-futures': 'Binance Futures',
-  bybit: 'Bybit', 'bybit-futures': 'Bybit Futures',
-  okx: 'OKX', 'okx-futures': 'OKX Futures',
-  bitget: 'Bitget', 'bitget-futures': 'Bitget Futures',
-  gate: 'Gate', 'gate-futures': 'Gate Futures',
+  binance: 'Binance',
+  'binance-futures': 'Binance Futures',
+  bybit: 'Bybit',
+  'bybit-futures': 'Bybit Futures',
+  okx: 'OKX',
+  'okx-futures': 'OKX Futures',
+  bitget: 'Bitget',
+  'bitget-futures': 'Bitget Futures',
+  gate: 'Gate',
+  'gate-futures': 'Gate Futures',
 }
 
 /** The symbol without our exchange prefix ("BYBIT:BTCUSDT.P" -> "BTCUSDT.P"), as TradingView shows it next to the exchange. */
@@ -208,14 +266,25 @@ function registerListings(listings: readonly BinanceSpotListing[]): void {
 type PackedListing = [string, string, number, number, string?, string?, string?]
 
 function packListing(listing: BinanceSpotListing): PackedListing {
-  return [listing.symbol, listing.baseAsset, listing.pricePrecision, listing.volumePrecision, listing.exchange ?? '', listing.quoteAsset ?? '', listing.apiSymbol ?? '']
+  return [
+    listing.symbol,
+    listing.baseAsset,
+    listing.pricePrecision,
+    listing.volumePrecision,
+    listing.exchange ?? '',
+    listing.quoteAsset ?? '',
+    listing.apiSymbol ?? '',
+  ]
 }
 
 function unpackListing(value: unknown): unknown {
   if (!Array.isArray(value)) return null
   const [symbol, baseAsset, pricePrecision, volumePrecision, exchange, quoteAsset, apiSymbol] = value as PackedListing
   return {
-    symbol, baseAsset, pricePrecision, volumePrecision,
+    symbol,
+    baseAsset,
+    pricePrecision,
+    volumePrecision,
     ...(exchange ? { exchange } : {}),
     ...(quoteAsset ? { quoteAsset } : {}),
     ...(apiSymbol ? { apiSymbol } : {}),
@@ -229,13 +298,17 @@ function readCatalogCache(): { fetchedAtMs: number; listings: BinanceSpotListing
       compact?: unknown
     } | null
     if (!value || typeof value.fetchedAtMs !== 'number' || !Array.isArray(value.compact)) return null
-    const listings = value.compact.map(unpackListing).filter((item): item is BinanceSpotListing => (
-      typeof item === 'object' && item !== null &&
-      /^([A-Z]+:)?[A-Z0-9_-]{2,40}(\.P)?$/.test((item as BinanceSpotListing).symbol) &&
-      typeof (item as BinanceSpotListing).baseAsset === 'string' &&
-      Number.isInteger((item as BinanceSpotListing).pricePrecision) &&
-      Number.isInteger((item as BinanceSpotListing).volumePrecision)
-    ))
+    const listings = value.compact
+      .map(unpackListing)
+      .filter(
+        (item): item is BinanceSpotListing =>
+          typeof item === 'object' &&
+          item !== null &&
+          /^([A-Z]+:)?[A-Z0-9_-]{2,40}(\.P)?$/.test((item as BinanceSpotListing).symbol) &&
+          typeof (item as BinanceSpotListing).baseAsset === 'string' &&
+          Number.isInteger((item as BinanceSpotListing).pricePrecision) &&
+          Number.isInteger((item as BinanceSpotListing).volumePrecision),
+      )
     return { fetchedAtMs: value.fetchedAtMs, listings }
   } catch {
     return null
@@ -261,9 +334,12 @@ export function allMarkets(): CryptoMarket[] {
 
 async function fetchServerCatalog(fetcher: MarketDataFetch | undefined, signal?: AbortSignal): Promise<BinanceSpotListing[] | null> {
   try {
-    const response = await (fetcher ?? ((input, init) => globalThis.fetch(input, init)))('/api/markets', { headers: { Accept: 'application/json' }, signal })
+    const response = await (fetcher ?? ((input, init) => globalThis.fetch(input, init)))('/api/markets', {
+      headers: { Accept: 'application/json' },
+      signal,
+    })
     if (!response.ok) return null
-    const payload = await response.json() as { listings?: unknown }
+    const payload = (await response.json()) as { listings?: unknown }
     const listings = Array.isArray(payload.listings) ? payload.listings.filter(isListing) : []
     return listings.length > 100 ? listings : null
   } catch {
@@ -273,16 +349,17 @@ async function fetchServerCatalog(fetcher: MarketDataFetch | undefined, signal?:
 
 function isListing(item: unknown): item is BinanceSpotListing {
   const value = item as BinanceSpotListing | null
-  return typeof value === 'object' && value !== null &&
-    /^([A-Z]+:)?[A-Z0-9_-]{2,40}(\.P)?$/.test(value.symbol) && typeof value.baseAsset === 'string' &&
-    Number.isInteger(value.pricePrecision) && Number.isInteger(value.volumePrecision)
+  return (
+    typeof value === 'object' &&
+    value !== null &&
+    /^([A-Z]+:)?[A-Z0-9_-]{2,40}(\.P)?$/.test(value.symbol) &&
+    typeof value.baseAsset === 'string' &&
+    Number.isInteger(value.pricePrecision) &&
+    Number.isInteger(value.volumePrecision)
+  )
 }
 
-export async function refreshMarketCatalog(
-  fetcher?: MarketDataFetch,
-  signal?: AbortSignal,
-  nowMs = Date.now(),
-): Promise<boolean> {
+export async function refreshMarketCatalog(fetcher?: MarketDataFetch, signal?: AbortSignal, nowMs = Date.now()): Promise<boolean> {
   restoreCatalogOnce()
   const cached = readCatalogCache()
   if (cached && nowMs - cached.fetchedAtMs < CATALOG_TTL_MS) return false

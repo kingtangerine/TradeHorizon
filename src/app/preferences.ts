@@ -27,16 +27,31 @@ export interface ChartAppearance {
   readonly lastPriceLine: boolean
 }
 
-export const DEFAULT_APPEARANCE: ChartAppearance = { upColor: '#089981', downColor: '#f23645', wicks: true, background: null, grid: 'both', lastPriceLine: true }
+export const DEFAULT_APPEARANCE: ChartAppearance = {
+  upColor: '#089981',
+  downColor: '#f23645',
+  wicks: true,
+  background: null,
+  grid: 'both',
+  lastPriceLine: true,
+}
 
-export const DEFAULT_PREFERENCES: Preferences = { candleCountdown: true, alertLines: true, timeZone: 'auto', highLowLabels: false, appearance: DEFAULT_APPEARANCE, favoriteIndicators: [] }
+export const DEFAULT_PREFERENCES: Preferences = {
+  candleCountdown: true,
+  alertLines: true,
+  timeZone: 'auto',
+  highLowLabels: false,
+  appearance: DEFAULT_APPEARANCE,
+  favoriteIndicators: [],
+}
 
 const COLOR = /^#[0-9a-fA-F]{6}$/
 
 export function parseAppearance(value: unknown): ChartAppearance {
   if (typeof value !== 'object' || value === null) return DEFAULT_APPEARANCE
   const raw = value as Record<string, unknown>
-  const color = (key: 'upColor' | 'downColor') => (typeof raw[key] === 'string' && COLOR.test(raw[key] as string) ? raw[key] as string : DEFAULT_APPEARANCE[key])
+  const color = (key: 'upColor' | 'downColor') =>
+    typeof raw[key] === 'string' && COLOR.test(raw[key] as string) ? (raw[key] as string) : DEFAULT_APPEARANCE[key]
   return {
     upColor: color('upColor'),
     downColor: color('downColor'),
@@ -60,7 +75,9 @@ export function parsePreferences(value: unknown): Preferences {
     timeZone: typeof raw.timeZone === 'string' && raw.timeZone.length <= 64 ? raw.timeZone : DEFAULT_PREFERENCES.timeZone,
     highLowLabels: typeof raw.highLowLabels === 'boolean' ? raw.highLowLabels : DEFAULT_PREFERENCES.highLowLabels,
     appearance: parseAppearance(raw.appearance),
-    favoriteIndicators: Array.isArray(raw.favoriteIndicators) ? [...new Set(raw.favoriteIndicators.filter((item): item is string => typeof item === 'string' && item.length <= 80))].slice(0, 100) : [],
+    favoriteIndicators: Array.isArray(raw.favoriteIndicators)
+      ? [...new Set(raw.favoriteIndicators.filter((item): item is string => typeof item === 'string' && item.length <= 80))].slice(0, 100)
+      : [],
   }
 }
 

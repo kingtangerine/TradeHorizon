@@ -31,8 +31,12 @@ export function ToolGroup({ label, tools, shown, activeTool, icons, disabled, on
     if (!open) return
     const inside = (target: EventTarget | null) =>
       target instanceof Node && (ref.current?.contains(target) || flyoutRef.current?.contains(target))
-    const close = (event: Event) => { if (!inside(event.target)) setOpen(false) }
-    const escape = (event: KeyboardEvent) => { if (event.key === 'Escape') setOpen(false) }
+    const close = (event: Event) => {
+      if (!inside(event.target)) setOpen(false)
+    }
+    const escape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setOpen(false)
+    }
     const dismiss = () => setOpen(false)
     document.addEventListener('pointerdown', close, true)
     document.addEventListener('keydown', escape)
@@ -82,37 +86,43 @@ export function ToolGroup({ label, tools, shown, activeTool, icons, disabled, on
           onClick={() => setOpen((current) => !current)}
           disabled={disabled}
         >
-          <svg viewBox="0 0 6 6" aria-hidden="true"><path d="M1 1 5 3 1 5Z" fill="currentColor" /></svg>
+          <svg viewBox="0 0 6 6" aria-hidden="true">
+            <path d="M1 1 5 3 1 5Z" fill="currentColor" />
+          </svg>
         </button>
       )}
-      {open && createPortal(
-        <div
-          className="tool-flyout"
-          role="menu"
-          aria-label={label}
-          ref={flyoutRef}
-          style={position ?? { visibility: 'hidden', left: 0, top: 0 }}
-        >
-          <strong>{label}</strong>
-          {tools.map((type) => {
-            const ItemIcon = icons[type]
-            return (
-              <button
-                type="button"
-                role="menuitem"
-                key={type}
-                className={activeTool === type ? 'active' : ''}
-                onClick={() => { setOpen(false); onChoose(type) }}
-              >
-                <ItemIcon />
-                <span>{DRAWING_TOOLS[type].label}</span>
-                <kbd>Alt+{DRAWING_TOOLS[type].shortcut}</kbd>
-              </button>
-            )
-          })}
-        </div>,
-        document.body,
-      )}
+      {open &&
+        createPortal(
+          <div
+            className="tool-flyout"
+            role="menu"
+            aria-label={label}
+            ref={flyoutRef}
+            style={position ?? { visibility: 'hidden', left: 0, top: 0 }}
+          >
+            <strong>{label}</strong>
+            {tools.map((type) => {
+              const ItemIcon = icons[type]
+              return (
+                <button
+                  type="button"
+                  role="menuitem"
+                  key={type}
+                  className={activeTool === type ? 'active' : ''}
+                  onClick={() => {
+                    setOpen(false)
+                    onChoose(type)
+                  }}
+                >
+                  <ItemIcon />
+                  <span>{DRAWING_TOOLS[type].label}</span>
+                  <kbd>Alt+{DRAWING_TOOLS[type].shortcut}</kbd>
+                </button>
+              )
+            })}
+          </div>,
+          document.body,
+        )}
     </div>
   )
 }

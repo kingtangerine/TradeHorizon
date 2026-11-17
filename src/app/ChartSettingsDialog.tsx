@@ -19,31 +19,53 @@ interface ChartSettingsDialogProps {
   onClose(): void
 }
 
-const GRID_LABELS: Record<GridLines, string> = { both: 'Vertical and horizontal', vertical: 'Vertical only', horizontal: 'Horizontal only', none: 'None' }
+const GRID_LABELS: Record<GridLines, string> = {
+  both: 'Vertical and horizontal',
+  vertical: 'Vertical only',
+  horizontal: 'Horizontal only',
+  none: 'None',
+}
 
 export function ChartSettingsDialog({ preferences, onPreferences, scaleMode, onScaleMode, onClose }: ChartSettingsDialogProps) {
   const [tab, setTab] = useState<Tab>('symbol')
   const appearance = preferences.appearance
-  const setAppearance = (patch: Partial<ChartAppearance>) => onPreferences((current) => ({ ...current, appearance: { ...current.appearance, ...patch } }))
+  const setAppearance = (patch: Partial<ChartAppearance>) =>
+    onPreferences((current) => ({ ...current, appearance: { ...current.appearance, ...patch } }))
   const set = <K extends keyof Preferences>(key: K, value: Preferences[K]) => onPreferences((current) => ({ ...current, [key]: value }))
 
   useEffect(() => {
-    const escape = (event: KeyboardEvent) => { if (event.key === 'Escape') onClose() }
+    const escape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') onClose()
+    }
     globalThis.addEventListener('keydown', escape)
     return () => globalThis.removeEventListener('keydown', escape)
   }, [onClose])
 
   return createPortal(
     <div className="modal-backdrop" role="presentation" onMouseDown={onClose}>
-      <section className="chart-settings-dialog" role="dialog" aria-modal="true" aria-label="Chart settings" onMouseDown={(event) => event.stopPropagation()}>
+      <section
+        className="chart-settings-dialog"
+        role="dialog"
+        aria-modal="true"
+        aria-label="Chart settings"
+        onMouseDown={(event) => event.stopPropagation()}
+      >
         <header>
           <strong>Settings</strong>
-          <button type="button" className="object-icon-button" aria-label="Close" onClick={onClose}><CloseIcon /></button>
+          <button type="button" className="object-icon-button" aria-label="Close" onClick={onClose}>
+            <CloseIcon />
+          </button>
         </header>
         <div className="chart-settings-body">
           <nav aria-label="Settings sections">
             {(['symbol', 'canvas', 'scales'] as const).map((item) => (
-              <button type="button" key={item} className={tab === item ? 'active' : ''} aria-current={tab === item} onClick={() => setTab(item)}>
+              <button
+                type="button"
+                key={item}
+                className={tab === item ? 'active' : ''}
+                aria-current={tab === item}
+                onClick={() => setTab(item)}
+              >
                 {item === 'symbol' ? 'Symbol' : item === 'canvas' ? 'Canvas' : 'Scales and time'}
               </button>
             ))}
@@ -58,7 +80,11 @@ export function ChartSettingsDialog({ preferences, onPreferences, scaleMode, onS
                 </div>
                 <div className="chart-settings-row">
                   <span>Down colour</span>
-                  <ColorPicker label="Down candle colour" value={appearance.downColor} onChange={(downColor) => setAppearance({ downColor })} />
+                  <ColorPicker
+                    label="Down candle colour"
+                    value={appearance.downColor}
+                    onChange={(downColor) => setAppearance({ downColor })}
+                  />
                 </div>
                 <label className="chart-settings-row">
                   <span>Wicks</span>
@@ -73,17 +99,32 @@ export function ChartSettingsDialog({ preferences, onPreferences, scaleMode, onS
                 <div className="chart-settings-row">
                   <span>Background</span>
                   <span className="chart-settings-inline">
-                    <select value={appearance.background ? 'custom' : 'theme'} onChange={(event) => setAppearance({ background: event.target.value === 'custom' ? (appearance.background ?? '#131722') : null })}>
+                    <select
+                      value={appearance.background ? 'custom' : 'theme'}
+                      onChange={(event) =>
+                        setAppearance({ background: event.target.value === 'custom' ? (appearance.background ?? '#131722') : null })
+                      }
+                    >
                       <option value="theme">Theme default</option>
                       <option value="custom">Solid colour</option>
                     </select>
-                    {appearance.background && <ColorPicker label="Background colour" value={appearance.background} onChange={(background) => setAppearance({ background })} />}
+                    {appearance.background && (
+                      <ColorPicker
+                        label="Background colour"
+                        value={appearance.background}
+                        onChange={(background) => setAppearance({ background })}
+                      />
+                    )}
                   </span>
                 </div>
                 <div className="chart-settings-row">
                   <span>Grid lines</span>
                   <select value={appearance.grid} onChange={(event) => setAppearance({ grid: event.target.value as GridLines })}>
-                    {(Object.keys(GRID_LABELS) as GridLines[]).map((value) => <option value={value} key={value}>{GRID_LABELS[value]}</option>)}
+                    {(Object.keys(GRID_LABELS) as GridLines[]).map((value) => (
+                      <option value={value} key={value}>
+                        {GRID_LABELS[value]}
+                      </option>
+                    ))}
                   </select>
                 </div>
               </>
@@ -101,15 +142,27 @@ export function ChartSettingsDialog({ preferences, onPreferences, scaleMode, onS
                 </div>
                 <label className="chart-settings-row">
                   <span>Last price line</span>
-                  <input type="checkbox" checked={appearance.lastPriceLine} onChange={(event) => setAppearance({ lastPriceLine: event.target.checked })} />
+                  <input
+                    type="checkbox"
+                    checked={appearance.lastPriceLine}
+                    onChange={(event) => setAppearance({ lastPriceLine: event.target.checked })}
+                  />
                 </label>
                 <label className="chart-settings-row">
                   <span>Candle countdown</span>
-                  <input type="checkbox" checked={preferences.candleCountdown} onChange={(event) => set('candleCountdown', event.target.checked)} />
+                  <input
+                    type="checkbox"
+                    checked={preferences.candleCountdown}
+                    onChange={(event) => set('candleCountdown', event.target.checked)}
+                  />
                 </label>
                 <label className="chart-settings-row">
                   <span>High and low price labels</span>
-                  <input type="checkbox" checked={preferences.highLowLabels} onChange={(event) => set('highLowLabels', event.target.checked)} />
+                  <input
+                    type="checkbox"
+                    checked={preferences.highLowLabels}
+                    onChange={(event) => set('highLowLabels', event.target.checked)}
+                  />
                 </label>
                 <label className="chart-settings-row">
                   <span>Alert lines</span>
@@ -120,7 +173,11 @@ export function ChartSettingsDialog({ preferences, onPreferences, scaleMode, onS
                   <span>Time zone</span>
                   <select value={preferences.timeZone} onChange={(event) => set('timeZone', event.target.value)}>
                     <option value={AUTO_TIME_ZONE}>Your computer · {timeZoneLabel(browserTimeZone())}</option>
-                    {TIME_ZONES.map(({ zone }) => <option value={zone} key={zone}>{timeZoneLabel(zone)}</option>)}
+                    {TIME_ZONES.map(({ zone }) => (
+                      <option value={zone} key={zone}>
+                        {timeZoneLabel(zone)}
+                      </option>
+                    ))}
                   </select>
                 </div>
               </>
@@ -128,8 +185,12 @@ export function ChartSettingsDialog({ preferences, onPreferences, scaleMode, onS
           </div>
         </div>
         <footer>
-          <button type="button" onClick={() => onPreferences((current) => ({ ...current, appearance: DEFAULT_APPEARANCE }))}>Reset colours and canvas</button>
-          <button type="button" className="primary" onClick={onClose}>Done</button>
+          <button type="button" onClick={() => onPreferences((current) => ({ ...current, appearance: DEFAULT_APPEARANCE }))}>
+            Reset colours and canvas
+          </button>
+          <button type="button" className="primary" onClick={onClose}>
+            Done
+          </button>
         </footer>
       </section>
     </div>,

@@ -9,7 +9,7 @@ export interface BackupFile {
   readonly format: typeof BACKUP_FORMAT
   readonly version: number
   readonly exportedAtMs: number
-  readonly account: { readonly email: string, readonly displayName: string }
+  readonly account: { readonly email: string; readonly displayName: string }
   /** localStorage entries with the `trade-horizon:user:<id>:` prefix removed. */
   readonly items: Readonly<Record<string, string>>
 }
@@ -20,7 +20,7 @@ function prefixFor(userId: string): string {
 
 export function buildBackup(
   userId: string,
-  account: { email: string, displayName: string },
+  account: { email: string; displayName: string },
   storage: Pick<Storage, 'length' | 'key' | 'getItem'> = localStorage,
   nowMs = Date.now(),
 ): BackupFile {
@@ -32,13 +32,23 @@ export function buildBackup(
     const value = storage.getItem(key)
     if (value !== null) items[key.slice(prefix.length)] = value
   }
-  return { format: BACKUP_FORMAT, version: BACKUP_VERSION, exportedAtMs: nowMs, account: { email: account.email, displayName: account.displayName }, items }
+  return {
+    format: BACKUP_FORMAT,
+    version: BACKUP_VERSION,
+    exportedAtMs: nowMs,
+    account: { email: account.email, displayName: account.displayName },
+    items,
+  }
 }
 
 export function parseBackup(text: string): BackupFile {
   if (text.length > MAX_BACKUP_BYTES) throw new Error('This file is too large to be a TradeHorizon backup.')
   let value: unknown
-  try { value = JSON.parse(text) } catch { throw new Error('This file is not valid JSON.') }
+  try {
+    value = JSON.parse(text)
+  } catch {
+    throw new Error('This file is not valid JSON.')
+  }
   const file = value as Partial<BackupFile> | null
   if (!file || file.format !== BACKUP_FORMAT || typeof file.items !== 'object' || file.items === null) {
     throw new Error('This is not a TradeHorizon backup file.')
@@ -50,7 +60,11 @@ export function parseBackup(text: string): BackupFile {
   for (const [key, item] of Object.entries(file.items)) {
     // Only plain data keys are accepted, and every stored value must itself be valid JSON.
     if (!/^[a-z0-9:_-]{1,64}$/i.test(key) || typeof item !== 'string') continue
-    try { JSON.parse(item) } catch { continue }
+    try {
+      JSON.parse(item)
+    } catch {
+      continue
+    }
     items[key] = item
   }
   if (Object.keys(items).length === 0) throw new Error('The backup contains no saved data.')

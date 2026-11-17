@@ -36,7 +36,9 @@ export interface StoredAlert extends AlertRuleFields {
 }
 
 /** An alert a device saw trigger (see newlyTriggered). */
-export interface TriggeredAlert extends StoredAlert { readonly triggeredAtMs: number }
+export interface TriggeredAlert extends StoredAlert {
+  readonly triggeredAtMs: number
+}
 
 /** What a notification says, for web push and Telegram. */
 export interface AlertPayload {
@@ -80,7 +82,9 @@ export interface AlertStore {
 }
 
 /** A live price feed (see priceFeed.ts). */
-export interface AlertFeed { setSymbols(groups: SymbolGroups): void }
+export interface AlertFeed {
+  setSymbols(groups: SymbolGroups): void
+}
 
 export interface AlertServiceOptions {
   readonly store: AlertStore
@@ -93,7 +97,11 @@ export interface AlertServiceOptions {
   readonly log?: ServiceLog
 }
 
-export interface AlertWatchStatus { readonly symbols: number, readonly live: number, readonly polled: number }
+export interface AlertWatchStatus {
+  readonly symbols: number
+  readonly live: number
+  readonly polled: number
+}
 
 export interface AlertService {
   start(): void
@@ -110,12 +118,17 @@ export interface AlertService {
 /** A browser's push subscription, as stored and as handed to the sender. */
 export interface WebPushSubscription {
   readonly endpoint: string
-  readonly keys: { readonly p256dh: string, readonly auth: string }
+  readonly keys: { readonly p256dh: string; readonly auth: string }
 }
 
-interface StoredSubscription extends WebPushSubscription { readonly createdAtMs: number }
+interface StoredSubscription extends WebPushSubscription {
+  readonly createdAtMs: number
+}
 
-interface VapidKeys { readonly publicKey: string, readonly privateKey: string }
+interface VapidKeys {
+  readonly publicKey: string
+  readonly privateKey: string
+}
 
 /** What createPushService needs from the web-push package (tests pass a stand-in). */
 export interface PushSender {
@@ -173,10 +186,16 @@ export function priceAgo(samples: readonly PriceSample[] | undefined, windowMs: 
 /** Alerts that can still fire. Anything malformed is ignored rather than trusted. */
 export function parseActiveAlerts(value: string): StoredAlert[] {
   let list: unknown
-  try { list = JSON.parse(value) } catch { return [] }
+  try {
+    list = JSON.parse(value)
+  } catch {
+    return []
+  }
   if (!Array.isArray(list)) return []
   const nowMs = Date.now()
-  return list.filter(isValidAlert).filter((alert: StoredAlert) => alert.enabled === true && !alert.triggeredAtMs && !isExpired(alert, nowMs))
+  return list
+    .filter(isValidAlert)
+    .filter((alert: StoredAlert) => alert.enabled === true && !alert.triggeredAtMs && !isExpired(alert, nowMs))
 }
 
 /** How long after triggering a device-reported alert is still worth a notification (old uploads are not re-sent). */
@@ -186,18 +205,41 @@ const RELAY_WINDOW_MS = 30 * 60_000
  * Alerts that are triggered in `nextValue` but were not (or not at that moment) in `previousValue`:
  * a device with the app open saw them trigger first and uploaded them. Only recent triggers count.
  */
-export function newlyTriggered(previousValue: string | null | undefined, nextValue: string | null | undefined, nowMs: number, maxAgeMs = RELAY_WINDOW_MS): TriggeredAlert[] {
+export function newlyTriggered(
+  previousValue: string | null | undefined,
+  nextValue: string | null | undefined,
+  nowMs: number,
+  maxAgeMs = RELAY_WINDOW_MS,
+): TriggeredAlert[] {
   // Uploaded data: the fields that matter are checked below.
-  const parse = (value: string | null | undefined): Array<Partial<StoredAlert> | null | undefined> => { try { const list: unknown = JSON.parse(value ?? '[]'); return Array.isArray(list) ? list : [] } catch { return [] } }
+  const parse = (value: string | null | undefined): Array<Partial<StoredAlert> | null | undefined> => {
+    try {
+      const list: unknown = JSON.parse(value ?? '[]')
+      return Array.isArray(list) ? list : []
+    } catch {
+      return []
+    }
+  }
   // "Every time" alerts stay active and record each trigger in lastTriggeredAtMs instead.
-  const at = (alert: Partial<StoredAlert> | null | undefined) => (typeof alert?.triggeredAtMs === 'number' ? alert.triggeredAtMs : alert?.lastTriggeredAtMs)
-  const before = new Map(parse(previousValue).filter((alert) => alert && typeof alert.id === 'string').map((alert): [unknown, number | undefined] => [alert?.id, at(alert)]))
-  return parse(nextValue).filter((alert) => (
-    alert && typeof alert.id === 'string' && typeof alert.symbol === 'string' &&
-    typeof alert.targetPrice === 'number' && typeof at(alert) === 'number' &&
-    before.get(alert.id) !== at(alert) &&
-    Math.abs(nowMs - Number(at(alert))) <= maxAgeMs
-  )).map((alert) => ({ ...alert, triggeredAtMs: at(alert) }) as TriggeredAlert)
+  const at = (alert: Partial<StoredAlert> | null | undefined) =>
+    typeof alert?.triggeredAtMs === 'number' ? alert.triggeredAtMs : alert?.lastTriggeredAtMs
+  const before = new Map(
+    parse(previousValue)
+      .filter((alert) => alert && typeof alert.id === 'string')
+      .map((alert): [unknown, number | undefined] => [alert?.id, at(alert)]),
+  )
+  return parse(nextValue)
+    .filter(
+      (alert) =>
+        alert &&
+        typeof alert.id === 'string' &&
+        typeof alert.symbol === 'string' &&
+        typeof alert.targetPrice === 'number' &&
+        typeof at(alert) === 'number' &&
+        before.get(alert.id) !== at(alert) &&
+        Math.abs(nowMs - Number(at(alert))) <= maxAgeMs,
+    )
+    .map((alert) => ({ ...alert, triggeredAtMs: at(alert) }) as TriggeredAlert)
 }
 
 export function alertPayload(alert: AlertRuleFields, price: number): AlertPayload {
@@ -218,37 +260,63 @@ async function getJson(url: string, fetchImpl: FetchLike): Promise<unknown> {
 
 /** Latest prices for { exchange: symbols[] }. One failing exchange only drops its own symbols. */
 /** Our symbol -> the exchange's own one when nothing better is known ("BYBIT:BTCUSDT.P" -> "BTCUSDT"). */
-const plainApiSymbol = (symbol: string) => String(symbol).replace(/^[A-Z]+:/, '').replace(/\.P$/, '')
+const plainApiSymbol = (symbol: string) =>
+  String(symbol)
+    .replace(/^[A-Z]+:/, '')
+    .replace(/\.P$/, '')
 
-export async function fetchLastPrices(groups: SymbolGroups, fetchImpl: FetchLike = (url, init) => fetch(url, init), apiSymbolOf: (symbol: string) => string = plainApiSymbol): Promise<Map<string, number>> {
+export async function fetchLastPrices(
+  groups: SymbolGroups,
+  fetchImpl: FetchLike = (url, init) => fetch(url, init),
+  apiSymbolOf: (symbol: string) => string = plainApiSymbol,
+): Promise<Map<string, number>> {
   const prices = new Map<string, number>()
   const jobs: Array<Promise<void>> = []
   const binance = groups.binance ?? []
   for (let index = 0; index < binance.length; index += BINANCE_BATCH) {
     const chunk = binance.slice(index, index + BINANCE_BATCH)
-    jobs.push(getJson(`https://data-api.binance.vision/api/v3/ticker/price?symbols=${encodeURIComponent(JSON.stringify(chunk))}`, fetchImpl)
-      .then((rows) => { for (const row of rows as Iterable<{ readonly symbol: string, readonly price: unknown }>) prices.set(row.symbol, Number(row.price)) }))
+    jobs.push(
+      getJson(`https://data-api.binance.vision/api/v3/ticker/price?symbols=${encodeURIComponent(JSON.stringify(chunk))}`, fetchImpl).then(
+        (rows) => {
+          for (const row of rows as Iterable<{ readonly symbol: string; readonly price: unknown }>)
+            prices.set(row.symbol, Number(row.price))
+        },
+      ),
+    )
   }
   // The other exchanges: one ticker request per exchange covers every symbol watched there.
   for (const [exchange, ticker] of Object.entries(VENUE_TICKERS)) {
     const symbols = groups[exchange] ?? []
     if (symbols.length === 0) continue
     const wanted = new Map(symbols.map((symbol): [unknown, string] => [apiSymbolOf(symbol), symbol]))
-    jobs.push(getJson(ticker.url, fetchImpl).then((payload) => {
-      for (const row of (ticker.rows(payload) ?? []) as Iterable<JsonFields | null | undefined>) {
-        const symbol = wanted.get(row?.[ticker.symbol])
-        if (symbol) prices.set(symbol, Number(row?.[ticker.price]))
-      }
-    }))
+    jobs.push(
+      getJson(ticker.url, fetchImpl).then((payload) => {
+        for (const row of (ticker.rows(payload) ?? []) as Iterable<JsonFields | null | undefined>) {
+          const symbol = wanted.get(row?.[ticker.symbol])
+          if (symbol) prices.set(symbol, Number(row?.[ticker.price]))
+        }
+      }),
+    )
   }
   for (const symbol of groups['binance-futures'] ?? []) {
     // Perpetuals are stored as "XXXUSDT.P"; Binance knows them without the suffix.
-    jobs.push(getJson(`https://fapi.binance.com/fapi/v1/ticker/price?symbol=${encodeURIComponent(apiSymbolOf(symbol))}`, fetchImpl)
-      .then((row) => { prices.set(symbol, Number((row as JsonFields).price)) }))
+    jobs.push(
+      getJson(`https://fapi.binance.com/fapi/v1/ticker/price?symbol=${encodeURIComponent(apiSymbolOf(symbol))}`, fetchImpl).then((row) => {
+        prices.set(symbol, Number((row as JsonFields).price))
+      }),
+    )
   }
   for (const symbol of groups.bybit ?? []) {
-    jobs.push(getJson(`https://api.bybit.com/v5/market/tickers?category=spot&symbol=${encodeURIComponent(apiSymbolOf(symbol))}`, fetchImpl)
-      .then((payload) => { prices.set(symbol, Number((payload as { readonly result?: { readonly list?: readonly JsonFields[] } }).result?.list?.[0]?.lastPrice)) }))
+    jobs.push(
+      getJson(`https://api.bybit.com/v5/market/tickers?category=spot&symbol=${encodeURIComponent(apiSymbolOf(symbol))}`, fetchImpl).then(
+        (payload) => {
+          prices.set(
+            symbol,
+            Number((payload as { readonly result?: { readonly list?: readonly JsonFields[] } }).result?.list?.[0]?.lastPrice),
+          )
+        },
+      ),
+    )
   }
   await Promise.allSettled(jobs)
   for (const [symbol, price] of prices) if (!Number.isFinite(price) || price <= 0) prices.delete(symbol)
@@ -261,7 +329,16 @@ export async function fetchLastPrices(groups: SymbolGroups, fetchImpl: FetchLike
  * @param notify     async (userId, payload) => void
  * @param feed       optional live price feed: { setSymbols({ exchange: symbols[] }) } (see priceFeed.ts)
  */
-export function createAlertService({ store, exchangeOf, apiSymbolOf, fetchPrices = (groups) => fetchLastPrices(groups, undefined, apiSymbolOf), notify = async () => {}, feed, now = () => Date.now(), log = console }: AlertServiceOptions): AlertService {
+export function createAlertService({
+  store,
+  exchangeOf,
+  apiSymbolOf,
+  fetchPrices = (groups) => fetchLastPrices(groups, undefined, apiSymbolOf),
+  notify = async () => {},
+  feed,
+  now = () => Date.now(),
+  log = console,
+}: AlertServiceOptions): AlertService {
   /** userId -> alerts that can still fire */
   const active = new Map<string, StoredAlert[]>()
   /** symbol -> last price seen */
@@ -273,7 +350,7 @@ export function createAlertService({ store, exchangeOf, apiSymbolOf, fetchPrices
   /** symbol -> when the live feed last delivered a price for it */
   const liveAt = new Map<string, number>()
   /** symbol -> [{ userId, alert }]: what to check when a price for that symbol arrives */
-  let bySymbol = new Map<string, Array<{ userId: string, alert: StoredAlert }>>()
+  let bySymbol = new Map<string, Array<{ userId: string; alert: StoredAlert }>>()
   /** exchange -> symbols, for the live feed and for polling */
   let groups: Record<string, string[]> = {}
   let watchedKey = ''
@@ -285,7 +362,7 @@ export function createAlertService({ store, exchangeOf, apiSymbolOf, fetchPrices
 
   /** Rebuilds the per-symbol index and, when the set of symbols changed, tells the live feed. */
   function reindex() {
-    const nextBySymbol = new Map<string, Array<{ userId: string, alert: StoredAlert }>>()
+    const nextBySymbol = new Map<string, Array<{ userId: string; alert: StoredAlert }>>()
     const nextGroups: Record<string, string[]> = {}
     for (const [userId, alerts] of active) {
       for (const alert of alerts) {
@@ -299,14 +376,27 @@ export function createAlertService({ store, exchangeOf, apiSymbolOf, fetchPrices
     }
     bySymbol = nextBySymbol
     groups = nextGroups
-    for (const symbol of [...lastPrice.keys()]) if (!bySymbol.has(symbol)) { lastPrice.delete(symbol); liveAt.delete(symbol); samples.delete(symbol) }
+    for (const symbol of [...lastPrice.keys()])
+      if (!bySymbol.has(symbol)) {
+        lastPrice.delete(symbol)
+        liveAt.delete(symbol)
+        samples.delete(symbol)
+      }
     const ids = new Set([...active.values()].flat().map((alert) => alert.id))
     for (const id of [...alertState.keys()]) if (!ids.has(id)) alertState.delete(id)
-    const key = JSON.stringify(Object.entries(groups).map(([exchange, symbols]) => [exchange, [...symbols].sort()]).sort())
+    const key = JSON.stringify(
+      Object.entries(groups)
+        .map(([exchange, symbols]) => [exchange, [...symbols].sort()])
+        .sort(),
+    )
     if (key !== watchedKey) {
       watchedKey = key
       // The live feed reports plain symbols, so prefixed ones ("BYBIT:BTCUSDT") are left to polling.
-      feed?.setSymbols(Object.fromEntries(Object.entries(groups).map(([exchange, symbols]) => [exchange, symbols.filter((symbol) => !symbol.includes(':'))])))
+      feed?.setSymbols(
+        Object.fromEntries(
+          Object.entries(groups).map(([exchange, symbols]) => [exchange, symbols.filter((symbol) => !symbol.includes(':'))]),
+        ),
+      )
     }
   }
 
@@ -371,7 +461,9 @@ export function createAlertService({ store, exchangeOf, apiSymbolOf, fetchPrices
             : { ...item, enabled: false, triggeredAtMs, triggeredPrice: price }
         })
         store.setAlertsValue(userId, JSON.stringify(updated))
-      } catch { /* leave the stored data alone if it cannot be read */ }
+      } catch {
+        /* leave the stored data alone if it cannot be read */
+      }
     }
     updateUserAlerts(userId, store.getAlertsValue(userId) ?? '[]')
     send(userId, alertPayload(alert, price))
@@ -399,7 +491,10 @@ export function createAlertService({ store, exchangeOf, apiSymbolOf, fetchPrices
       let count = 0
       for (const [exchange, symbols] of Object.entries(groups)) {
         const due = symbols.filter((symbol) => !(now() - (liveAt.get(symbol) ?? -Infinity) < LIVE_STALE_MS))
-        if (due.length > 0) { stale[exchange] = due; count += due.length }
+        if (due.length > 0) {
+          stale[exchange] = due
+          count += due.length
+        }
       }
       polledSymbols = count
       if (count === 0) return
@@ -421,13 +516,18 @@ export function createAlertService({ store, exchangeOf, apiSymbolOf, fetchPrices
     const value = store.getAlertsValue(userId)
     if (!value) return []
     try {
-      const at = (alert: Partial<StoredAlert> | null | undefined) => (typeof alert?.triggeredAtMs === 'number' ? alert.triggeredAtMs : alert?.lastTriggeredAtMs)
+      const at = (alert: Partial<StoredAlert> | null | undefined) =>
+        typeof alert?.triggeredAtMs === 'number' ? alert.triggeredAtMs : alert?.lastTriggeredAtMs
       // Stored data: anything but an array throws and counts as no events.
       return (JSON.parse(value) as Array<Partial<StoredAlert> | null | undefined>)
         .filter((alert): alert is Partial<StoredAlert> => typeof at(alert) === 'number' && Number(at(alert)) > sinceMs)
         .map((alert): AlertEvent => ({
-          id: alert.id, symbol: alert.symbol, targetPrice: alert.targetPrice, direction: alert.direction,
-          triggeredAtMs: at(alert), triggeredPrice: alert.triggeredPrice ?? alert.lastTriggeredPrice,
+          id: alert.id,
+          symbol: alert.symbol,
+          targetPrice: alert.targetPrice,
+          direction: alert.direction,
+          triggeredAtMs: at(alert),
+          triggeredPrice: alert.triggeredPrice ?? alert.lastTriggeredPrice,
           ...(alert.frequency === 'everyTime' ? { everyTime: true } : {}),
         }))
     } catch {
@@ -441,7 +541,9 @@ export function createAlertService({ store, exchangeOf, apiSymbolOf, fetchPrices
       timer = setInterval(() => void tick(), POLL_MS)
       timer.unref()
     },
-    stop() { clearInterval(timer) },
+    stop() {
+      clearInterval(timer)
+    },
     updateUserAlerts,
     relayTriggered,
     eventsSince,
@@ -467,7 +569,11 @@ export function createPushService({ dataDir, subject, log = console, sender = we
   let vapid: VapidKeys | undefined
   if (existsSync(vapidFile)) {
     // Both keys are checked below.
-    try { vapid = JSON.parse(readFileSync(vapidFile, 'utf8')) as VapidKeys } catch { /* regenerated below */ }
+    try {
+      vapid = JSON.parse(readFileSync(vapidFile, 'utf8')) as VapidKeys
+    } catch {
+      /* regenerated below */
+    }
   }
   if (!vapid?.publicKey || !vapid?.privateKey) {
     vapid = webpush.generateVAPIDKeys()
@@ -480,7 +586,11 @@ export function createPushService({ dataDir, subject, log = console, sender = we
   let subscriptions: Record<string, StoredSubscription[]> = {}
   if (existsSync(subsFile)) {
     // Written only by persist() below.
-    try { subscriptions = JSON.parse(readFileSync(subsFile, 'utf8')) as Record<string, StoredSubscription[]> } catch { /* start empty */ }
+    try {
+      subscriptions = JSON.parse(readFileSync(subsFile, 'utf8')) as Record<string, StoredSubscription[]>
+    } catch {
+      /* start empty */
+    }
   }
 
   function persist() {
@@ -494,18 +604,24 @@ export function createPushService({ dataDir, subject, log = console, sender = we
     /** Returns an error message, or undefined on success. */
     subscribe(userId, input) {
       // Request JSON: endpoint and keys are checked below.
-      const subscription = input as { readonly endpoint?: unknown, readonly keys?: { readonly p256dh?: unknown, readonly auth?: unknown } } | null | undefined
+      const subscription = input as
+        { readonly endpoint?: unknown; readonly keys?: { readonly p256dh?: unknown; readonly auth?: unknown } } | null | undefined
       const endpoint = subscription?.endpoint
       const keys = subscription?.keys
       if (typeof endpoint !== 'string' || endpoint.length > 2048 || typeof keys?.p256dh !== 'string' || typeof keys?.auth !== 'string') {
         return 'Invalid subscription.'
       }
       let url: URL
-      try { url = new URL(endpoint) } catch { return 'Invalid subscription.' }
+      try {
+        url = new URL(endpoint)
+      } catch {
+        return 'Invalid subscription.'
+      }
       if (url.protocol !== 'https:' || !PUSH_HOSTS.test(url.hostname)) return 'Unsupported push service.'
       const others = (subscriptions[userId] ?? []).filter((item) => item.endpoint !== endpoint)
-      subscriptions[userId] = [...others, { endpoint, keys: { p256dh: keys.p256dh, auth: keys.auth }, createdAtMs: Date.now() }]
-        .slice(-MAX_SUBSCRIPTIONS_PER_USER)
+      subscriptions[userId] = [...others, { endpoint, keys: { p256dh: keys.p256dh, auth: keys.auth }, createdAtMs: Date.now() }].slice(
+        -MAX_SUBSCRIPTIONS_PER_USER,
+      )
       persist()
       return undefined
     },
@@ -534,27 +650,33 @@ export function createPushService({ dataDir, subject, log = console, sender = we
     /** Queues the notification for every device of the user; settles when each was delivered or given up on. */
     async send(userId, payload) {
       const body = JSON.stringify(payload)
-      return Promise.all((subscriptions[userId] ?? []).map((subscription) => queue.enqueue(subscription.endpoint, async () => {
-        try {
-          await sender.sendNotification({ endpoint: subscription.endpoint, keys: subscription.keys }, body, { TTL: 3600 })
-        } catch (caught) {
-          // web-push rejects with a WebPushError (statusCode, headers); anything else is reported the same way.
-          const error = caught as PushFailure
-          const status = error?.statusCode
-          if (status === 404 || status === 410) {
-            // The browser dropped the subscription: forget it, retrying cannot help.
-            const rest = (subscriptions[userId] ?? []).filter((item) => item.endpoint !== subscription.endpoint)
-            if (rest.length === 0) delete subscriptions[userId]
-            else subscriptions[userId] = rest
-            persist()
-            throw Object.assign(new Error(`subscription gone (${status})`), { permanent: true })
-          }
-          const retryAfter = Number(error?.headers?.['retry-after'])
-          if (status === 429 && retryAfter > 0) error.retryAfterMs = retryAfter * 1000
-          else if (status !== undefined && status >= 400 && status < 500 && status !== 429) error.permanent = true
-          throw Object.assign(error instanceof Error ? error : new Error(String(error)), { message: `push service answered ${status ?? error?.message}` })
-        }
-      })))
+      return Promise.all(
+        (subscriptions[userId] ?? []).map((subscription) =>
+          queue.enqueue(subscription.endpoint, async () => {
+            try {
+              await sender.sendNotification({ endpoint: subscription.endpoint, keys: subscription.keys }, body, { TTL: 3600 })
+            } catch (caught) {
+              // web-push rejects with a WebPushError (statusCode, headers); anything else is reported the same way.
+              const error = caught as PushFailure
+              const status = error?.statusCode
+              if (status === 404 || status === 410) {
+                // The browser dropped the subscription: forget it, retrying cannot help.
+                const rest = (subscriptions[userId] ?? []).filter((item) => item.endpoint !== subscription.endpoint)
+                if (rest.length === 0) delete subscriptions[userId]
+                else subscriptions[userId] = rest
+                persist()
+                throw Object.assign(new Error(`subscription gone (${status})`), { permanent: true })
+              }
+              const retryAfter = Number(error?.headers?.['retry-after'])
+              if (status === 429 && retryAfter > 0) error.retryAfterMs = retryAfter * 1000
+              else if (status !== undefined && status >= 400 && status < 500 && status !== 429) error.permanent = true
+              throw Object.assign(error instanceof Error ? error : new Error(String(error)), {
+                message: `push service answered ${status ?? error?.message}`,
+              })
+            }
+          }),
+        ),
+      )
     },
   }
 }

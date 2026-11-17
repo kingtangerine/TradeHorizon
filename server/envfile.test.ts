@@ -6,15 +6,19 @@ import { loadEnvFile, parseEnv } from './envfile.ts'
 
 describe('.env file', () => {
   it('parses KEY=value lines, comments, export and quotes', () => {
-    expect(parseEnv([
-      '# Telegram',
-      'TH_TELEGRAM_TOKEN=123:abc',
-      '  TH_TRUST_PROXY = 1  ',
-      'export TH_VAPID_SUBJECT="mailto:me@example.com"',
-      "QUOTED='a b'",
-      'not a setting',
-      '',
-    ].join('\r\n'))).toEqual({
+    expect(
+      parseEnv(
+        [
+          '# Telegram',
+          'TH_TELEGRAM_TOKEN=123:abc',
+          '  TH_TRUST_PROXY = 1  ',
+          'export TH_VAPID_SUBJECT="mailto:me@example.com"',
+          "QUOTED='a b'",
+          'not a setting',
+          '',
+        ].join('\r\n'),
+      ),
+    ).toEqual({
       TH_TELEGRAM_TOKEN: '123:abc',
       TH_TRUST_PROXY: '1',
       TH_VAPID_SUBJECT: 'mailto:me@example.com',

@@ -31,7 +31,9 @@ export function subscribeRemoteData(listener: RemoteDataListener): () => void {
     unseenKeys.clear()
     listener(keys)
   }
-  return () => { remoteListeners.delete(listener) }
+  return () => {
+    remoteListeners.delete(listener)
+  }
 }
 
 // --- Status (for the status bar and the sync check in the account window) -------------------------
@@ -58,19 +60,25 @@ export const getSyncStatus = (): SyncStatus => status
 
 export function subscribeSyncStatus(listener: (status: SyncStatus) => void): () => void {
   statusListeners.add(listener)
-  return () => { statusListeners.delete(listener) }
+  return () => {
+    statusListeners.delete(listener)
+  }
 }
 
 /** Plain-language reason for a failed request, with the fix when it is a known deployment problem. */
 export function describeHttpProblem(statusCode: number, serverMessage?: string): string {
   if (statusCode === 401) return 'Your session has expired. Sign out and sign in again.'
-  if (statusCode === 413) return 'The server (or the proxy in front of it) refused the upload as too large (HTTP 413). If nginx is in front, set client_max_body_size 10m; and restart nginx.'
-  if (statusCode === 404 || statusCode === 405) return `The server does not understand this request (HTTP ${statusCode}). It is probably still running an older TradeHorizon: on the server run git pull, npm ci, npm run build, then restart the Node process.`
-  if (statusCode === 502 || statusCode === 503 || statusCode === 504) return `The proxy could not reach the TradeHorizon server (HTTP ${statusCode}). Check that the Node process is running.`
+  if (statusCode === 413)
+    return 'The server (or the proxy in front of it) refused the upload as too large (HTTP 413). If nginx is in front, set client_max_body_size 10m; and restart nginx.'
+  if (statusCode === 404 || statusCode === 405)
+    return `The server does not understand this request (HTTP ${statusCode}). It is probably still running an older TradeHorizon: on the server run git pull, npm ci, npm run build, then restart the Node process.`
+  if (statusCode === 502 || statusCode === 503 || statusCode === 504)
+    return `The proxy could not reach the TradeHorizon server (HTTP ${statusCode}). Check that the Node process is running.`
   return `The server answered HTTP ${statusCode}${serverMessage ? `: ${serverMessage}` : ''}.`
 }
 
-const OUTDATED_SERVER = 'The server is running an older TradeHorizon that does not support the new sync, so nothing can be exchanged. On the server run git pull, npm ci, npm run build, then restart the Node process.'
+const OUTDATED_SERVER =
+  'The server is running an older TradeHorizon that does not support the new sync, so nothing can be exchanged. On the server run git pull, npm ci, npm run build, then restart the Node process.'
 
 // --- Device name (shown next to each saved item, so you can tell which computer saved it) -----------
 
@@ -83,8 +91,28 @@ const DEVICE_KEY = 'trade-horizon:device'
 
 function guessDeviceName(): string {
   const agent = navigator.userAgent
-  const os = /Android/.test(agent) ? 'Android' : /iPhone|iPad/.test(agent) ? 'iPhone/iPad' : /Windows/.test(agent) ? 'Windows' : /Mac OS/.test(agent) ? 'Mac' : /Linux/.test(agent) ? 'Linux' : 'Device'
-  const browser = /Edg\//.test(agent) ? 'Edge' : /OPR\//.test(agent) ? 'Opera' : /Firefox\//.test(agent) ? 'Firefox' : /Chrome\//.test(agent) ? 'Chrome' : /Safari\//.test(agent) ? 'Safari' : 'Browser'
+  const os = /Android/.test(agent)
+    ? 'Android'
+    : /iPhone|iPad/.test(agent)
+      ? 'iPhone/iPad'
+      : /Windows/.test(agent)
+        ? 'Windows'
+        : /Mac OS/.test(agent)
+          ? 'Mac'
+          : /Linux/.test(agent)
+            ? 'Linux'
+            : 'Device'
+  const browser = /Edg\//.test(agent)
+    ? 'Edge'
+    : /OPR\//.test(agent)
+      ? 'Opera'
+      : /Firefox\//.test(agent)
+        ? 'Firefox'
+        : /Chrome\//.test(agent)
+          ? 'Chrome'
+          : /Safari\//.test(agent)
+            ? 'Safari'
+            : 'Browser'
   return `${os} · ${browser}`
 }
 
@@ -92,15 +120,25 @@ export function getDevice(): DeviceInfo {
   try {
     const stored = JSON.parse(localStorage.getItem(DEVICE_KEY) ?? 'null') as Partial<DeviceInfo> | null
     if (stored && typeof stored.id === 'string' && typeof stored.name === 'string') return { id: stored.id, name: stored.name }
-  } catch { /* create below */ }
+  } catch {
+    /* create below */
+  }
   const device = { id: crypto.randomUUID(), name: guessDeviceName() }
-  try { localStorage.setItem(DEVICE_KEY, JSON.stringify(device)) } catch { /* storage blocked */ }
+  try {
+    localStorage.setItem(DEVICE_KEY, JSON.stringify(device))
+  } catch {
+    /* storage blocked */
+  }
   return device
 }
 
 export function setDeviceName(name: string): DeviceInfo {
   const device = { ...getDevice(), name: name.trim().slice(0, 60) || guessDeviceName() }
-  try { localStorage.setItem(DEVICE_KEY, JSON.stringify(device)) } catch { /* storage blocked */ }
+  try {
+    localStorage.setItem(DEVICE_KEY, JSON.stringify(device))
+  } catch {
+    /* storage blocked */
+  }
   return device
 }
 
@@ -112,12 +150,14 @@ export async function syncNow(): Promise<void> {
 }
 
 /** What this device knows per item (server revision it is based on, unsent changes), for the sync check. */
-export function syncKeyStates(userId: string): Record<string, { rev: number, dirty: boolean }> {
+export function syncKeyStates(userId: string): Record<string, { rev: number; dirty: boolean }> {
   const meta = readMeta(userId)
   const prefix = userPrefix(userId)
-  return Object.fromEntries(Object.entries(meta.keys)
-    .filter(([key]) => key.startsWith(prefix))
-    .map(([key, known]) => [key.slice(prefix.length), { rev: known.rev, dirty: known.dirty }]))
+  return Object.fromEntries(
+    Object.entries(meta.keys)
+      .filter(([key]) => key.startsWith(prefix))
+      .map(([key, known]) => [key.slice(prefix.length), { rev: known.rev, dirty: known.dirty }]),
+  )
 }
 
 interface ServerItem {
@@ -170,7 +210,9 @@ function readMeta(userId: string): SyncMeta {
   try {
     const value = JSON.parse(localStorage.getItem(metaKey(userId)) ?? 'null') as Partial<SyncMeta> | null
     if (value && typeof value.rev === 'number' && typeof value.keys === 'object' && value.keys) return { rev: value.rev, keys: value.keys }
-  } catch { /* start fresh */ }
+  } catch {
+    /* start fresh */
+  }
   return { rev: 0, keys: {} }
 }
 
@@ -188,7 +230,11 @@ export async function startUserSync(userId: string): Promise<void> {
   const prefix = userPrefix(userId)
   const meta = readMeta(userId)
   /** Items with edits that never reached the server before this page load (e.g. made offline last time). */
-  const dirtyAtStart = new Set(Object.entries(meta.keys).filter(([, known]) => known.dirty).map(([key]) => key))
+  const dirtyAtStart = new Set(
+    Object.entries(meta.keys)
+      .filter(([, known]) => known.dirty)
+      .map(([key]) => key),
+  )
   const timers = new Map<string, ReturnType<typeof setTimeout>>()
   const retryDelays = new Map<string, number>()
   let ready = false
@@ -203,7 +249,11 @@ export async function startUserSync(userId: string): Promise<void> {
   const saveMeta = () => {
     clearTimeout(metaTimer)
     metaTimer = undefined
-    try { writeLocal(metaKey(userId), JSON.stringify(meta)) } catch { /* storage full: rebuilt on the next start */ }
+    try {
+      writeLocal(metaKey(userId), JSON.stringify(meta))
+    } catch {
+      /* storage full: rebuilt on the next start */
+    }
   }
   const saveMetaSoon = () => {
     if (metaTimer === undefined) metaTimer = setTimeout(saveMeta, 500)
@@ -214,7 +264,8 @@ export async function startUserSync(userId: string): Promise<void> {
     const pending = pendingCount()
     setStatus({ ...patch, pending, error: undefined, state: pending > 0 ? 'saving' : 'synced' })
   }
-  const markProblem = (error: string, offline = false) => setStatus({ error, pending: pendingCount(), state: offline ? 'offline' : 'error' })
+  const markProblem = (error: string, offline = false) =>
+    setStatus({ error, pending: pendingCount(), state: offline ? 'offline' : 'error' })
 
   const announce = (keys: string[]) => {
     if (keys.length === 0 || stopped) return
@@ -232,11 +283,12 @@ export async function startUserSync(userId: string): Promise<void> {
     return run
   }
 
-  const request = (path: string, init: RequestInit = {}, timeoutMs = REQUEST_TIMEOUT_MS) => fetch(path, {
-    ...init,
-    headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-    signal: init.keepalive ? undefined : AbortSignal.timeout(timeoutMs),
-  })
+  const request = (path: string, init: RequestInit = {}, timeoutMs = REQUEST_TIMEOUT_MS) =>
+    fetch(path, {
+      ...init,
+      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+      signal: init.keepalive ? undefined : AbortSignal.timeout(timeoutMs),
+    })
 
   /** Takes in a server copy, merging it with unsynced local edits. Returns true when the local copy changed. */
   const absorb = (key: string, item: ServerItem, startup = false): boolean => {
@@ -281,27 +333,35 @@ export async function startUserSync(userId: string): Promise<void> {
         keepalive: keepalive && value.length < 60_000,
       })
     } catch {
-      markProblem('Could not reach the server to upload changes (offline, or the server is down). They are kept and sent when it is back.', true)
+      markProblem(
+        'Could not reach the server to upload changes (offline, or the server is down). They are kept and sent when it is back.',
+        true,
+      )
       retryLater(key) // offline: try again later; the edit stays marked as unsynced
       return
     }
     if (stopped) return
     if (response.status === 409) {
-      const body = await response.json().catch(() => ({})) as { item?: ServerItem }
+      const body = (await response.json().catch(() => ({}))) as { item?: ServerItem }
       if (stopped) return
       // Another device changed this item first: merge its copy in (which uploads the result if it differs).
-      if (body.item) { if (absorb(key, body.item)) announce([key]) } else retryLater(key)
+      if (body.item) {
+        if (absorb(key, body.item)) announce([key])
+      } else retryLater(key)
       return
     }
     if (!response.ok) {
-      const body = await response.json().catch(() => ({})) as { error?: string }
+      const body = (await response.json().catch(() => ({}))) as { error?: string }
       markProblem(`Saving ${suffix(key)} failed. ${describeHttpProblem(response.status, body.error)}`)
       retryLater(key)
       return
     }
-    const { rev } = await response.json() as { rev?: number }
+    const { rev } = (await response.json()) as { rev?: number }
     if (stopped) return
-    if (typeof rev !== 'number') { markProblem(OUTDATED_SERVER); return }
+    if (typeof rev !== 'number') {
+      markProblem(OUTDATED_SERVER)
+      return
+    }
     retryDelays.delete(key)
     known.rev = rev
     known.base = baseOfRaw(value)
@@ -315,17 +375,23 @@ export async function startUserSync(userId: string): Promise<void> {
   function schedulePush(key: string, delay = PUSH_DELAY_MS) {
     if (!ready || stopped) return // held until the first download is merged; then every unsynced key is uploaded
     clearTimeout(timers.get(key))
-    timers.set(key, setTimeout(() => { timers.delete(key); void serial(() => push(key)) }, delay))
+    timers.set(
+      key,
+      setTimeout(() => {
+        timers.delete(key)
+        void serial(() => push(key))
+      }, delay),
+    )
   }
 
   /** Downloads changes (all items at start-up, since the last revision afterwards) and merges them in. */
   const pull = async (startup: boolean): Promise<string[]> => {
     const response = await request(`/api/data?since=${startup ? 0 : meta.rev}`, {}, startup ? STARTUP_TIMEOUT_MS : REQUEST_TIMEOUT_MS)
     if (!response.ok) {
-      const body = await response.json().catch(() => ({})) as { error?: string }
+      const body = (await response.json().catch(() => ({}))) as { error?: string }
       throw new Error(describeHttpProblem(response.status, body.error))
     }
-    const body = await response.json() as { items: Record<string, ServerItem>, rev?: number }
+    const body = (await response.json()) as { items: Record<string, ServerItem>; rev?: number }
     // A sync that was stopped meanwhile (sign-out, or a newer start) must not touch storage any more.
     if (stopped) return []
     if (typeof body.rev !== 'number') throw new Error(OUTDATED_SERVER)
@@ -343,19 +409,27 @@ export async function startUserSync(userId: string): Promise<void> {
 
   // Watch writes from the rest of the app. Rewriting an unchanged value is not an edit.
   Storage.prototype.setItem = function (this: Storage, key: string, value: string) {
-    if (this !== localStorage || !key.startsWith(prefix)) { originalSetItem.call(this, key, value); return }
+    if (this !== localStorage || !key.startsWith(prefix)) {
+      originalSetItem.call(this, key, value)
+      return
+    }
     const previous = this.getItem(key)
     originalSetItem.call(this, key, value)
     if (previous === value || stopped) return
     state(key).dirty = true
     saveMetaSoon()
     schedulePush(key)
-    if (ready) setStatus({ pending: pendingCount(), state: status.state === 'error' || status.state === 'offline' ? status.state : 'saving' })
+    if (ready)
+      setStatus({ pending: pendingCount(), state: status.state === 'error' || status.state === 'offline' ? status.state : 'saving' })
   }
 
   const flush = () => {
     saveMeta()
-    for (const [key, timer] of timers) { clearTimeout(timer); timers.delete(key); void push(key, true) }
+    for (const [key, timer] of timers) {
+      clearTimeout(timer)
+      timers.delete(key)
+      void push(key, true)
+    }
   }
 
   const poll = () => {
@@ -364,9 +438,18 @@ export async function startUserSync(userId: string): Promise<void> {
   }
   function reportPullError(error: unknown) {
     const offline = error instanceof TypeError || (error instanceof DOMException && error.name === 'TimeoutError')
-    markProblem(offline ? 'Could not reach the server to check for changes from other devices (offline, or the server is down).' : error instanceof Error ? error.message : String(error), offline)
+    markProblem(
+      offline
+        ? 'Could not reach the server to check for changes from other devices (offline, or the server is down).'
+        : error instanceof Error
+          ? error.message
+          : String(error),
+      offline,
+    )
   }
-  const onVisible = () => { if (document.visibilityState === 'visible') poll() }
+  const onVisible = () => {
+    if (document.visibilityState === 'visible') poll()
+  }
   const onOnline = () => {
     for (const [key, known] of Object.entries(meta.keys)) if (known.dirty) schedulePush(key, 0)
     poll()
@@ -394,7 +477,10 @@ export async function startUserSync(userId: string): Promise<void> {
 
   syncNowActive = async () => {
     if (stopped) return
-    for (const [key, timer] of timers) { clearTimeout(timer); timers.delete(key) }
+    for (const [key, timer] of timers) {
+      clearTimeout(timer)
+      timers.delete(key)
+    }
     for (const [key, known] of Object.entries(meta.keys)) if (known.dirty) await serial(() => push(key))
     await serial(() => pull(false)).then(announce, reportPullError)
     saveMeta()
@@ -417,7 +503,11 @@ export async function startUserSync(userId: string): Promise<void> {
   }
   ready = true
   saveMeta()
-  try { localStorage.removeItem(legacyMetaKey(userId)) } catch { /* ignore */ }
+  try {
+    localStorage.removeItem(legacyMetaKey(userId))
+  } catch {
+    /* ignore */
+  }
   for (const [key, known] of Object.entries(meta.keys)) if (known.dirty) schedulePush(key, 0)
   announce(changed)
 }

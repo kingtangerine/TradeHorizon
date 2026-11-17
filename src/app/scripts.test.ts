@@ -12,8 +12,12 @@ beforeEach(() => {
   vi.mocked(reportProblem).mockClear()
   vi.stubGlobal('localStorage', {
     getItem: (key: string) => values.get(key) ?? null,
-    setItem: (key: string, value: string) => { values.set(key, value) },
-    removeItem: (key: string) => { values.delete(key) },
+    setItem: (key: string, value: string) => {
+      values.set(key, value)
+    },
+    removeItem: (key: string) => {
+      values.delete(key)
+    },
   })
 })
 
@@ -39,7 +43,11 @@ describe('loadScripts', () => {
   })
 
   it('treats blocked storage as nothing saved', () => {
-    vi.stubGlobal('localStorage', { getItem: () => { throw new Error('SecurityError') } })
+    vi.stubGlobal('localStorage', {
+      getItem: () => {
+        throw new Error('SecurityError')
+      },
+    })
     expect(loadScripts('u1')).toEqual([])
     expect(reportProblem).not.toHaveBeenCalled()
   })

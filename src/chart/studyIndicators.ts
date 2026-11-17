@@ -8,7 +8,9 @@ export const studyIndicatorName = (type: StudyType) => `tradeHorizonStudy:${type
 
 type Row = Record<string, number | undefined>
 
-interface StudyExtend { colors: readonly string[] }
+interface StudyExtend {
+  colors: readonly string[]
+}
 
 function colorsOf(indicator: { extendData?: unknown }, type: StudyType): readonly string[] {
   const extend = indicator.extendData as StudyExtend | undefined
@@ -71,7 +73,7 @@ function fillBetween(
   }
 }
 
-function visible(chart: { getVisibleRange(): { from: number, to: number } }, length: number): [number, number] {
+function visible(chart: { getVisibleRange(): { from: number; to: number } }, length: number): [number, number] {
   const range = chart.getVisibleRange()
   return [Math.max(0, Math.floor(range.from)), Math.min(length, Math.ceil(range.to) + 1)]
 }
@@ -86,8 +88,15 @@ function templates(): IndicatorTemplate<Row>[] {
       maxValue: 100,
       precision: 2,
       figures: lineFigures('rsi'),
-      calc: (data: KLineData[], indicator) => rsi(data.map((bar) => bar.close), indicator.calcParams[0] as number).map((value) => ({ rsi: value })),
-      draw: ({ ctx, bounding, yAxis }) => { drawLevels(ctx, STUDIES.rsi.levels!, bounding.width, (value) => yAxis.convertToPixel(value)); return false },
+      calc: (data: KLineData[], indicator) =>
+        rsi(
+          data.map((bar) => bar.close),
+          indicator.calcParams[0] as number,
+        ).map((value) => ({ rsi: value })),
+      draw: ({ ctx, bounding, yAxis }) => {
+        drawLevels(ctx, STUDIES.rsi.levels!, bounding.width, (value) => yAxis.convertToPixel(value))
+        return false
+      },
     },
     {
       name: studyIndicatorName('macd'),
@@ -112,9 +121,17 @@ function templates(): IndicatorTemplate<Row>[] {
       ],
       calc: (data: KLineData[], indicator) => {
         const [fast, slow, signal] = indicator.calcParams as number[]
-        return macd(data.map((bar) => bar.close), fast, slow, signal)
+        return macd(
+          data.map((bar) => bar.close),
+          fast,
+          slow,
+          signal,
+        )
       },
-      draw: ({ ctx, bounding, yAxis }) => { drawLevels(ctx, [0], bounding.width, (value) => yAxis.convertToPixel(value)); return false },
+      draw: ({ ctx, bounding, yAxis }) => {
+        drawLevels(ctx, [0], bounding.width, (value) => yAxis.convertToPixel(value))
+        return false
+      },
     },
     {
       name: studyIndicatorName('bb'),
@@ -123,12 +140,26 @@ function templates(): IndicatorTemplate<Row>[] {
       figures: lineFigures('bb'),
       calc: (data: KLineData[], indicator) => {
         const [length, deviations] = indicator.calcParams as number[]
-        return bollinger(data.map((bar) => bar.close), length, deviations)
+        return bollinger(
+          data.map((bar) => bar.close),
+          length,
+          deviations,
+        )
       },
       draw: ({ ctx, chart, indicator, xAxis, yAxis }) => {
         const [from, to] = visible(chart, indicator.result.length)
         const color = withAlpha(colorsOf(indicator, 'bb')[1], 0.08)
-        fillBetween(ctx, indicator.result, from, to, 'upper', 'lower', (i) => xAxis.convertToPixel(i), (v) => yAxis.convertToPixel(v), () => color)
+        fillBetween(
+          ctx,
+          indicator.result,
+          from,
+          to,
+          'upper',
+          'lower',
+          (i) => xAxis.convertToPixel(i),
+          (v) => yAxis.convertToPixel(v),
+          () => color,
+        )
         return false
       },
     },
@@ -142,9 +173,18 @@ function templates(): IndicatorTemplate<Row>[] {
       figures: lineFigures('stochRsi'),
       calc: (data: KLineData[], indicator) => {
         const [k, d, rsiLength, stochLength] = indicator.calcParams as number[]
-        return stochRsi(data.map((bar) => bar.close), k, d, rsiLength, stochLength)
+        return stochRsi(
+          data.map((bar) => bar.close),
+          k,
+          d,
+          rsiLength,
+          stochLength,
+        )
       },
-      draw: ({ ctx, bounding, yAxis }) => { drawLevels(ctx, STUDIES.stochRsi.levels!, bounding.width, (value) => yAxis.convertToPixel(value)); return false },
+      draw: ({ ctx, bounding, yAxis }) => {
+        drawLevels(ctx, STUDIES.stochRsi.levels!, bounding.width, (value) => yAxis.convertToPixel(value))
+        return false
+      },
     },
     {
       name: studyIndicatorName('atr'),
@@ -167,7 +207,17 @@ function templates(): IndicatorTemplate<Row>[] {
         const colors = colorsOf(indicator, 'ichimoku')
         const up = withAlpha(colors[3], 0.18)
         const down = withAlpha(colors[4], 0.18)
-        fillBetween(ctx, indicator.result, from, to, 'spanA', 'spanB', (i) => xAxis.convertToPixel(i), (v) => yAxis.convertToPixel(v), (row) => ((row.spanA ?? 0) >= (row.spanB ?? 0) ? up : down))
+        fillBetween(
+          ctx,
+          indicator.result,
+          from,
+          to,
+          'spanA',
+          'spanB',
+          (i) => xAxis.convertToPixel(i),
+          (v) => yAxis.convertToPixel(v),
+          (row) => ((row.spanA ?? 0) >= (row.spanB ?? 0) ? up : down),
+        )
         return false
       },
     },

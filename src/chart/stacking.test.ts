@@ -2,7 +2,12 @@ import { describe, expect, it } from 'vitest'
 import { stackLevels } from './geometry'
 
 const box = (id: string, t0: number, t1: number, p0: number, p1: number, type = 'rectangle') => ({
-  id, type, anchors: [{ timeMs: t0, price: String(p0) }, { timeMs: t1, price: String(p1) }],
+  id,
+  type,
+  anchors: [
+    { timeMs: t0, price: String(p0) },
+    { timeMs: t1, price: String(p1) },
+  ],
 })
 
 describe('stackLevels', () => {

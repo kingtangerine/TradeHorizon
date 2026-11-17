@@ -1,3 +1,4 @@
+import type { Overlay } from 'klinecharts'
 import { describe, expect, it } from 'vitest'
 import { drawingFromOverlay, drawingPoints } from './model'
 import { calculateLongPositionMetrics } from './position'
@@ -37,9 +38,9 @@ describe('drawingFromOverlay with rectangle', () => {
         { timestamp: 1_000, value: 100 },
         { timestamp: 2_000, value: 200 },
       ],
-    } as any
+    } as Partial<Overlay> as Overlay
 
-    const drawing = drawingFromOverlay(overlay, 'binance:spot:BTC-USDT' as any, undefined, 'rectangle')
+    const drawing = drawingFromOverlay(overlay, 'binance:spot:BTC-USDT', undefined, 'rectangle')
     expect(drawing).not.toBeNull()
     expect(drawing?.anchors).toHaveLength(8)
     expect(drawing?.anchors).toEqual([
@@ -78,9 +79,9 @@ describe('drawingFromOverlay with rectangle', () => {
         { timestamp: 1_000, value: 100 },
         { timestamp: 1_000, value: 150 },
       ],
-    } as any
+    } as Partial<Overlay> as Overlay
 
-    const drawing = drawingFromOverlay(overlay, 'binance:spot:BTC-USDT' as any, undefined, 'rectangle')
+    const drawing = drawingFromOverlay(overlay, 'binance:spot:BTC-USDT', undefined, 'rectangle')
     expect(drawing).not.toBeNull()
     expect(drawing?.anchors).toHaveLength(8)
     expect(drawing?.anchors[1]).toEqual({ timeMs: 1_500, price: '200' })
@@ -93,8 +94,8 @@ describe('drawingFromOverlay with rectangle', () => {
     const hOverlay = {
       id: 'hline-1',
       points: [{ timestamp: 1_000, value: 45000 }],
-    } as any
-    const hDrawing = drawingFromOverlay(hOverlay, 'binance:spot:BTC-USDT' as any, undefined, 'horizontalLine')
+    } as Partial<Overlay> as Overlay
+    const hDrawing = drawingFromOverlay(hOverlay, 'binance:spot:BTC-USDT', undefined, 'horizontalLine')
     expect(hDrawing).not.toBeNull()
     expect(hDrawing?.anchors).toHaveLength(1)
     expect(hDrawing?.anchors[0]).toEqual({ timeMs: 1_000, price: '45000' })
@@ -105,8 +106,8 @@ describe('drawingFromOverlay with rectangle', () => {
         { timestamp: 1_000, value: 45000 },
         { timestamp: 2_000, value: 47500 },
       ],
-    } as any
-    const prDrawing = drawingFromOverlay(prOverlay, 'binance:spot:BTC-USDT' as any, undefined, 'priceRange')
+    } as Partial<Overlay> as Overlay
+    const prDrawing = drawingFromOverlay(prOverlay, 'binance:spot:BTC-USDT', undefined, 'priceRange')
     expect(prDrawing).not.toBeNull()
     expect(prDrawing?.anchors).toHaveLength(2)
     expect(prDrawing?.anchors[0]).toEqual({ timeMs: 1_000, price: '45000' })

@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { AUTO_TIME_ZONE, TIME_ZONES, browserTimeZone, resolveTimeZone, timeZoneLabel } from './timeZones'
 
 /** Status-bar time zone button with TradingView's list (bottom right in TradingView). */
-export function TimeZoneMenu({ value, onChange }: { value: string, onChange(zone: string): void }) {
+export function TimeZoneMenu({ value, onChange }: { value: string; onChange(zone: string): void }) {
   const [open, setOpen] = useState(false)
   const rootRef = useRef<HTMLSpanElement>(null)
   const listRef = useRef<HTMLDivElement>(null)
@@ -10,8 +10,12 @@ export function TimeZoneMenu({ value, onChange }: { value: string, onChange(zone
 
   useEffect(() => {
     if (!open) return
-    const outside = (event: Event) => { if (!(event.target instanceof Node && rootRef.current?.contains(event.target))) setOpen(false) }
-    const escape = (event: KeyboardEvent) => { if (event.key === 'Escape') setOpen(false) }
+    const outside = (event: Event) => {
+      if (!(event.target instanceof Node && rootRef.current?.contains(event.target))) setOpen(false)
+    }
+    const escape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setOpen(false)
+    }
     document.addEventListener('pointerdown', outside, true)
     document.addEventListener('keydown', escape)
     listRef.current?.querySelector<HTMLElement>('[aria-checked="true"]')?.scrollIntoView({ block: 'center' })
@@ -21,9 +25,19 @@ export function TimeZoneMenu({ value, onChange }: { value: string, onChange(zone
     }
   }, [open])
 
-  const choose = (zone: string) => { onChange(zone); setOpen(false) }
+  const choose = (zone: string) => {
+    onChange(zone)
+    setOpen(false)
+  }
   const option = (zone: string, label: string, checked: boolean) => (
-    <button type="button" role="menuitemradio" aria-checked={checked} key={zone} className={checked ? 'selected' : ''} onClick={() => choose(zone)}>
+    <button
+      type="button"
+      role="menuitemradio"
+      aria-checked={checked}
+      key={zone}
+      className={checked ? 'selected' : ''}
+      onClick={() => choose(zone)}
+    >
       {label}
     </button>
   )

@@ -23,7 +23,10 @@ export function registerVolumeOverlay(): void {
       const to = Math.min(data.length, Math.ceil(range.to))
       if (to <= from) return true
       const visible = data.slice(from, to)
-      const heights = volumeBarHeights(visible.map((bar) => bar.volume), bounding.height * VOLUME_HEIGHT_RATIO)
+      const heights = volumeBarHeights(
+        visible.map((bar) => bar.volume),
+        bounding.height * VOLUME_HEIGHT_RATIO,
+      )
       const width = Math.max(1, chart.getBarSpace().gapBar)
       const bar = chart.getStyles().candle.bar
       const up = faded(bar.upColor, 'rgba(8, 153, 129, 0.45)')

@@ -2,9 +2,10 @@
 // Passwords are never stored or logged, only their hash, so nobody can look one up: a forgotten password is replaced.
 import { randomBytes, randomInt, scrypt, timingSafeEqual } from 'node:crypto'
 
-const derive = (password: string, salt: Buffer) => new Promise<Buffer>((ok, fail) => {
-  scrypt(password, salt, 64, (error, key) => (error ? fail(error) : ok(key)))
-})
+const derive = (password: string, salt: Buffer) =>
+  new Promise<Buffer>((ok, fail) => {
+    scrypt(password, salt, 64, (error, key) => (error ? fail(error) : ok(key)))
+  })
 
 export async function makeHash(password: string): Promise<string> {
   const salt = randomBytes(16)

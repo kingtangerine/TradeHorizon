@@ -19,19 +19,31 @@ export const MAX_SCRIPT_INSTANCES = 10
 export function normalizeScriptInstances(value: unknown): ScriptInstance[] {
   if (!Array.isArray(value)) return []
   const seen = new Set<string>()
-  return value.filter((item): item is ScriptInstance => {
-    const candidate = item as ScriptInstance | null
-    if (!candidate || typeof candidate.id !== 'string' || seen.has(candidate.id) || typeof candidate.source !== 'string' || candidate.source.length > MAX_SOURCE_LENGTH) return false
-    seen.add(candidate.id)
-    return true
-  }).slice(0, MAX_SCRIPT_INSTANCES).map((item) => ({
-    id: item.id,
-    scriptId: typeof item.scriptId === 'string' ? item.scriptId : item.id,
-    name: typeof item.name === 'string' ? item.name.slice(0, 60) : 'My script',
-    source: item.source,
-    inputs: Array.isArray(item.inputs) ? item.inputs.filter((value): value is number => typeof value === 'number' && Number.isFinite(value)).slice(0, 32) : [],
-    visible: item.visible !== false,
-  }))
+  return value
+    .filter((item): item is ScriptInstance => {
+      const candidate = item as ScriptInstance | null
+      if (
+        !candidate ||
+        typeof candidate.id !== 'string' ||
+        seen.has(candidate.id) ||
+        typeof candidate.source !== 'string' ||
+        candidate.source.length > MAX_SOURCE_LENGTH
+      )
+        return false
+      seen.add(candidate.id)
+      return true
+    })
+    .slice(0, MAX_SCRIPT_INSTANCES)
+    .map((item) => ({
+      id: item.id,
+      scriptId: typeof item.scriptId === 'string' ? item.scriptId : item.id,
+      name: typeof item.name === 'string' ? item.name.slice(0, 60) : 'My script',
+      source: item.source,
+      inputs: Array.isArray(item.inputs)
+        ? item.inputs.filter((value): value is number => typeof value === 'number' && Number.isFinite(value)).slice(0, 32)
+        : [],
+      visible: item.visible !== false,
+    }))
 }
 
 export type MovingAverageKind = 'sma' | 'ema'
@@ -105,9 +117,7 @@ export const DOMINANCE_COLORS: Readonly<Record<DominanceKey, string>> = {
 
 export function parsePeriod(value: unknown): number | undefined {
   const period = typeof value === 'string' ? Number(value) : value
-  return typeof period === 'number' && Number.isInteger(period) && period >= 1 && period <= MAX_MOVING_AVERAGE_PERIOD
-    ? period
-    : undefined
+  return typeof period === 'number' && Number.isInteger(period) && period >= 1 && period <= MAX_MOVING_AVERAGE_PERIOD ? period : undefined
 }
 
 export function addMovingAveragePeriod(settings: MovingAverageSettings, period: number): MovingAverageSettings {
@@ -138,10 +148,19 @@ function normalizeMovingAverage(value: unknown, fallback: MovingAverageSettings)
 
 export function normalizeIndicators(value: unknown): IndicatorSettings {
   if (typeof value !== 'object' || value === null) return DEFAULT_INDICATORS
-  const candidate = value as { sma?: unknown; ema?: unknown; dominance?: unknown; vwap?: { visible?: unknown; anchor?: unknown }; qvwap?: { visible?: unknown }; studies?: unknown; compare?: unknown; scripts?: unknown }
-  const dominance = (typeof candidate.dominance === 'object' && candidate.dominance !== null
-    ? candidate.dominance
-    : {}) as Partial<Record<DominanceKey, unknown>>
+  const candidate = value as {
+    sma?: unknown
+    ema?: unknown
+    dominance?: unknown
+    vwap?: { visible?: unknown; anchor?: unknown }
+    qvwap?: { visible?: unknown }
+    studies?: unknown
+    compare?: unknown
+    scripts?: unknown
+  }
+  const dominance = (typeof candidate.dominance === 'object' && candidate.dominance !== null ? candidate.dominance : {}) as Partial<
+    Record<DominanceKey, unknown>
+  >
   return {
     sma: normalizeMovingAverage(candidate.sma, DEFAULT_INDICATORS.sma),
     ema: normalizeMovingAverage(candidate.ema, DEFAULT_INDICATORS.ema),

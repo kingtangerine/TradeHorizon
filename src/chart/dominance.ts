@@ -46,10 +46,11 @@ export function registerDominanceIndicators(): void {
 /** Indicator values for candles that share the rows' timeframe; other candles stay empty. */
 export function dominanceCalc(key: DominanceKey, rows: readonly DominanceRow[]) {
   const byTime = new Map(rows.map((row) => [row.timestamp, row.close[key]]))
-  return (dataList: KLineData[]) => dataList.map((item) => {
-    const value = byTime.get(item.timestamp)
-    return value === undefined ? {} : { value }
-  })
+  return (dataList: KLineData[]) =>
+    dataList.map((item) => {
+      const value = byTime.get(item.timestamp)
+      return value === undefined ? {} : { value }
+    })
 }
 
 export function dominanceCandles(rows: readonly DominanceRow[], key: IndexKey): KLineData[] {
@@ -78,10 +79,13 @@ function readCachedWeights(): DominanceWeights | null {
       !(typeof value.tetherCap === 'number' && value.tetherCap > 0) ||
       typeof value.stableCap !== 'number' ||
       typeof value.ethereumCap !== 'number' ||
-      typeof value.topTen !== 'object' || value.topTen === null ||
+      typeof value.topTen !== 'object' ||
+      value.topTen === null ||
       typeof value.tailCap !== 'number' ||
-      typeof value.trackedCaps !== 'object' || value.trackedCaps === null
-    ) return null
+      typeof value.trackedCaps !== 'object' ||
+      value.trackedCaps === null
+    )
+      return null
     return value as DominanceWeights
   } catch {
     return null
@@ -94,7 +98,11 @@ export function loadDominanceWeights(): Promise<DominanceWeights> {
   if (cached && Date.now() - cached.fetchedAtMs < WEIGHTS_TTL_MS) return Promise.resolve(cached)
   if (inflightWeights) return inflightWeights
 
-  const symbols = new Set(allMarkets().filter((item) => item.kind === 'spot').map((item) => item.symbol))
+  const symbols = new Set(
+    allMarkets()
+      .filter((item) => item.kind === 'spot')
+      .map((item) => item.symbol),
+  )
   inflightWeights = fetchDominanceWeights(symbols, { cachedBase: '/api/cg' })
     .then((weights) => {
       try {
@@ -127,28 +135,30 @@ export async function fetchDominancePage(
   options: { limit?: number; endTimeMs?: number; reference?: Record<string, number> } = {},
 ): Promise<DominancePage> {
   const limit = options.limit ?? PAGE_SIZE
-  const entries = await Promise.all(dominancePriceSymbols(weights).map(async (symbol) => {
-    try {
-      const candles = await fetchBinanceKlines({
-        symbol,
-        interval,
-        limit,
-        ...(options.endTimeMs === undefined ? {} : { endTimeMs: options.endTimeMs }),
-      })
-      const bars: PriceBar[] = candles.map((candle) => ({
-        timestamp: candle.openTimeMs,
-        open: Number(candle.open),
-        high: Number(candle.high),
-        low: Number(candle.low),
-        close: Number(candle.close),
-      }))
-      return [symbol, bars] as const
-    } catch (error) {
-      // Bitcoin is the time grid; any other coin that fails just joins the untracked remainder.
-      if (symbol === BITCOIN_PRICE_SYMBOL) throw error
-      return [symbol, [] as PriceBar[]] as const
-    }
-  }))
+  const entries = await Promise.all(
+    dominancePriceSymbols(weights).map(async (symbol) => {
+      try {
+        const candles = await fetchBinanceKlines({
+          symbol,
+          interval,
+          limit,
+          ...(options.endTimeMs === undefined ? {} : { endTimeMs: options.endTimeMs }),
+        })
+        const bars: PriceBar[] = candles.map((candle) => ({
+          timestamp: candle.openTimeMs,
+          open: Number(candle.open),
+          high: Number(candle.high),
+          low: Number(candle.low),
+          close: Number(candle.close),
+        }))
+        return [symbol, bars] as const
+      } catch (error) {
+        // Bitcoin is the time grid; any other coin that fails just joins the untracked remainder.
+        if (symbol === BITCOIN_PRICE_SYMBOL) throw error
+        return [symbol, [] as PriceBar[]] as const
+      }
+    }),
+  )
 
   const bars = Object.fromEntries(entries)
   const reference = options.reference ?? referencePrices(bars, weights.fetchedAtMs)

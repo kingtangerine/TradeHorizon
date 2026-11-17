@@ -23,10 +23,18 @@ export function reportProblem(message: string, source: string): void {
 
 export function installErrorReporting(): void {
   window.addEventListener('error', (event) => {
-    report(event.message || 'Script error', `${event.filename}:${event.lineno}`, event.error instanceof Error ? event.error.stack : undefined)
+    report(
+      event.message || 'Script error',
+      `${event.filename}:${event.lineno}`,
+      event.error instanceof Error ? event.error.stack : undefined,
+    )
   })
   window.addEventListener('unhandledrejection', (event) => {
     const reason = event.reason as unknown
-    report(reason instanceof Error ? reason.message : String(reason), 'unhandledrejection', reason instanceof Error ? reason.stack : undefined)
+    report(
+      reason instanceof Error ? reason.message : String(reason),
+      'unhandledrejection',
+      reason instanceof Error ? reason.stack : undefined,
+    )
   })
 }

@@ -23,7 +23,7 @@ describe('DCA position metrics', () => {
   it('averages both fills once triggered', () => {
     const metrics = dca(true)
     expect(metrics.averageEntry).toBeCloseTo(95)
-    expect(metrics.totalQuantity).toBeCloseTo(2 * 100 / 30)
+    expect(metrics.totalQuantity).toBeCloseTo((2 * 100) / 30)
     expect(metrics.riskAmount).toBeCloseTo(metrics.totalQuantity * 15)
     expect(metrics.rewardAmount).toBeCloseTo(metrics.totalQuantity * 35)
     expect(metrics.riskReward).toBeCloseTo(35 / 15)

@@ -69,7 +69,19 @@ describe('watchlists', () => {
   it('repairs invalid stored data', () => {
     expect(parseWatchlists(null)).toEqual(defaultWatchlists())
     const parsed = parseWatchlists({
-      lists: [{ id: 'a', name: 'ok', items: [{ symbol: 'BTCUSDT', flag: 'red' }, { symbol: 'BTCUSDT' }, { symbol: 5 }, { symbol: 'X Y' }, { symbol: 'ETHUSDT', flag: 'pink' }] }],
+      lists: [
+        {
+          id: 'a',
+          name: 'ok',
+          items: [
+            { symbol: 'BTCUSDT', flag: 'red' },
+            { symbol: 'BTCUSDT' },
+            { symbol: 5 },
+            { symbol: 'X Y' },
+            { symbol: 'ETHUSDT', flag: 'pink' },
+          ],
+        },
+      ],
       activeId: 'gone',
     })
     expect(parsed.activeId).toBe('a')

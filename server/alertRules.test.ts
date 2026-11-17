@@ -58,7 +58,9 @@ describe('alert rules', () => {
 
   it('describes alerts and uses the custom message', () => {
     expect(describeAlert({ ...base, condition: 'enterChannel', upperPrice: 90 })).toBe('Entering 90 – 100')
-    expect(describeAlert({ ...base, condition: 'movePercent', percent: 2.5, windowMs: 900_000, direction: 'below' })).toBe('Moving down 2.5% in 15m')
+    expect(describeAlert({ ...base, condition: 'movePercent', percent: 2.5, windowMs: 900_000, direction: 'below' })).toBe(
+      'Moving down 2.5% in 15m',
+    )
     expect(describeAlert({ ...base, line: { t1: 0, p1: 1, t2: 1, p2: 2 } })).toBe('Crossing up trend line')
     expect(alertMessage({ ...base, message: '  Take profit!  ' }, 101)).toBe('Take profit!')
     expect(alertMessage(base, 101)).toBe('Crossing up 100: price 101.')

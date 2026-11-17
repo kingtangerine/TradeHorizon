@@ -51,33 +51,65 @@ type Loose = { [field: string]: unknown } | null | undefined
 
 /** TH_ADMIN_EMAILS="a@example.com, b@example.org" -> Set of lower-case emails. */
 export function adminEmails(value: string | undefined): Set<string> {
-  return new Set(String(value ?? '').split(',').map((email) => email.trim().toLowerCase()).filter(Boolean))
+  return new Set(
+    String(value ?? '')
+      .split(',')
+      .map((email) => email.trim().toLowerCase())
+      .filter(Boolean),
+  )
 }
 
-const parse = (raw: string): unknown => { try { return JSON.parse(raw) as unknown } catch { return undefined } }
+const parse = (raw: string): unknown => {
+  try {
+    return JSON.parse(raw) as unknown
+  } catch {
+    return undefined
+  }
+}
 const arrayLength = (value: unknown) => (Array.isArray(value) ? value.length : 0)
 
 /** Counts per kind of stored item (what the user has, not what it says). */
 export function countItems(key: string, raw: string): Partial<ItemCounts> {
   const value = parse(raw) as Loose // every field is checked before use
   switch (key) {
-    case 'layouts:v1': return { layouts: arrayLength(value) }
-    case 'drawings:v1': return { drawings: arrayLength(value?.drawings) }
+    case 'layouts:v1':
+      return { layouts: arrayLength(value) }
+    case 'drawings:v1':
+      return { drawings: arrayLength(value?.drawings) }
     case 'alerts:v1': {
       const list = Array.isArray(value) ? value : []
       return { alerts: list.length, activeAlerts: list.filter((alert: Loose) => alert?.enabled && !alert?.triggeredAtMs).length }
     }
-    case 'workspace:v1': return { openTabs: arrayLength(value?.tabs) }
-    case 'watchlists:v1': return { watchlistSymbols: (Array.isArray(value?.lists) ? value.lists : []).reduce((sum: number, list: Loose) => sum + arrayLength(list?.items), 0) }
-    case 'layout-folders:v1': return { layoutFolders: arrayLength(value?.groups) }
-    case 'rect-templates:v1': return { templates: arrayLength(value?.templates) }
-    default: return {}
+    case 'workspace:v1':
+      return { openTabs: arrayLength(value?.tabs) }
+    case 'watchlists:v1':
+      return {
+        watchlistSymbols: (Array.isArray(value?.lists) ? value.lists : []).reduce(
+          (sum: number, list: Loose) => sum + arrayLength(list?.items),
+          0,
+        ),
+      }
+    case 'layout-folders:v1':
+      return { layoutFolders: arrayLength(value?.groups) }
+    case 'rect-templates:v1':
+      return { templates: arrayLength(value?.templates) }
+    default:
+      return {}
   }
 }
 
 /** One user's stored data, summarised for the users table. */
 export function summarizeUserData(data: UserData): UserDataSummary {
-  const counts: ItemCounts = { layouts: 0, drawings: 0, alerts: 0, activeAlerts: 0, openTabs: 0, watchlistSymbols: 0, layoutFolders: 0, templates: 0 }
+  const counts: ItemCounts = {
+    layouts: 0,
+    drawings: 0,
+    alerts: 0,
+    activeAlerts: 0,
+    openTabs: 0,
+    watchlistSymbols: 0,
+    layoutFolders: 0,
+    templates: 0,
+  }
   const devices = new Map<string, DeviceSummary>()
   let bytes = 0
   let lastSyncAtMs = 0
@@ -88,7 +120,8 @@ export function summarizeUserData(data: UserData): UserDataSummary {
     for (const [name, count] of Object.entries(countItems(key, item.value))) counts[name as keyof ItemCounts] += count
     if (item.by && item.by !== 'server') {
       const seen = devices.get(item.by)
-      if (!seen || seen.lastSaveAtMs < (item.updatedAtMs ?? 0)) devices.set(item.by, { name: item.byName ?? 'Unknown device', lastSaveAtMs: item.updatedAtMs ?? 0 })
+      if (!seen || seen.lastSaveAtMs < (item.updatedAtMs ?? 0))
+        devices.set(item.by, { name: item.byName ?? 'Unknown device', lastSaveAtMs: item.updatedAtMs ?? 0 })
     }
   }
   return {
@@ -102,14 +135,16 @@ export function summarizeUserData(data: UserData): UserDataSummary {
 
 /** Every stored item of a user: size, last save, saving device, revision and counts (no content). */
 export function describeUserItems(data: UserData): StoredItemInfo[] {
-  return Object.entries(data).map(([key, item]): StoredItemInfo => ({
-    key,
-    bytes: typeof item?.value === 'string' ? item.value.length : 0,
-    updatedAtMs: item?.updatedAtMs ?? null,
-    rev: item?.rev ?? null,
-    savedBy: item?.byName ?? (item?.by === 'server' ? 'TradeHorizon server' : null),
-    counts: typeof item?.value === 'string' ? countItems(key, item.value) : {},
-  })).sort((a, b) => b.bytes - a.bytes)
+  return Object.entries(data)
+    .map(([key, item]): StoredItemInfo => ({
+      key,
+      bytes: typeof item?.value === 'string' ? item.value.length : 0,
+      updatedAtMs: item?.updatedAtMs ?? null,
+      rev: item?.rev ?? null,
+      savedBy: item?.byName ?? (item?.by === 'server' ? 'TradeHorizon server' : null),
+      counts: typeof item?.value === 'string' ? countItems(key, item.value) : {},
+    }))
+    .sort((a, b) => b.bytes - a.bytes)
 }
 
 /** Total size of a folder, recursively (bytes). */
@@ -120,7 +155,9 @@ export function folderSize(path: string): number {
     const full = join(path, entry.name)
     try {
       total += entry.isDirectory() ? folderSize(full) : statSync(full).size
-    } catch { /* vanished while counting */ }
+    } catch {
+      /* vanished while counting */
+    }
   }
   return total
 }

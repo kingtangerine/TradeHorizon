@@ -1,11 +1,5 @@
 import type { KLineData, Overlay } from 'klinecharts'
-import {
-  DRAWING_SCHEMA_VERSION,
-  expandRectangleAnchors,
-  type Anchor,
-  type Drawing,
-  type DrawingType,
-} from '../drawings'
+import { DRAWING_SCHEMA_VERSION, expandRectangleAnchors, type Anchor, type Drawing, type DrawingType } from '../drawings'
 import type { Candle } from '../market'
 import { DRAWING_TOOLS, anchorCountFor } from './tools'
 
@@ -77,9 +71,10 @@ export function drawingFromOverlay(
   } else {
     const count = anchorCountFor(type)
     // Positions carry an optional fourth anchor: the DCA price.
-    anchors = (type === 'longPosition' || type === 'shortPosition') && overlay.points.length >= count + 1
-      ? overlayAnchors(overlay, count + 1)
-      : overlayAnchors(overlay, count)
+    anchors =
+      (type === 'longPosition' || type === 'shortPosition') && overlay.points.length >= count + 1
+        ? overlayAnchors(overlay, count + 1)
+        : overlayAnchors(overlay, count)
   }
 
   if (!anchors) return null

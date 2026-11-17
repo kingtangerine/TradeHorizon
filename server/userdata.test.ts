@@ -11,7 +11,10 @@ function itemOf(result: WriteResult): DataItem {
 
 describe('user data revisions', () => {
   it('gives revisions to items stored before revisions existed', () => {
-    const data: Record<string, LegacyItem> = { 'layouts:v1': { value: '[]', updatedAtMs: 1 }, 'theme:v1': { value: 'dark', updatedAtMs: 2, rev: 4 } }
+    const data: Record<string, LegacyItem> = {
+      'layouts:v1': { value: '[]', updatedAtMs: 1 },
+      'theme:v1': { value: 'dark', updatedAtMs: 2, rev: 4 },
+    }
     expect(ensureRevisions(data)).toBe(true)
     expect(data['layouts:v1'].rev).toBe(5)
     expect(ensureRevisions(data)).toBe(false)

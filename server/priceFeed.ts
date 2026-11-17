@@ -32,10 +32,8 @@ interface ProtocolBase {
 }
 
 /** How to talk to one exchange's stream. Exchanges that need a keep-alive message set both `pingMs` and `ping`. */
-export type PriceProtocol = ProtocolBase & (
-  | { readonly pingMs?: undefined, readonly ping?: undefined }
-  | { readonly pingMs: number, readonly ping: () => unknown }
-)
+export type PriceProtocol = ProtocolBase &
+  ({ readonly pingMs?: undefined; readonly ping?: undefined } | { readonly pingMs: number; readonly ping: () => unknown })
 
 /** A parsed JSON message before its fields are checked. */
 type JsonFields = { readonly [field: string]: unknown }
@@ -67,7 +65,10 @@ export interface PriceFeedOptions {
   readonly now?: () => number
 }
 
-export interface PriceFeedStatus { readonly binance: StreamStatus, readonly bybit: StreamStatus }
+export interface PriceFeedStatus {
+  readonly binance: StreamStatus
+  readonly bybit: StreamStatus
+}
 
 export interface PriceFeed {
   /** Symbols per exchange that should be live; other exchanges are ignored. */
@@ -87,7 +88,9 @@ export const binanceProtocol: PriceProtocol = {
   parse(message) {
     // Network JSON: each field read below is checked or converted.
     const events = (Array.isArray(message) ? message : [message]) as Array<JsonFields | null | undefined>
-    return events.filter((event): event is JsonFields => event?.e === '24hrMiniTicker').map((event): PricePair => [event.s, Number(event.c)])
+    return events
+      .filter((event): event is JsonFields => event?.e === '24hrMiniTicker')
+      .map((event): PricePair => [event.s, Number(event.c)])
   },
 }
 
@@ -102,7 +105,7 @@ export const bybitProtocol: PriceProtocol = {
   unsubscribe: (symbols) => ({ op: 'unsubscribe', args: symbols.map((symbol) => `tickers.${symbol}`) }),
   parse(json) {
     // Network JSON: `topic` is checked below, the data fields are checked by the caller or converted.
-    const message = json as { readonly topic?: unknown, readonly data?: JsonFields } | null | undefined
+    const message = json as { readonly topic?: unknown; readonly data?: JsonFields } | null | undefined
     if (typeof message?.topic !== 'string' || !message.topic.startsWith('tickers.') || !message.data) return []
     return [[message.data.symbol ?? message.topic.slice(8), Number(message.data.lastPrice)]]
   },
@@ -123,14 +126,22 @@ function createStream(protocol: PriceProtocol, { WebSocketImpl, onPrice, log, no
   let stopped = false
   let reportedBadMessage = false
 
-  const sendJson = (payload: unknown) => { try { socket?.send(JSON.stringify(payload)) } catch { /* reconnect handles it */ } }
+  const sendJson = (payload: unknown) => {
+    try {
+      socket?.send(JSON.stringify(payload))
+    } catch {
+      /* reconnect handles it */
+    }
+  }
 
   function syncSubscriptions() {
     if (!socket || socket.readyState !== 1) return
     const add = [...wanted].filter((symbol) => !subscribed.has(symbol))
     const remove = [...subscribed].filter((symbol) => !wanted.has(symbol))
-    for (let index = 0; index < add.length; index += protocol.batch) sendJson(protocol.subscribe(add.slice(index, index + protocol.batch), messageId++))
-    for (let index = 0; index < remove.length; index += protocol.batch) sendJson(protocol.unsubscribe(remove.slice(index, index + protocol.batch), messageId++))
+    for (let index = 0; index < add.length; index += protocol.batch)
+      sendJson(protocol.subscribe(add.slice(index, index + protocol.batch), messageId++))
+    for (let index = 0; index < remove.length; index += protocol.batch)
+      sendJson(protocol.unsubscribe(remove.slice(index, index + protocol.batch), messageId++))
     subscribed = new Set(wanted)
   }
 
@@ -139,7 +150,11 @@ function createStream(protocol: PriceProtocol, { WebSocketImpl, onPrice, log, no
     clearInterval(watchdog)
     if (socket) {
       socket.onopen = socket.onmessage = socket.onclose = socket.onerror = null
-      try { socket.close() } catch { /* already closed */ }
+      try {
+        socket.close()
+      } catch {
+        /* already closed */
+      }
     }
     socket = undefined
     subscribed = new Set<string>()
@@ -198,14 +213,21 @@ function createStream(protocol: PriceProtocol, { WebSocketImpl, onPrice, log, no
         if (typeof symbol === 'string' && Number.isFinite(price) && price > 0) onPrice(symbol, price)
       }
     }
-    socket.onclose = () => { if (!stopped) scheduleReconnect() }
-    socket.onerror = () => { /* onclose follows and reconnects */ }
+    socket.onclose = () => {
+      if (!stopped) scheduleReconnect()
+    }
+    socket.onerror = () => {
+      /* onclose follows and reconnects */
+    }
   }
 
   return {
     setSymbols(symbols) {
       wanted = new Set<string>(symbols)
-      if (wanted.size === 0) { cleanup(); return }
+      if (wanted.size === 0) {
+        cleanup()
+        return
+      }
       if (!socket) connect()
       else syncSubscriptions()
     },
@@ -227,7 +249,12 @@ function createStream(protocol: PriceProtocol, { WebSocketImpl, onPrice, log, no
  * @param onPrice (symbol, price) for every live price received
  * @param WebSocketImpl injectable for tests; without one (very old Node) the feed stays off and polling does the work
  */
-export function createPriceFeed({ onPrice, WebSocketImpl = globalThis.WebSocket, log = console, now = () => Date.now() }: PriceFeedOptions): PriceFeed {
+export function createPriceFeed({
+  onPrice,
+  WebSocketImpl = globalThis.WebSocket,
+  log = console,
+  now = () => Date.now(),
+}: PriceFeedOptions): PriceFeed {
   if (!WebSocketImpl) log.warn?.('[prices] this Node.js has no WebSocket support: alerts are checked by polling only')
   const streams = {
     binance: createStream(binanceProtocol, { WebSocketImpl, onPrice, log, now }),
@@ -239,7 +266,9 @@ export function createPriceFeed({ onPrice, WebSocketImpl = globalThis.WebSocket,
       streams.binance.setSymbols(groups.binance ?? [])
       streams.bybit.setSymbols(groups.bybit ?? [])
     },
-    stop() { for (const stream of Object.values(streams)) stream.stop() },
+    stop() {
+      for (const stream of Object.values(streams)) stream.stop()
+    },
     status: () => ({ binance: streams.binance.status(), bybit: streams.bybit.status() }),
   }
 }

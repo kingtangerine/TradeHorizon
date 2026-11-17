@@ -52,7 +52,7 @@ export function rectangleStyleOf(style: Readonly<Record<string, unknown>>): Rect
 
 export function parseTemplates(value: unknown): TemplateState {
   if (typeof value !== 'object' || value === null) return EMPTY_TEMPLATES
-  const raw = value as { templates?: unknown, defaultId?: unknown }
+  const raw = value as { templates?: unknown; defaultId?: unknown }
   const templates: RectangleTemplate[] = []
   if (Array.isArray(raw.templates)) {
     for (const item of raw.templates) {
@@ -63,9 +63,8 @@ export function parseTemplates(value: unknown): TemplateState {
       templates.push({ id, name: name.slice(0, 40), style: rectangleStyleOf(style as Record<string, unknown>) })
     }
   }
-  const defaultId = typeof raw.defaultId === 'string' && templates.some((template) => template.id === raw.defaultId)
-    ? raw.defaultId
-    : undefined
+  const defaultId =
+    typeof raw.defaultId === 'string' && templates.some((template) => template.id === raw.defaultId) ? raw.defaultId : undefined
   return { templates: templates.slice(0, MAX_TEMPLATES), ...(defaultId ? { defaultId } : {}) }
 }
 
@@ -86,12 +85,7 @@ export function saveTemplates(userId: string, state: TemplateState): void {
 }
 
 /** Adds a template; saving under an existing name updates that template instead of duplicating it. */
-export function saveTemplate(
-  state: TemplateState,
-  name: string,
-  style: RectangleStyle,
-  id: string = crypto.randomUUID(),
-): TemplateState {
+export function saveTemplate(state: TemplateState, name: string, style: RectangleStyle, id: string = crypto.randomUUID()): TemplateState {
   const cleanName = name.trim().slice(0, 40) || 'Rectangle template'
   const existing = state.templates.find((template) => template.name.toLowerCase() === cleanName.toLowerCase())
   if (existing) {

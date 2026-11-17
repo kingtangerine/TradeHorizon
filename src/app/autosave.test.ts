@@ -1,12 +1,31 @@
 import { describe, expect, it } from 'vitest'
 import { autosaveLayouts, type ChartTab, type SavedLayout, type UserWorkspace } from './workspace'
 
-const tab = (id: string, symbol: string, layoutId?: string): ChartTab => ({ id, symbol, interval: '15m', createdAtMs: 1, ...(layoutId ? { layoutId } : {}) })
+const tab = (id: string, symbol: string, layoutId?: string): ChartTab => ({
+  id,
+  symbol,
+  interval: '15m',
+  createdAtMs: 1,
+  ...(layoutId ? { layoutId } : {}),
+})
 const layout = (id: string, tabs: ChartTab[], extra: Partial<SavedLayout> = {}): SavedLayout => ({
-  id, name: id, tabs, activeTabId: tabs[0].id, volumeVisible: true, customIntervals: [], createdAtMs: 1, updatedAtMs: 1, ...extra,
+  id,
+  name: id,
+  tabs,
+  activeTabId: tabs[0].id,
+  volumeVisible: true,
+  customIntervals: [],
+  createdAtMs: 1,
+  updatedAtMs: 1,
+  ...extra,
 })
 const workspace = (tabs: ChartTab[], activeTabId: string, extra: Partial<UserWorkspace> = {}): UserWorkspace => ({
-  tabs, activeTabId, layoutName: 'x', volumeVisible: true, customIntervals: [], ...extra,
+  tabs,
+  activeTabId,
+  layoutName: 'x',
+  volumeVisible: true,
+  customIntervals: [],
+  ...extra,
 })
 
 describe('layout autosave', () => {

@@ -24,7 +24,14 @@ function fresh() {
 }
 
 const quiet = { log() {}, warn() {} }
-const account = (id: string, email: string, extra: Partial<NewUser> = {}): NewUser => ({ id, email, displayName: id, passwordHash: 'salt:hash', createdAtMs: 1000, ...extra })
+const account = (id: string, email: string, extra: Partial<NewUser> = {}): NewUser => ({
+  id,
+  email,
+  displayName: id,
+  passwordHash: 'salt:hash',
+  createdAtMs: 1000,
+  ...extra,
+})
 
 /** The item a write answered with (fails the test when it has none). */
 function itemOf(result: WriteResult): DataItem {
@@ -36,7 +43,12 @@ describe('database: accounts and sessions', () => {
   it('creates, finds and counts accounts; emails are unique', () => {
     const { store } = fresh()
     store.users.create(account('u1', 'a@example.com'))
-    expect(store.users.byEmail('a@example.com')).toMatchObject({ id: 'u1', displayName: 'u1', passwordHash: 'salt:hash', createdAtMs: 1000 })
+    expect(store.users.byEmail('a@example.com')).toMatchObject({
+      id: 'u1',
+      displayName: 'u1',
+      passwordHash: 'salt:hash',
+      createdAtMs: 1000,
+    })
     expect(store.users.get('nope')).toBeUndefined()
     expect(() => store.users.create(account('u2', 'a@example.com'))).toThrow()
     store.users.setLastLogin('u1', 5000)
@@ -102,7 +114,10 @@ describe('database: synced data', () => {
 })
 
 describe('moving the old JSON files into the database', () => {
-  function legacyFiles(dir: string, { users, sessions = [], data = {} }: { users: NewUser[], sessions?: Session[], data?: Record<string, Record<string, LegacyItem>> }) {
+  function legacyFiles(
+    dir: string,
+    { users, sessions = [], data = {} }: { users: NewUser[]; sessions?: Session[]; data?: Record<string, Record<string, LegacyItem>> },
+  ) {
     writeFileSync(join(dir, 'users.json'), JSON.stringify({ users, sessions }))
     mkdirSync(join(dir, 'userdata'))
     for (const [userId, items] of Object.entries(data)) writeFileSync(join(dir, 'userdata', `${userId}.json`), JSON.stringify(items))
@@ -112,9 +127,15 @@ describe('moving the old JSON files into the database', () => {
     const { dir, store } = fresh()
     legacyFiles(dir, {
       users: [account('u1', 'A@Example.com', { lastLoginAtMs: 7 }), account('u2', 'b@example.com')],
-      sessions: [{ tokenHash: 'live', userId: 'u1', expiresAtMs: 9e15 }, { tokenHash: 'old', userId: 'u1', expiresAtMs: 1 }],
+      sessions: [
+        { tokenHash: 'live', userId: 'u1', expiresAtMs: 9e15 },
+        { tokenHash: 'old', userId: 'u1', expiresAtMs: 1 },
+      ],
       data: {
-        u1: { 'layouts:v1': { value: '[{"id":"l"}]', updatedAtMs: 5, rev: 4, by: 'pc-1234', byName: 'PC' }, 'theme:v1': { value: 'dark', updatedAtMs: 6 } },
+        u1: {
+          'layouts:v1': { value: '[{"id":"l"}]', updatedAtMs: 5, rev: 4, by: 'pc-1234', byName: 'PC' },
+          'theme:v1': { value: 'dark', updatedAtMs: 6 },
+        },
         orphan: { 'theme:v1': { value: 'light', updatedAtMs: 1 } },
       },
     })
@@ -158,7 +179,10 @@ describe('backups', () => {
     store.users.create(account('u1', 'a@example.com'))
     let time = Date.UTC(2026, 10, 1)
     const backups = createBackupService({ store, dir: join(dir, 'backups'), keep: 2, everyMs: 1000, log: quiet, now: () => time })
-    for (let index = 0; index < 3; index += 1) { backups.run(); time += 2000 }
+    for (let index = 0; index < 3; index += 1) {
+      backups.run()
+      time += 2000
+    }
     const status = backups.status()
     expect(status.count).toBe(2)
     if (!status.newest) throw new Error('no backup copy')
@@ -188,7 +212,9 @@ describe('schema upgrades', () => {
     const old = new DatabaseSync(file)
     old.exec(MIGRATIONS[1])
     old.exec('PRAGMA user_version = 1')
-    old.prepare('INSERT INTO users (id, email, display_name, password_hash, created_at) VALUES (?, ?, ?, ?, ?)').run('u1', 'a@example.com', 'Ann', 'salt:hash', 5)
+    old
+      .prepare('INSERT INTO users (id, email, display_name, password_hash, created_at) VALUES (?, ?, ?, ?, ?)')
+      .run('u1', 'a@example.com', 'Ann', 'salt:hash', 5)
     old.prepare('INSERT INTO user_data (user_id, key, value, updated_at, rev) VALUES (?, ?, ?, ?, ?)').run('u1', 'layouts:v1', '[]', 6, 1)
     old.close()
 

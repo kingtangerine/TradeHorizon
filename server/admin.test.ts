@@ -5,7 +5,12 @@ import { describe, expect, it } from 'vitest'
 import { adminEmails, countItems, describeUserItems, folderSize, summarizeUserData } from './admin.ts'
 import type { DataItem } from './userdata.ts'
 
-const item = (value: unknown, extra: Partial<DataItem> = {}): DataItem => ({ value: JSON.stringify(value), updatedAtMs: 100, rev: 1, ...extra })
+const item = (value: unknown, extra: Partial<DataItem> = {}): DataItem => ({
+  value: JSON.stringify(value),
+  updatedAtMs: 100,
+  rev: 1,
+  ...extra,
+})
 
 describe('admin helpers', () => {
   it('reads the admin list from TH_ADMIN_EMAILS', () => {
@@ -16,7 +21,10 @@ describe('admin helpers', () => {
   it('counts what each stored item holds', () => {
     expect(countItems('layouts:v1', JSON.stringify([{}, {}]))).toEqual({ layouts: 2 })
     expect(countItems('drawings:v1', JSON.stringify({ version: 1, drawings: [{}] }))).toEqual({ drawings: 1 })
-    expect(countItems('alerts:v1', JSON.stringify([{ enabled: true }, { enabled: false }, { enabled: true, triggeredAtMs: 1 }]))).toEqual({ alerts: 3, activeAlerts: 1 })
+    expect(countItems('alerts:v1', JSON.stringify([{ enabled: true }, { enabled: false }, { enabled: true, triggeredAtMs: 1 }]))).toEqual({
+      alerts: 3,
+      activeAlerts: 1,
+    })
     expect(countItems('theme:v1', 'dark')).toEqual({})
     expect(countItems('layouts:v1', 'not json')).toEqual({ layouts: 0 })
   })
@@ -29,7 +37,10 @@ describe('admin helpers', () => {
     }
     const summary = summarizeUserData(data)
     expect(summary).toMatchObject({ items: 3, lastSyncAtMs: 400, counts: { layouts: 2, drawings: 1, alerts: 1, activeAlerts: 1 } })
-    expect(summary.devices).toEqual([{ name: 'PC', lastSaveAtMs: 300 }, { name: 'Laptop', lastSaveAtMs: 200 }])
+    expect(summary.devices).toEqual([
+      { name: 'PC', lastSaveAtMs: 300 },
+      { name: 'Laptop', lastSaveAtMs: 200 },
+    ])
     expect(summary.bytes).toBe(Object.values(data).reduce((sum, entry) => sum + entry.value.length, 0))
     const items = describeUserItems(data)
     expect(items[0]).toMatchObject({ key: 'drawings:v1', savedBy: 'Laptop' })

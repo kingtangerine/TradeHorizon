@@ -34,14 +34,31 @@ function formatDate(ms: number): string {
   return new Date(ms).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })
 }
 
-export function ProfileDialog({ user, theme, tabCount, layoutCount, onTheme, candleCountdown, onCandleCountdown, timeZone, onTimeZone, highLowLabels, onHighLowLabels, focusSection, onPasswordChanged, onOpenAdmin, onLogout, onClose }: ProfileDialogProps) {
+export function ProfileDialog({
+  user,
+  theme,
+  tabCount,
+  layoutCount,
+  onTheme,
+  candleCountdown,
+  onCandleCountdown,
+  timeZone,
+  onTimeZone,
+  highLowLabels,
+  onHighLowLabels,
+  focusSection,
+  onPasswordChanged,
+  onOpenAdmin,
+  onLogout,
+  onClose,
+}: ProfileDialogProps) {
   const [current, setCurrent] = useState('')
   const [next, setNext] = useState('')
   const [confirm, setConfirm] = useState('')
-  const [passwordMessage, setPasswordMessage] = useState<{ ok: boolean, text: string }>()
+  const [passwordMessage, setPasswordMessage] = useState<{ ok: boolean; text: string }>()
   const [passwordBusy, setPasswordBusy] = useState(false)
   const [pendingImport, setPendingImport] = useState<BackupFile>()
-  const [dataMessage, setDataMessage] = useState<{ ok: boolean, text: string }>()
+  const [dataMessage, setDataMessage] = useState<{ ok: boolean; text: string }>()
   const fileRef = useRef<HTMLInputElement>(null)
   const chartSectionRef = useRef<HTMLElement>(null)
   const passwordSectionRef = useRef<HTMLElement>(null)
@@ -54,7 +71,12 @@ export function ProfileDialog({ user, theme, tabCount, layoutCount, onTheme, can
   }, [focusSection])
 
   useEffect(() => {
-    const onKey = (event: KeyboardEvent) => { if (event.key === 'Escape') { event.stopPropagation(); onClose() } }
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        event.stopPropagation()
+        onClose()
+      }
+    }
     document.addEventListener('keydown', onKey, true)
     return () => document.removeEventListener('keydown', onKey, true)
   }, [onClose])
@@ -62,11 +84,16 @@ export function ProfileDialog({ user, theme, tabCount, layoutCount, onTheme, can
   const submitPassword = async (event: FormEvent) => {
     event.preventDefault()
     setPasswordMessage(undefined)
-    if (next !== confirm) { setPasswordMessage({ ok: false, text: 'The new passwords do not match.' }); return }
+    if (next !== confirm) {
+      setPasswordMessage({ ok: false, text: 'The new passwords do not match.' })
+      return
+    }
     setPasswordBusy(true)
     try {
       await changePassword(current, next)
-      setCurrent(''); setNext(''); setConfirm('')
+      setCurrent('')
+      setNext('')
+      setConfirm('')
       setPasswordMessage({ ok: true, text: 'Password changed. Other devices have been signed out.' })
       onPasswordChanged?.()
     } catch (error) {
@@ -110,24 +137,58 @@ export function ProfileDialog({ user, theme, tabCount, layoutCount, onTheme, can
 
   return createPortal(
     <div className="modal-backdrop" role="presentation" onMouseDown={onClose}>
-      <section className="profile-dialog" role="dialog" aria-modal="true" aria-label="Account" onMouseDown={(event) => event.stopPropagation()}>
+      <section
+        className="profile-dialog"
+        role="dialog"
+        aria-modal="true"
+        aria-label="Account"
+        onMouseDown={(event) => event.stopPropagation()}
+      >
         <header className="profile-dialog-header">
-          <span className="profile-large-avatar"><UserIcon /></span>
-          <div><strong>{user.displayName}</strong><span>{user.email}</span></div>
-          <button type="button" className="object-icon-button" aria-label="Close" onClick={onClose}><CloseIcon /></button>
+          <span className="profile-large-avatar">
+            <UserIcon />
+          </span>
+          <div>
+            <strong>{user.displayName}</strong>
+            <span>{user.email}</span>
+          </div>
+          <button type="button" className="object-icon-button" aria-label="Close" onClick={onClose}>
+            <CloseIcon />
+          </button>
         </header>
 
         <div className="profile-dialog-body">
           <section>
             <h3>Account</h3>
             <dl className="profile-facts">
-              <div><dt>Display name</dt><dd>{user.displayName}</dd></div>
-              <div><dt>Email</dt><dd>{user.email}</dd></div>
-              <div><dt>Member since</dt><dd>{formatDate(user.createdAtMs)}</dd></div>
-              <div><dt>Open chart tabs</dt><dd>{tabCount}</dd></div>
-              <div><dt>Saved layouts</dt><dd>{layoutCount}</dd></div>
-              <div><dt>Storage</dt><dd>TradeHorizon server, synced across devices</dd></div>
-              <div><dt>App version</dt><dd>{versionDetails()}</dd></div>
+              <div>
+                <dt>Display name</dt>
+                <dd>{user.displayName}</dd>
+              </div>
+              <div>
+                <dt>Email</dt>
+                <dd>{user.email}</dd>
+              </div>
+              <div>
+                <dt>Member since</dt>
+                <dd>{formatDate(user.createdAtMs)}</dd>
+              </div>
+              <div>
+                <dt>Open chart tabs</dt>
+                <dd>{tabCount}</dd>
+              </div>
+              <div>
+                <dt>Saved layouts</dt>
+                <dd>{layoutCount}</dd>
+              </div>
+              <div>
+                <dt>Storage</dt>
+                <dd>TradeHorizon server, synced across devices</dd>
+              </div>
+              <div>
+                <dt>App version</dt>
+                <dd>{versionDetails()}</dd>
+              </div>
             </dl>
           </section>
 
@@ -136,8 +197,22 @@ export function ProfileDialog({ user, theme, tabCount, layoutCount, onTheme, can
           <section>
             <h3>Appearance</h3>
             <div className="segmented" role="group" aria-label="Theme">
-              <button type="button" className={theme === 'dark' ? 'active' : ''} aria-pressed={theme === 'dark'} onClick={() => onTheme('dark')}>Dark</button>
-              <button type="button" className={theme === 'light' ? 'active' : ''} aria-pressed={theme === 'light'} onClick={() => onTheme('light')}>Light</button>
+              <button
+                type="button"
+                className={theme === 'dark' ? 'active' : ''}
+                aria-pressed={theme === 'dark'}
+                onClick={() => onTheme('dark')}
+              >
+                Dark
+              </button>
+              <button
+                type="button"
+                className={theme === 'light' ? 'active' : ''}
+                aria-pressed={theme === 'light'}
+                onClick={() => onTheme('light')}
+              >
+                Light
+              </button>
             </div>
           </section>
 
@@ -158,55 +233,125 @@ export function ProfileDialog({ user, theme, tabCount, layoutCount, onTheme, can
               </span>
             </label>
             <label className="profile-select">
-              <span><b>Time zone</b><small>Time axis and crosshair date. Daily candles still open at 00:00 UTC, as on the exchange.</small></span>
+              <span>
+                <b>Time zone</b>
+                <small>Time axis and crosshair date. Daily candles still open at 00:00 UTC, as on the exchange.</small>
+              </span>
               <select value={timeZone} onChange={(event) => onTimeZone(event.target.value)}>
                 <option value={AUTO_TIME_ZONE}>Your computer · {timeZoneLabel(browserTimeZone())}</option>
-                {TIME_ZONES.map(({ zone }) => <option value={zone} key={zone}>{timeZoneLabel(zone)}</option>)}
+                {TIME_ZONES.map(({ zone }) => (
+                  <option value={zone} key={zone}>
+                    {timeZoneLabel(zone)}
+                  </option>
+                ))}
               </select>
             </label>
           </section>
 
           <section ref={passwordSectionRef} className={focusSection === 'password' ? 'profile-focus' : undefined}>
             <h3>Change password</h3>
-            {user.mustChangePassword && <p className="profile-note error">You signed in with a temporary password. Enter it as the current password, then choose your own.</p>}
+            {user.mustChangePassword && (
+              <p className="profile-note error">
+                You signed in with a temporary password. Enter it as the current password, then choose your own.
+              </p>
+            )}
             <form className="profile-form" onSubmit={submitPassword}>
-              <input type="password" placeholder="Current password" aria-label="Current password" autoComplete="current-password" value={current} onChange={(event) => setCurrent(event.target.value)} required />
-              <input type="password" placeholder="New password (8+ characters)" aria-label="New password" autoComplete="new-password" minLength={8} value={next} onChange={(event) => setNext(event.target.value)} required />
-              <input type="password" placeholder="Repeat new password" aria-label="Repeat new password" autoComplete="new-password" minLength={8} value={confirm} onChange={(event) => setConfirm(event.target.value)} required />
-              {passwordMessage && <p className={passwordMessage.ok ? 'profile-note ok' : 'profile-note error'} role="status">{passwordMessage.text}</p>}
-              <button type="submit" disabled={passwordBusy}>{passwordBusy ? 'Saving…' : 'Change password'}</button>
+              <input
+                type="password"
+                placeholder="Current password"
+                aria-label="Current password"
+                autoComplete="current-password"
+                value={current}
+                onChange={(event) => setCurrent(event.target.value)}
+                required
+              />
+              <input
+                type="password"
+                placeholder="New password (8+ characters)"
+                aria-label="New password"
+                autoComplete="new-password"
+                minLength={8}
+                value={next}
+                onChange={(event) => setNext(event.target.value)}
+                required
+              />
+              <input
+                type="password"
+                placeholder="Repeat new password"
+                aria-label="Repeat new password"
+                autoComplete="new-password"
+                minLength={8}
+                value={confirm}
+                onChange={(event) => setConfirm(event.target.value)}
+                required
+              />
+              {passwordMessage && (
+                <p className={passwordMessage.ok ? 'profile-note ok' : 'profile-note error'} role="status">
+                  {passwordMessage.text}
+                </p>
+              )}
+              <button type="submit" disabled={passwordBusy}>
+                {passwordBusy ? 'Saving…' : 'Change password'}
+              </button>
             </form>
           </section>
 
           <section>
             <h3>Your data</h3>
-            <p className="profile-help">Download your chart tabs, saved layouts, drawings, groups and alerts as a file, or restore them from one. Importing replaces what is currently saved.</p>
+            <p className="profile-help">
+              Download your chart tabs, saved layouts, drawings, groups and alerts as a file, or restore them from one. Importing replaces
+              what is currently saved.
+            </p>
             <div className="profile-actions">
-              <button type="button" onClick={exportData}>Export data</button>
-              <button type="button" onClick={() => fileRef.current?.click()}>Import data…</button>
-              <input ref={fileRef} type="file" accept="application/json,.json" hidden onChange={(event) => void chooseFile(event.target.files?.[0])} />
+              <button type="button" onClick={exportData}>
+                Export data
+              </button>
+              <button type="button" onClick={() => fileRef.current?.click()}>
+                Import data…
+              </button>
+              <input
+                ref={fileRef}
+                type="file"
+                accept="application/json,.json"
+                hidden
+                onChange={(event) => void chooseFile(event.target.files?.[0])}
+              />
             </div>
             {pendingImport && (
               <div className="profile-confirm" role="alert">
                 <p>
                   Restore {Object.keys(pendingImport.items).length} items from a backup
                   {pendingImport.account.email ? ` of ${pendingImport.account.email}` : ''}
-                  {pendingImport.exportedAtMs ? ` made on ${formatDate(pendingImport.exportedAtMs)}` : ''}?
-                  Your current layouts, drawings and alerts will be replaced.
+                  {pendingImport.exportedAtMs ? ` made on ${formatDate(pendingImport.exportedAtMs)}` : ''}? Your current layouts, drawings
+                  and alerts will be replaced.
                 </p>
                 <div className="profile-actions">
-                  <button type="button" className="danger" onClick={confirmImport}>Replace my data</button>
-                  <button type="button" onClick={() => setPendingImport(undefined)}>Cancel</button>
+                  <button type="button" className="danger" onClick={confirmImport}>
+                    Replace my data
+                  </button>
+                  <button type="button" onClick={() => setPendingImport(undefined)}>
+                    Cancel
+                  </button>
                 </div>
               </div>
             )}
-            {dataMessage && <p className={dataMessage.ok ? 'profile-note ok' : 'profile-note error'} role="status">{dataMessage.text}</p>}
+            {dataMessage && (
+              <p className={dataMessage.ok ? 'profile-note ok' : 'profile-note error'} role="status">
+                {dataMessage.text}
+              </p>
+            )}
           </section>
         </div>
 
         <footer className="profile-dialog-footer">
-          {onOpenAdmin && <button type="button" className="profile-admin" onClick={onOpenAdmin}>Admin panel</button>}
-          <button type="button" className="profile-logout" onClick={onLogout}>Log out</button>
+          {onOpenAdmin && (
+            <button type="button" className="profile-admin" onClick={onOpenAdmin}>
+              Admin panel
+            </button>
+          )}
+          <button type="button" className="profile-logout" onClick={onLogout}>
+            Log out
+          </button>
         </footer>
       </section>
     </div>,

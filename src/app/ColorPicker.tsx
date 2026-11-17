@@ -38,7 +38,10 @@ export function ColorPicker({ value, label, onChange, onNone, none = false }: Co
       setOpen(false)
     }
     const escape = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') { event.stopPropagation(); setOpen(false) }
+      if (event.key === 'Escape') {
+        event.stopPropagation()
+        setOpen(false)
+      }
     }
     document.addEventListener('pointerdown', close)
     document.addEventListener('keydown', escape, true)
@@ -89,26 +92,36 @@ export function ColorPicker({ value, label, onChange, onNone, none = false }: Co
       >
         <span className={none ? 'color-none' : undefined} style={none ? undefined : { background: value }} />
       </button>
-      {open && createPortal(
-        <div ref={popoverRef} className="color-popover" role="dialog" aria-label={label} style={position}>
-          {onNone && (
-            <button type="button" className={none ? 'color-none-option selected' : 'color-none-option'} onClick={() => { onNone(); setOpen(false) }}>
-              <span className="color-none" aria-hidden="true" /> No color
-            </button>
-          )}
-          <div className="color-row">{GREYS.map(swatch)}</div>
-          <div className="color-grid">
-            {Array.from({ length: 9 }, (_, shade) => (
-              <div className="color-row" key={shade}>{HUES.map((hue) => swatch(hue[shade]))}</div>
-            ))}
-          </div>
-          <label className="color-custom">
-            <span>Custom…</span>
-            <input type="color" value={value} onChange={(event) => onChange(event.target.value)} aria-label={`${label} (custom)`} />
-          </label>
-        </div>,
-        document.body,
-      )}
+      {open &&
+        createPortal(
+          <div ref={popoverRef} className="color-popover" role="dialog" aria-label={label} style={position}>
+            {onNone && (
+              <button
+                type="button"
+                className={none ? 'color-none-option selected' : 'color-none-option'}
+                onClick={() => {
+                  onNone()
+                  setOpen(false)
+                }}
+              >
+                <span className="color-none" aria-hidden="true" /> No color
+              </button>
+            )}
+            <div className="color-row">{GREYS.map(swatch)}</div>
+            <div className="color-grid">
+              {Array.from({ length: 9 }, (_, shade) => (
+                <div className="color-row" key={shade}>
+                  {HUES.map((hue) => swatch(hue[shade]))}
+                </div>
+              ))}
+            </div>
+            <label className="color-custom">
+              <span>Custom…</span>
+              <input type="color" value={value} onChange={(event) => onChange(event.target.value)} aria-label={`${label} (custom)`} />
+            </label>
+          </div>,
+          document.body,
+        )}
     </span>
   )
 }

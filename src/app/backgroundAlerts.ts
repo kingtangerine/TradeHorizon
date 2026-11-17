@@ -58,21 +58,27 @@ export async function enablePush(): Promise<PushStatus> {
   }
   if (!keyResponse.ok) {
     // 404 means the running server predates background alerts: the new server files were not deployed or the Node process was not restarted.
-    throw new Error(keyResponse.status === 404 || keyResponse.status === 405
-      ? 'This server does not support background alerts yet. The server needs the latest TradeHorizon version, then a restart (administrator: see /healthz).'
-      : `The server could not provide a notification key (error ${keyResponse.status}). Try again in a moment.`)
+    throw new Error(
+      keyResponse.status === 404 || keyResponse.status === 405
+        ? 'This server does not support background alerts yet. The server needs the latest TradeHorizon version, then a restart (administrator: see /healthz).'
+        : `The server could not provide a notification key (error ${keyResponse.status}). Try again in a moment.`,
+    )
   }
-  const keyBody = await keyResponse.json().catch(() => undefined) as { publicKey?: string } | undefined
+  const keyBody = (await keyResponse.json().catch(() => undefined)) as { publicKey?: string } | undefined
   if (!keyBody?.publicKey) {
-    throw new Error('The server answered with something that is not a notification key. If a proxy sits in front of the app, it must pass /api/ requests to the Node server.')
+    throw new Error(
+      'The server answered with something that is not a notification key. If a proxy sits in front of the app, it must pass /api/ requests to the Node server.',
+    )
   }
   const { publicKey } = keyBody
   await registration()
   const ready = await navigator.serviceWorker.ready
-  const subscription = (await ready.pushManager.getSubscription()) ?? await ready.pushManager.subscribe({
-    userVisibleOnly: true,
-    applicationServerKey: applicationServerKey(publicKey),
-  })
+  const subscription =
+    (await ready.pushManager.getSubscription()) ??
+    (await ready.pushManager.subscribe({
+      userVisibleOnly: true,
+      applicationServerKey: applicationServerKey(publicKey),
+    }))
   const response = await fetch('/api/push/subscribe', {
     method: 'POST',
     headers: authHeaders(),
@@ -81,7 +87,7 @@ export async function enablePush(): Promise<PushStatus> {
   if (!response.ok) {
     // Best-effort cleanup; the error that matters is the server's answer, thrown below.
     await subscription.unsubscribe().catch(() => undefined)
-    const { error } = await response.json().catch(() => ({ error: undefined })) as { error?: string }
+    const { error } = (await response.json().catch(() => ({ error: undefined }))) as { error?: string }
     throw new Error(error ?? 'The server rejected this device for notifications.')
   }
   return 'on'

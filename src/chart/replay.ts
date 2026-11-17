@@ -29,4 +29,3 @@ export function replayTransitionCursor(barTimes: readonly number[], targetTimest
   if (cursor === -1) cursor = barTimes.length
   return Math.max(1, cursor)
 }
-

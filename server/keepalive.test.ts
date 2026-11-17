@@ -17,7 +17,13 @@ describe('keep-alive', () => {
 
   it('pings /healthz on the learned address, and not before it knows one', async () => {
     const calls: string[] = []
-    const keepAlive = createKeepAlive({ fetchImpl: async (url) => { calls.push(url); return { ok: true } }, log: quiet })
+    const keepAlive = createKeepAlive({
+      fetchImpl: async (url) => {
+        calls.push(url)
+        return { ok: true }
+      },
+      log: quiet,
+    })
     await keepAlive.ping()
     expect(calls).toEqual([])
     keepAlive.observe({ headers: { host: 'example.com', 'x-forwarded-proto': 'https' } })
@@ -29,7 +35,14 @@ describe('keep-alive', () => {
 
   it('uses TH_PUBLIC_URL when given', async () => {
     const calls: string[] = []
-    const keepAlive = createKeepAlive({ publicUrl: 'https://trade.example.com/', fetchImpl: async (url) => { calls.push(url); return { ok: true } }, log: quiet })
+    const keepAlive = createKeepAlive({
+      publicUrl: 'https://trade.example.com/',
+      fetchImpl: async (url) => {
+        calls.push(url)
+        return { ok: true }
+      },
+      log: quiet,
+    })
     await keepAlive.ping()
     expect(calls).toEqual(['https://trade.example.com/healthz?keepalive=1'])
   })

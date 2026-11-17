@@ -16,8 +16,6 @@ import { calculateDcaPositionMetrics, calculateLongPositionMetrics } from './pos
 
 export * from './overlayNames'
 
-
-
 function numericStyle(styles: unknown, key: string, fallback: number): number {
   if (!styles || typeof styles !== 'object') return fallback
   const value = (styles as Record<string, unknown>)[key]
@@ -38,9 +36,7 @@ function rgba(hex: string, opacityPercent: number): string {
 }
 
 function formatPositionNumber(value: number, digits = 2): string {
-  return Number.isFinite(value)
-    ? value.toLocaleString('en-US', { maximumFractionDigits: digits })
-    : '—'
+  return Number.isFinite(value) ? value.toLocaleString('en-US', { maximumFractionDigits: digits }) : '—'
 }
 
 export function registerTradeHorizonOverlays(): void {
@@ -69,19 +65,30 @@ export function registerTradeHorizonOverlays(): void {
           if (y > maxY) maxY = y
         }
 
-        const figures: Array<Record<string, unknown>> = [{
-          type: 'rect',
-          attrs: {
-            x: minX,
-            y: minY,
-            width: Math.max(1, maxX - minX),
-            height: Math.max(1, maxY - minY),
+        const figures: Array<Record<string, unknown>> = [
+          {
+            type: 'rect',
+            attrs: {
+              x: minX,
+              y: minY,
+              width: Math.max(1, maxX - minX),
+              height: Math.max(1, maxY - minY),
+            },
           },
-        }]
+        ]
         // Optional horizontal line through the middle of the box.
         if (numericStyle(overlay.styles, 'showMidline', 0) === 1) {
           const middle = (minY + maxY) / 2
-          figures.push({ type: 'line', attrs: { coordinates: [{ x: minX, y: middle }, { x: maxX, y: middle }] }, ignoreEvent: true })
+          figures.push({
+            type: 'line',
+            attrs: {
+              coordinates: [
+                { x: minX, y: middle },
+                { x: maxX, y: middle },
+              ],
+            },
+            ignoreEvent: true,
+          })
         }
         return figures as never
       },
@@ -162,146 +169,248 @@ export function registerTradeHorizonOverlays(): void {
     [LONG_POSITION_OVERLAY_NAME, 'long'],
     [SHORT_POSITION_OVERLAY_NAME, 'short'],
   ]
-  for (const [positionName, direction] of positions) if (!supported.has(positionName)) registerOverlay({
-    name: positionName,
-    totalStep: 4,
-    needDefaultPointFigure: true,
-    needDefaultXAxisFigure: true,
-    needDefaultYAxisFigure: true,
-    createPointFigures: ({ coordinates, overlay }) => {
-      if (coordinates.length < 3 || overlay.points.length < 3 || coordinates.length !== overlay.points.length) return []
+  for (const [positionName, direction] of positions)
+    if (!supported.has(positionName))
+      registerOverlay({
+        name: positionName,
+        totalStep: 4,
+        needDefaultPointFigure: true,
+        needDefaultXAxisFigure: true,
+        needDefaultYAxisFigure: true,
+        createPointFigures: ({ coordinates, overlay }) => {
+          if (coordinates.length < 3 || overlay.points.length < 3 || coordinates.length !== overlay.points.length) return []
 
-      const [entryCoordinate, targetCoordinate, stopCoordinate, dcaCoordinate] = coordinates
-      const entry = overlay.points[0].value
-      const target = overlay.points[1].value
-      const stop = overlay.points[2].value
-      if (entry === undefined || target === undefined || stop === undefined) return []
+          const [entryCoordinate, targetCoordinate, stopCoordinate, dcaCoordinate] = coordinates
+          const entry = overlay.points[0].value
+          const target = overlay.points[1].value
+          const stop = overlay.points[2].value
+          if (entry === undefined || target === undefined || stop === undefined) return []
 
-      const left = Math.min(entryCoordinate.x, targetCoordinate.x, stopCoordinate.x)
-      const right = Math.max(entryCoordinate.x, targetCoordinate.x, stopCoordinate.x)
-      const width = Math.max(1, right - left)
-      const targetColor = stringStyle(overlay.styles, 'targetColor', '#16a085')
-      const stopColor = stringStyle(overlay.styles, 'stopColor', '#f0445e')
-      const textColor = stringStyle(overlay.styles, 'textColor', '#ffffff')
-      const lineColor = stringStyle(overlay.styles, 'positionLineColor', '#c7d0db')
-      const fillOpacity = numericStyle(overlay.styles, 'positionFillOpacity', 22)
-      const lineWidth = numericStyle(overlay.styles, 'positionLineWidth', 1)
-      const accountSize = numericStyle(overlay.styles, 'accountSize', 10_000)
-      const riskPercent = numericStyle(overlay.styles, 'riskPercent', 1)
-      const showValues = numericStyle(overlay.styles, 'showValues', 1) !== 0
-      const dca = overlay.points[3]?.value
-      const dcaTriggered = numericStyle(overlay.styles, 'dcaTriggered', 0) !== 0
-      const dcaSize = numericStyle(overlay.styles, 'dcaSize', 1)
-      const dcaMetrics = dca !== undefined && dcaCoordinate
-        ? calculateDcaPositionMetrics(entry, dca, target, stop, accountSize, riskPercent, dcaSize, dcaTriggered)
-        : undefined
-      const metrics = dcaMetrics ?? calculateLongPositionMetrics(entry, target, stop, accountSize, riskPercent)
-      const referenceEntry = dcaMetrics?.averageEntry ?? entry
-      const lineStyles = { color: lineColor, size: lineWidth, style: 'solid' }
-      const textStyles = {
-        color: textColor,
-        size: 11,
-        family: 'Inter, system-ui, sans-serif',
-        weight: 600,
-        style: 'fill',
-        borderStyle: 'solid',
-        borderDashedValue: [2, 2],
-        paddingLeft: 5,
-        paddingRight: 5,
-        paddingTop: 3,
-        paddingBottom: 3,
-      }
+          const left = Math.min(entryCoordinate.x, targetCoordinate.x, stopCoordinate.x)
+          const right = Math.max(entryCoordinate.x, targetCoordinate.x, stopCoordinate.x)
+          const width = Math.max(1, right - left)
+          const targetColor = stringStyle(overlay.styles, 'targetColor', '#16a085')
+          const stopColor = stringStyle(overlay.styles, 'stopColor', '#f0445e')
+          const textColor = stringStyle(overlay.styles, 'textColor', '#ffffff')
+          const lineColor = stringStyle(overlay.styles, 'positionLineColor', '#c7d0db')
+          const fillOpacity = numericStyle(overlay.styles, 'positionFillOpacity', 22)
+          const lineWidth = numericStyle(overlay.styles, 'positionLineWidth', 1)
+          const accountSize = numericStyle(overlay.styles, 'accountSize', 10_000)
+          const riskPercent = numericStyle(overlay.styles, 'riskPercent', 1)
+          const showValues = numericStyle(overlay.styles, 'showValues', 1) !== 0
+          const dca = overlay.points[3]?.value
+          const dcaTriggered = numericStyle(overlay.styles, 'dcaTriggered', 0) !== 0
+          const dcaSize = numericStyle(overlay.styles, 'dcaSize', 1)
+          const dcaMetrics =
+            dca !== undefined && dcaCoordinate
+              ? calculateDcaPositionMetrics(entry, dca, target, stop, accountSize, riskPercent, dcaSize, dcaTriggered)
+              : undefined
+          const metrics = dcaMetrics ?? calculateLongPositionMetrics(entry, target, stop, accountSize, riskPercent)
+          const referenceEntry = dcaMetrics?.averageEntry ?? entry
+          const lineStyles = { color: lineColor, size: lineWidth, style: 'solid' }
+          const textStyles = {
+            color: textColor,
+            size: 11,
+            family: 'Inter, system-ui, sans-serif',
+            weight: 600,
+            style: 'fill',
+            borderStyle: 'solid',
+            borderDashedValue: [2, 2],
+            paddingLeft: 5,
+            paddingRight: 5,
+            paddingTop: 3,
+            paddingBottom: 3,
+          }
 
-      // Once the DCA fills, the entry label sits on the average entry instead.
-      const avgY = dcaMetrics && dcaTriggered && dcaCoordinate && dca !== undefined && dca !== entry
-        ? entryCoordinate.y + (dcaCoordinate.y - entryCoordinate.y) * ((referenceEntry - entry) / (dca - entry))
-        : entryCoordinate.y
-      const dcaLines = !dcaCoordinate ? [] : [
-        { type: 'line', attrs: { coordinates: [{ x: left, y: dcaCoordinate.y }, { x: right, y: dcaCoordinate.y }] }, styles: { ...lineStyles, style: 'dashed', dashedValue: [6, 4] } },
-        ...(dcaTriggered ? [{ type: 'line', attrs: { coordinates: [{ x: left, y: avgY }, { x: right, y: avgY }] }, styles: { ...lineStyles, color: '#f4b860', style: 'dashed', dashedValue: [2, 3] } }] : []),
-      ]
-      const dcaLabels = !showValues || !dcaMetrics || dca === undefined || !dcaCoordinate ? [] : [{
-        type: 'text',
-        attrs: { x: right - 5, y: dcaCoordinate.y, text: `DCA${dcaTriggered ? ' (filled)' : ''}: ${formatPositionNumber(dca)}  Qty: ${formatPositionNumber(dcaMetrics.baseQuantity * dcaSize, 6)}${dcaTriggered ? `  Avg: ${formatPositionNumber(dcaMetrics.averageEntry)}` : ''}`, align: 'right', baseline: direction === 'long' ? 'top' : 'bottom' },
-        styles: { ...textStyles, backgroundColor: '#8a6d1d' },
-        ignoreEvent: true,
-      }]
+          // Once the DCA fills, the entry label sits on the average entry instead.
+          const avgY =
+            dcaMetrics && dcaTriggered && dcaCoordinate && dca !== undefined && dca !== entry
+              ? entryCoordinate.y + (dcaCoordinate.y - entryCoordinate.y) * ((referenceEntry - entry) / (dca - entry))
+              : entryCoordinate.y
+          const dcaLines = !dcaCoordinate
+            ? []
+            : [
+                {
+                  type: 'line',
+                  attrs: {
+                    coordinates: [
+                      { x: left, y: dcaCoordinate.y },
+                      { x: right, y: dcaCoordinate.y },
+                    ],
+                  },
+                  styles: { ...lineStyles, style: 'dashed', dashedValue: [6, 4] },
+                },
+                ...(dcaTriggered
+                  ? [
+                      {
+                        type: 'line',
+                        attrs: {
+                          coordinates: [
+                            { x: left, y: avgY },
+                            { x: right, y: avgY },
+                          ],
+                        },
+                        styles: { ...lineStyles, color: '#f4b860', style: 'dashed', dashedValue: [2, 3] },
+                      },
+                    ]
+                  : []),
+              ]
+          const dcaLabels =
+            !showValues || !dcaMetrics || dca === undefined || !dcaCoordinate
+              ? []
+              : [
+                  {
+                    type: 'text',
+                    attrs: {
+                      x: right - 5,
+                      y: dcaCoordinate.y,
+                      text: `DCA${dcaTriggered ? ' (filled)' : ''}: ${formatPositionNumber(dca)}  Qty: ${formatPositionNumber(dcaMetrics.baseQuantity * dcaSize, 6)}${dcaTriggered ? `  Avg: ${formatPositionNumber(dcaMetrics.averageEntry)}` : ''}`,
+                      align: 'right',
+                      baseline: direction === 'long' ? 'top' : 'bottom',
+                    },
+                    styles: { ...textStyles, backgroundColor: '#8a6d1d' },
+                    ignoreEvent: true,
+                  },
+                ]
 
-      const labels = !showValues ? [] : [
-        {
-          type: 'text',
-          attrs: { x: (left + right) / 2, y: targetCoordinate.y, text: `Target: ${formatPositionNumber(target)} (${formatPositionNumber(metrics.targetPercent)}%)  P&L: ${formatPositionNumber(metrics.rewardAmount)}  Qty: ${formatPositionNumber(metrics.quantity, 6)}`, align: 'center', baseline: direction === 'long' ? 'bottom' : 'top' },
-          styles: { ...textStyles, backgroundColor: targetColor },
-          ignoreEvent: true,
+          const labels = !showValues
+            ? []
+            : [
+                {
+                  type: 'text',
+                  attrs: {
+                    x: (left + right) / 2,
+                    y: targetCoordinate.y,
+                    text: `Target: ${formatPositionNumber(target)} (${formatPositionNumber(metrics.targetPercent)}%)  P&L: ${formatPositionNumber(metrics.rewardAmount)}  Qty: ${formatPositionNumber(metrics.quantity, 6)}`,
+                    align: 'center',
+                    baseline: direction === 'long' ? 'bottom' : 'top',
+                  },
+                  styles: { ...textStyles, backgroundColor: targetColor },
+                  ignoreEvent: true,
+                },
+                {
+                  type: 'text',
+                  attrs: {
+                    x: (left + right) / 2,
+                    y: avgY,
+                    text: `${dcaMetrics && dcaTriggered ? 'Avg entry' : 'Entry'}: ${formatPositionNumber(referenceEntry)}  Risk/Reward: ${formatPositionNumber(metrics.riskReward)}`,
+                    align: 'center',
+                    baseline: 'bottom',
+                  },
+                  styles: { ...textStyles, backgroundColor: '#3a4655' },
+                  ignoreEvent: true,
+                },
+                {
+                  type: 'text',
+                  attrs: {
+                    x: (left + right) / 2,
+                    y: stopCoordinate.y,
+                    text: `Stop: ${formatPositionNumber(stop)} (${formatPositionNumber(metrics.stopPercent)}%)  Risk: ${formatPositionNumber(metrics.riskAmount)}`,
+                    align: 'center',
+                    baseline: direction === 'long' ? 'top' : 'bottom',
+                  },
+                  styles: { ...textStyles, backgroundColor: stopColor },
+                  ignoreEvent: true,
+                },
+              ]
+
+          return [
+            {
+              type: 'rect',
+              attrs: {
+                x: left,
+                y: Math.min(entryCoordinate.y, targetCoordinate.y),
+                width,
+                height: Math.abs(targetCoordinate.y - entryCoordinate.y),
+              },
+              styles: {
+                style: 'stroke_fill',
+                color: rgba(targetColor, fillOpacity),
+                borderColor: targetColor,
+                borderSize: lineWidth,
+                borderStyle: 'solid',
+                borderDashedValue: [4, 4],
+                borderRadius: 0,
+              },
+            },
+            {
+              type: 'rect',
+              attrs: {
+                x: left,
+                y: Math.min(entryCoordinate.y, stopCoordinate.y),
+                width,
+                height: Math.abs(stopCoordinate.y - entryCoordinate.y),
+              },
+              styles: {
+                style: 'stroke_fill',
+                color: rgba(stopColor, fillOpacity),
+                borderColor: stopColor,
+                borderSize: lineWidth,
+                borderStyle: 'solid',
+                borderDashedValue: [4, 4],
+                borderRadius: 0,
+              },
+            },
+            {
+              type: 'line',
+              attrs: {
+                coordinates: [
+                  { x: left, y: targetCoordinate.y },
+                  { x: right, y: targetCoordinate.y },
+                ],
+              },
+              styles: lineStyles,
+            },
+            {
+              type: 'line',
+              attrs: {
+                coordinates: [
+                  { x: left, y: entryCoordinate.y },
+                  { x: right, y: entryCoordinate.y },
+                ],
+              },
+              styles: lineStyles,
+            },
+            {
+              type: 'line',
+              attrs: {
+                coordinates: [
+                  { x: left, y: stopCoordinate.y },
+                  { x: right, y: stopCoordinate.y },
+                ],
+              },
+              styles: lineStyles,
+            },
+            ...dcaLines,
+            ...labels,
+            ...dcaLabels,
+          ]
         },
-        {
-          type: 'text',
-          attrs: { x: (left + right) / 2, y: avgY, text: `${dcaMetrics && dcaTriggered ? 'Avg entry' : 'Entry'}: ${formatPositionNumber(referenceEntry)}  Risk/Reward: ${formatPositionNumber(metrics.riskReward)}`, align: 'center', baseline: 'bottom' },
-          styles: { ...textStyles, backgroundColor: '#3a4655' },
-          ignoreEvent: true,
-        },
-        {
-          type: 'text',
-          attrs: { x: (left + right) / 2, y: stopCoordinate.y, text: `Stop: ${formatPositionNumber(stop)} (${formatPositionNumber(metrics.stopPercent)}%)  Risk: ${formatPositionNumber(metrics.riskAmount)}`, align: 'center', baseline: direction === 'long' ? 'top' : 'bottom' },
-          styles: { ...textStyles, backgroundColor: stopColor },
-          ignoreEvent: true,
-        },
-      ]
+        performEventPressedMove: ({ points, performPointIndex }) => {
+          if (points.length < 3) return
+          const entry = points[0].value
+          const target = points[1].value
+          const stop = points[2].value
+          if (entry === undefined || target === undefined || stop === undefined) return
 
-      return [
-        {
-          type: 'rect',
-          attrs: {
-            x: left,
-            y: Math.min(entryCoordinate.y, targetCoordinate.y),
-            width,
-            height: Math.abs(targetCoordinate.y - entryCoordinate.y),
-          },
-          styles: { style: 'stroke_fill', color: rgba(targetColor, fillOpacity), borderColor: targetColor, borderSize: lineWidth, borderStyle: 'solid', borderDashedValue: [4, 4], borderRadius: 0 },
+          if (performPointIndex === 0) {
+            points[0].value = Math.min(Math.max(target, stop), Math.max(Math.min(target, stop), entry))
+          } else if (performPointIndex === 1 || performPointIndex === 2) {
+            // Target and stop share the right edge, so dragging either one sideways resizes the whole box.
+            const moved = points[performPointIndex]
+            const other = points[performPointIndex === 1 ? 2 : 1]
+            other.timestamp = moved.timestamp
+            other.dataIndex = moved.dataIndex
+            const clamped = clampPositionLevels(direction, entry, target, stop)
+            points[1].value = clamped.target
+            points[2].value = clamped.stop
+          }
+          // The DCA stays inside the buy region, between entry and stop, whichever handle moved.
+          if (points.length > 3 && points[3].value !== undefined) {
+            points[3].value = clampDcaPrice(points[0].value ?? entry, points[2].value ?? stop, points[3].value)
+          }
         },
-        {
-          type: 'rect',
-          attrs: {
-            x: left,
-            y: Math.min(entryCoordinate.y, stopCoordinate.y),
-            width,
-            height: Math.abs(stopCoordinate.y - entryCoordinate.y),
-          },
-          styles: { style: 'stroke_fill', color: rgba(stopColor, fillOpacity), borderColor: stopColor, borderSize: lineWidth, borderStyle: 'solid', borderDashedValue: [4, 4], borderRadius: 0 },
-        },
-        { type: 'line', attrs: { coordinates: [{ x: left, y: targetCoordinate.y }, { x: right, y: targetCoordinate.y }] }, styles: lineStyles },
-        { type: 'line', attrs: { coordinates: [{ x: left, y: entryCoordinate.y }, { x: right, y: entryCoordinate.y }] }, styles: lineStyles },
-        { type: 'line', attrs: { coordinates: [{ x: left, y: stopCoordinate.y }, { x: right, y: stopCoordinate.y }] }, styles: lineStyles },
-        ...dcaLines,
-        ...labels,
-        ...dcaLabels,
-      ]
-    },
-    performEventPressedMove: ({ points, performPointIndex }) => {
-      if (points.length < 3) return
-      const entry = points[0].value
-      const target = points[1].value
-      const stop = points[2].value
-      if (entry === undefined || target === undefined || stop === undefined) return
-
-      if (performPointIndex === 0) {
-        points[0].value = Math.min(Math.max(target, stop), Math.max(Math.min(target, stop), entry))
-      } else if (performPointIndex === 1 || performPointIndex === 2) {
-        // Target and stop share the right edge, so dragging either one sideways resizes the whole box.
-        const moved = points[performPointIndex]
-        const other = points[performPointIndex === 1 ? 2 : 1]
-        other.timestamp = moved.timestamp
-        other.dataIndex = moved.dataIndex
-        const clamped = clampPositionLevels(direction, entry, target, stop)
-        points[1].value = clamped.target
-        points[2].value = clamped.stop
-      }
-      // The DCA stays inside the buy region, between entry and stop, whichever handle moved.
-      if (points.length > 3 && points[3].value !== undefined) {
-        points[3].value = clampDcaPrice(points[0].value ?? entry, points[2].value ?? stop, points[3].value)
-      }
-    },
-  })
+      })
 
   if (!supported.has(ALERT_LINE_OVERLAY_NAME)) {
     // A price alert: a dashed line across the chart, a label with the price and a ✕ to delete it on the right,
@@ -323,9 +432,8 @@ export function registerTradeHorizonOverlays(): void {
       paddingTop: 3,
       paddingBottom: 3,
     })
-    const formatAlertPrice = (value: number | undefined, precision: number) => (
+    const formatAlertPrice = (value: number | undefined, precision: number) =>
       value === undefined ? '' : value.toLocaleString('en-US', { minimumFractionDigits: precision, maximumFractionDigits: precision })
-    )
     registerOverlay({
       name: ALERT_LINE_OVERLAY_NAME,
       totalStep: 2,
@@ -343,13 +451,24 @@ export function registerTradeHorizonOverlays(): void {
         return [
           {
             type: 'line',
-            attrs: { coordinates: [{ x: 0, y }, { x: bounding.width, y }] },
+            attrs: {
+              coordinates: [
+                { x: 0, y },
+                { x: bounding.width, y },
+              ],
+            },
             styles: { style: 'dashed', color, size: 1, dashedValue: [6, 4] },
           },
           {
             key: 'alert-label',
             type: 'text',
-            attrs: { x: right - 24, y, text: `${paused ? 'Paused  ' : ''}🔔 ${formatAlertPrice(overlay.points[0]?.value, precision)}`, align: 'right', baseline: 'middle' },
+            attrs: {
+              x: right - 24,
+              y,
+              text: `${paused ? 'Paused  ' : ''}🔔 ${formatAlertPrice(overlay.points[0]?.value, precision)}`,
+              align: 'right',
+              baseline: 'middle',
+            },
             styles: alertText(color),
           },
           {
@@ -364,11 +483,19 @@ export function registerTradeHorizonOverlays(): void {
         if (coordinates.length < 1) return []
         const color = stringStyle(overlay.styles, 'alertColor', '#f5a623')
         const precision = chart.getSymbol()?.pricePrecision ?? 2
-        return [{
-          type: 'text',
-          attrs: { x: 0, y: coordinates[0].y, text: formatAlertPrice(overlay.points[0]?.value, precision), align: 'left', baseline: 'middle' },
-          styles: { ...alertText(color), borderRadius: 2, paddingLeft: 4 },
-        }]
+        return [
+          {
+            type: 'text',
+            attrs: {
+              x: 0,
+              y: coordinates[0].y,
+              text: formatAlertPrice(overlay.points[0]?.value, precision),
+              align: 'left',
+              baseline: 'middle',
+            },
+            styles: { ...alertText(color), borderRadius: 2, paddingLeft: 4 },
+          },
+        ]
       },
     })
   }
@@ -386,7 +513,13 @@ export function registerTradeHorizonOverlays(): void {
         const lines = (stringStyle(overlay.styles, 'textValue', 'Text') || ' ').split(String.fromCharCode(10))
         return lines.map((line, index) => ({
           type: 'text',
-          attrs: { x: coordinates[0].x, y: coordinates[0].y + index * fontSize * 1.35, text: line || ' ', align: 'left', baseline: 'middle' },
+          attrs: {
+            x: coordinates[0].x,
+            y: coordinates[0].y + index * fontSize * 1.35,
+            text: line || ' ',
+            align: 'left',
+            baseline: 'middle',
+          },
           styles: {
             style: 'fill',
             color: stringStyle(overlay.styles, 'textColor', '#2962ff'),
@@ -590,7 +723,11 @@ export function registerTradeHorizonOverlays(): void {
         if (first === undefined || second === undefined || !yAxis) return []
         // TradingView's Style tab (drawingVisibility.ts: fibSettings), passed as JSON in the overlay styles.
         let settings: FibSettings
-        try { settings = JSON.parse(stringStyle(overlay.styles, 'fibConfig', '')) as FibSettings } catch { settings = fibSettings(undefined) }
+        try {
+          settings = JSON.parse(stringStyle(overlay.styles, 'fibConfig', '')) as FibSettings
+        } catch {
+          settings = fibSettings(undefined)
+        }
         if (settings.reverse) [first, second] = [second, first]
 
         const [c1, c2] = coordinates
@@ -610,58 +747,73 @@ export function registerTradeHorizonOverlays(): void {
             return { level: row.v, price, y: yAxis.convertToPixel(price), color: settings.oneColor ?? row.c }
           })
 
-        const bands = !settings.background ? [] : levels.slice(1).map((current, index) => {
-          const previous = levels[index]
-          return {
-            type: 'rect',
-            attrs: { x: left, y: Math.min(previous.y, current.y), width: right - left, height: Math.abs(current.y - previous.y) },
-            styles: { style: 'fill', color: rgba(current.color, fillOpacity), borderSize: 0 },
-            ignoreEvent: true,
-          }
-        })
+        const bands = !settings.background
+          ? []
+          : levels.slice(1).map((current, index) => {
+              const previous = levels[index]
+              return {
+                type: 'rect',
+                attrs: { x: left, y: Math.min(previous.y, current.y), width: right - left, height: Math.abs(current.y - previous.y) },
+                styles: { style: 'fill', color: rgba(current.color, fillOpacity), borderSize: 0 },
+                ignoreEvent: true,
+              }
+            })
         const lines = levels.map((item) => ({
           type: 'line',
-          attrs: { coordinates: [{ x: left, y: item.y }, { x: right, y: item.y }] },
+          attrs: {
+            coordinates: [
+              { x: left, y: item.y },
+              { x: right, y: item.y },
+            ],
+          },
           styles: { color: item.color, size: lineWidth, style: lineStyle, dashedValue: [4, 4] },
         }))
-        const labelText = (item: { level: number, price: number }) => {
+        const labelText = (item: { level: number; price: number }) => {
           const parts: string[] = []
           if (settings.levels) parts.push(fibLevelText(item.level, settings.percent))
-          if (settings.prices) parts.push(settings.levels ? `(${formatPositionNumber(item.price, precision)})` : formatPositionNumber(item.price, precision))
+          if (settings.prices)
+            parts.push(settings.levels ? `(${formatPositionNumber(item.price, precision)})` : formatPositionNumber(item.price, precision))
           return parts.join(' ')
         }
-        const labels = !settings.levels && !settings.prices ? [] : levels.map((item) => ({
-          type: 'text',
-          attrs: {
-            x: settings.labelSide === 'right' ? right - 4 : left + 4,
-            y: item.y - 2,
-            text: labelText(item),
-            align: settings.labelSide === 'right' ? 'right' : 'left',
-            baseline: 'bottom',
-          },
-          styles: {
-            color: item.color,
-            size: 11,
-            family: 'Inter, system-ui, sans-serif',
-            weight: 600,
-            style: 'fill',
-            backgroundColor: 'transparent',
-            paddingLeft: 0,
-            paddingRight: 0,
-            paddingTop: 0,
-            paddingBottom: 0,
-          },
-          ignoreEvent: true,
-        }))
+        const labels =
+          !settings.levels && !settings.prices
+            ? []
+            : levels.map((item) => ({
+                type: 'text',
+                attrs: {
+                  x: settings.labelSide === 'right' ? right - 4 : left + 4,
+                  y: item.y - 2,
+                  text: labelText(item),
+                  align: settings.labelSide === 'right' ? 'right' : 'left',
+                  baseline: 'bottom',
+                },
+                styles: {
+                  color: item.color,
+                  size: 11,
+                  family: 'Inter, system-ui, sans-serif',
+                  weight: 600,
+                  style: 'fill',
+                  backgroundColor: 'transparent',
+                  paddingLeft: 0,
+                  paddingRight: 0,
+                  paddingTop: 0,
+                  paddingBottom: 0,
+                },
+                ignoreEvent: true,
+              }))
 
         return [
           ...bands,
           ...lines,
-          ...(settings.trend ? [{
-            type: 'line',
-            attrs: { coordinates: [c1, c2] },
-            styles: { color: '#787b86', size: 1, style: 'dashed', dashedValue: [3, 3] },
-          }] : []),
+          ...(settings.trend
+            ? [
+                {
+                  type: 'line',
+                  attrs: { coordinates: [c1, c2] },
+                  styles: { color: '#787b86', size: 1, style: 'dashed', dashedValue: [3, 3] },
+                },
+              ]
+            : []),
           ...labels,
         ]
       },

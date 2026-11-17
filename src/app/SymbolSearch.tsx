@@ -44,7 +44,10 @@ function matchRank(item: CryptoMarket, needle: string): number {
 }
 
 export function matchMarkets(query: string, markets: readonly CryptoMarket[]): CryptoMarket[] {
-  const needle = query.trim().toLowerCase().replace(/[\s/]+/g, '')
+  const needle = query
+    .trim()
+    .toLowerCase()
+    .replace(/[\s/]+/g, '')
   if (!needle) return [...markets]
   return markets
     .map((item, index) => ({ item, index, rank: matchRank(item, needle) }))
@@ -66,10 +69,22 @@ export function SymbolSearch({ markets, current, onSelect, onClose, initialQuery
   const [highlight, setHighlight] = useState(0)
   const [source, setSource] = useState<Source>('all')
   const inputRef = useRef<HTMLInputElement>(null)
-  const results = useMemo(() => matchMarkets(query, markets).filter((item) => (
-    (category === 'All' || (category === 'Spot' ? item.kind === 'spot' : category === 'Futures' ? item.kind === 'futures' : item.kind === 'dominance')) &&
-    (source === 'all' || (item.kind !== 'dominance' && sourceOf(item) === source))
-  )).slice(0, MAX_ROWS), [query, markets, category, source])
+  const results = useMemo(
+    () =>
+      matchMarkets(query, markets)
+        .filter(
+          (item) =>
+            (category === 'All' ||
+              (category === 'Spot'
+                ? item.kind === 'spot'
+                : category === 'Futures'
+                  ? item.kind === 'futures'
+                  : item.kind === 'dominance')) &&
+            (source === 'all' || (item.kind !== 'dominance' && sourceOf(item) === source)),
+        )
+        .slice(0, MAX_ROWS),
+    [query, markets, category, source],
+  )
   const activeIndex = Math.min(highlight, Math.max(0, results.length - 1))
 
   useEffect(() => {
@@ -111,7 +126,9 @@ export function SymbolSearch({ markets, current, onSelect, onClose, initialQuery
       >
         <header>
           <h2 id="symbol-search-title">Symbol search</h2>
-          <button type="button" aria-label="Close symbol search" onClick={onClose}><CloseIcon /></button>
+          <button type="button" aria-label="Close symbol search" onClick={onClose}>
+            <CloseIcon />
+          </button>
         </header>
 
         <div className="symbol-search-input">
@@ -123,10 +140,20 @@ export function SymbolSearch({ markets, current, onSelect, onClose, initialQuery
             spellCheck={false}
             autoComplete="off"
             aria-label="Search symbols"
-            onChange={(event) => { setQuery(event.target.value); setHighlight(0) }}
+            onChange={(event) => {
+              setQuery(event.target.value)
+              setHighlight(0)
+            }}
           />
           {query && (
-            <button type="button" aria-label="Clear search" onClick={() => { setQuery(''); inputRef.current?.focus() }}>
+            <button
+              type="button"
+              aria-label="Clear search"
+              onClick={() => {
+                setQuery('')
+                inputRef.current?.focus()
+              }}
+            >
               <CloseIcon />
             </button>
           )}
@@ -154,9 +181,17 @@ export function SymbolSearch({ markets, current, onSelect, onClose, initialQuery
             className="symbol-search-source"
             value={source}
             aria-label="Exchange"
-            onChange={(event) => { setSource(event.target.value as Source); setHighlight(0); if (query === current.symbol) setQuery('') }}
+            onChange={(event) => {
+              setSource(event.target.value as Source)
+              setHighlight(0)
+              if (query === current.symbol) setQuery('')
+            }}
           >
-            {SOURCES.map((item) => <option value={item.value} key={item.value}>{item.label}</option>)}
+            {SOURCES.map((item) => (
+              <option value={item.value} key={item.value}>
+                {item.label}
+              </option>
+            ))}
           </select>
         </div>
 
@@ -171,9 +206,13 @@ export function SymbolSearch({ markets, current, onSelect, onClose, initialQuery
               onMouseMove={() => setHighlight(index)}
               onClick={() => onSelect(item)}
             >
-              <span className="symbol-row-badge" style={{ background: badgeColor(item) }}>{item.mark}</span>
+              <span className="symbol-row-badge" style={{ background: badgeColor(item) }}>
+                {item.mark}
+              </span>
               <strong>{displaySymbol(item.symbol)}</strong>
-              <span className="symbol-row-name">{item.kind === 'spot' ? `${item.name} / ${item.quoteAsset === 'BTC' ? 'Bitcoin' : 'TetherUS'}` : item.name}</span>
+              <span className="symbol-row-name">
+                {item.kind === 'spot' ? `${item.name} / ${item.quoteAsset === 'BTC' ? 'Bitcoin' : 'TetherUS'}` : item.name}
+              </span>
               <small>{item.kind === 'spot' ? 'spot' : item.kind === 'futures' ? 'perpetual' : 'index · estimated'}</small>
               {item.kind !== 'dominance' && <em className={`symbol-row-venue venue-${sourceOf(item)}`}>{sourceOf(item).toUpperCase()}</em>}
             </button>

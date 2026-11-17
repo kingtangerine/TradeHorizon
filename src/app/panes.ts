@@ -34,7 +34,8 @@ export const SYNC_KEYS = ['symbol', 'interval', 'crosshair', 'time'] as const
 /** Changes one pane; a synced symbol or timeframe goes to every pane of the tab. */
 export function withSyncedPaneChange<T extends PaneTab>(tab: T, index: number, changes: Partial<PaneSpec>): T {
   const sync = tab.split?.sync
-  if (!tab.split || !sync || (!(sync.symbol && changes.symbol) && !(sync.interval && changes.interval))) return withPaneChange(tab, index, changes)
+  if (!tab.split || !sync || (!(sync.symbol && changes.symbol) && !(sync.interval && changes.interval)))
+    return withPaneChange(tab, index, changes)
   const shared: Partial<PaneSpec> = {
     ...(sync.symbol && changes.symbol ? { symbol: changes.symbol } : {}),
     ...(sync.interval && changes.interval ? { interval: changes.interval } : {}),
@@ -86,7 +87,10 @@ export function defaultPanes(base: PaneSpec, count: number): PaneSpec[] {
   const panes: PaneSpec[] = []
   for (const interval of [...longer, ...shorter]) {
     if (panes.length >= count - 1) break
-    if (!taken.has(interval)) { taken.add(interval); panes.push({ symbol: base.symbol, interval }) }
+    if (!taken.has(interval)) {
+      taken.add(interval)
+      panes.push({ symbol: base.symbol, interval })
+    }
   }
   while (panes.length < count - 1) panes.push({ symbol: base.symbol, interval: base.interval })
   return panes
@@ -100,9 +104,10 @@ export function withPaneCount<T extends PaneTab>(tab: T, count: 1 | SplitCount):
   }
   const existing = tab.split?.panes ?? []
   const wanted = count - 1
-  const panes = existing.length >= wanted
-    ? existing.slice(0, wanted)
-    : [...existing, ...defaultPanes({ symbol: tab.symbol, interval: tab.interval }, count).slice(existing.length)]
+  const panes =
+    existing.length >= wanted
+      ? existing.slice(0, wanted)
+      : [...existing, ...defaultPanes({ symbol: tab.symbol, interval: tab.interval }, count).slice(existing.length)]
   return { ...tab, split: { count, panes, active: Math.min(tab.split?.active ?? 0, count - 1) } }
 }
 
@@ -121,13 +126,13 @@ export function withPaneChange<T extends PaneTab>(tab: T, index: number, changes
 /** Reads a stored split, dropping anything that is not valid. */
 export function parseSplit(value: unknown, fallback: PaneSpec): TabSplit | undefined {
   if (typeof value !== 'object' || value === null) return undefined
-  const raw = value as { count?: unknown, panes?: unknown, active?: unknown }
+  const raw = value as { count?: unknown; panes?: unknown; active?: unknown }
   if (!SPLIT_COUNTS.includes(raw.count as SplitCount)) return undefined
   const count = raw.count as SplitCount
   const stored = Array.isArray(raw.panes) ? raw.panes : []
   const panes: PaneSpec[] = []
   for (let index = 0; index < count - 1; index += 1) {
-    const item = stored[index] as { symbol?: unknown, interval?: unknown } | undefined
+    const item = stored[index] as { symbol?: unknown; interval?: unknown } | undefined
     panes.push(
       typeof item?.symbol === 'string' && /^[A-Za-z0-9.]{2,30}$/.test(item.symbol) && isMarketInterval(item.interval)
         ? { symbol: item.symbol, interval: item.interval }

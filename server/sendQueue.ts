@@ -18,7 +18,11 @@ export interface SendError {
 }
 
 /** How one queued message ended. */
-export interface SendResult { readonly ok: boolean, readonly attempts: number, readonly error?: string }
+export interface SendResult {
+  readonly ok: boolean
+  readonly attempts: number
+  readonly error?: string
+}
 
 export interface SendQueueOptions {
   readonly name: string
@@ -59,7 +63,15 @@ interface Job {
  * @param perKeyGapMs  least time between two sends to the same key (e.g. the same Telegram chat)
  * @param maxAttempts  tries per message before it counts as failed
  */
-export function createSendQueue({ name, perSecond = 25, perKeyGapMs = 0, maxAttempts = 5, maxPending = 10_000, log = console, now = () => Date.now() }: SendQueueOptions): SendQueue {
+export function createSendQueue({
+  name,
+  perSecond = 25,
+  perKeyGapMs = 0,
+  maxAttempts = 5,
+  maxPending = 10_000,
+  log = console,
+  now = () => Date.now(),
+}: SendQueueOptions): SendQueue {
   const jobs: Job[] = []
   const keyReadyAt = new Map<SendKey, number>()
   const startedAt: number[] = []
@@ -72,7 +84,13 @@ export function createSendQueue({ name, perSecond = 25, perKeyGapMs = 0, maxAtte
   function schedule(delayMs: number) {
     if (stopped) return
     if (timer) return
-    timer = setTimeout(() => { timer = undefined; pump() }, Math.max(0, delayMs))
+    timer = setTimeout(
+      () => {
+        timer = undefined
+        pump()
+      },
+      Math.max(0, delayMs),
+    )
     timer.unref?.()
   }
 
@@ -83,10 +101,17 @@ export function createSendQueue({ name, perSecond = 25, perKeyGapMs = 0, maxAtte
     if (pausedUntil > at) wake = pausedUntil - at
     else {
       for (let index = 0; index < jobs.length;) {
-        if (startedAt.length >= perSecond) { wake = Math.min(wake, startedAt[0] + 1000 - at); break }
+        if (startedAt.length >= perSecond) {
+          wake = Math.min(wake, startedAt[0] + 1000 - at)
+          break
+        }
         const job = jobs[index]
         const readyAt = Math.max(job.notBefore, keyReadyAt.get(job.key) ?? 0)
-        if (readyAt > at) { wake = Math.min(wake, readyAt - at); index += 1; continue }
+        if (readyAt > at) {
+          wake = Math.min(wake, readyAt - at)
+          index += 1
+          continue
+        }
         jobs.splice(index, 1)
         startedAt.push(at)
         keyReadyAt.set(job.key, at + perKeyGapMs)
@@ -136,7 +161,12 @@ export function createSendQueue({ name, perSecond = 25, perKeyGapMs = 0, maxAtte
         schedule(0)
       })
     },
-    status: () => ({ pending: jobs.length, ...stats, pausedForSec: pausedUntil > now() ? Math.ceil((pausedUntil - now()) / 1000) : 0, lastError }),
+    status: () => ({
+      pending: jobs.length,
+      ...stats,
+      pausedForSec: pausedUntil > now() ? Math.ceil((pausedUntil - now()) / 1000) : 0,
+      lastError,
+    }),
     stop() {
       stopped = true
       clearTimeout(timer)

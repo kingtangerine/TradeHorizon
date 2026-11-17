@@ -68,23 +68,28 @@ export type RawRecord = Record<string, unknown>
 export const records = (value: unknown): (RawRecord | null | undefined)[] | undefined => (Array.isArray(value) ? value : undefined)
 
 /** Caught values are usually Errors; this reads their message without assuming so. */
-export const messageOf = (error: unknown): unknown => (typeof error === 'object' && error !== null ? (error as { message?: unknown }).message : undefined)
+export const messageOf = (error: unknown): unknown =>
+  typeof error === 'object' && error !== null ? (error as { message?: unknown }).message : undefined
 
 /** Top 500 coins by market cap, for the market-cap badge on the chart (separate from the top-100 dominance data). */
-const COINGECKO_CAP_PAGES = [1, 2].map((page) => `https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&order=market_cap_desc&per_page=250&page=${page}`)
+const COINGECKO_CAP_PAGES = [1, 2].map(
+  (page) => `https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&order=market_cap_desc&per_page=250&page=${page}`,
+)
 const CAPS_TTL_MS = 30 * 60 * 1000
 
 /** Keeps what the chart needs from CoinGecko's market rows: symbol, name, market cap, rank, 24h volume. */
 export function compactMarketCaps(pages: unknown[]): MarketCap[] {
-  return (pages.flat() as (CoinGeckoMarketRow | null | undefined)[]).filter((coin): coin is CoinGeckoMarketRow & { symbol: string; market_cap: number } => Boolean(
-    coin && typeof coin.symbol === 'string' && typeof coin.market_cap === 'number' && coin.market_cap > 0
-  )).map((coin) => ({
-    s: coin.symbol.toUpperCase(),
-    n: String(coin.name ?? coin.symbol),
-    c: coin.market_cap,
-    r: Number(coin.market_cap_rank) || 0,
-    v: Number(coin.total_volume) || 0,
-  }))
+  return (pages.flat() as (CoinGeckoMarketRow | null | undefined)[])
+    .filter((coin): coin is CoinGeckoMarketRow & { symbol: string; market_cap: number } =>
+      Boolean(coin && typeof coin.symbol === 'string' && typeof coin.market_cap === 'number' && coin.market_cap > 0),
+    )
+    .map((coin) => ({
+      s: coin.symbol.toUpperCase(),
+      n: String(coin.name ?? coin.symbol),
+      c: coin.market_cap,
+      r: Number(coin.market_cap_rank) || 0,
+      v: Number(coin.total_volume) || 0,
+    }))
 }
 
 const CATALOG_REFRESH_MS = 6 * 60 * 60 * 1000
@@ -116,10 +121,14 @@ export function parseBinanceListings(payload: unknown): Listing[] {
   const listings: Listing[] = []
   for (const entry of symbols) {
     if (
-      entry?.status !== 'TRADING' || entry.isSpotTradingAllowed === false ||
+      entry?.status !== 'TRADING' ||
+      entry.isSpotTradingAllowed === false ||
       (entry.quoteAsset !== 'USDT' && entry.quoteAsset !== 'BTC') ||
-      typeof entry.symbol !== 'string' || typeof entry.baseAsset !== 'string' || !SYMBOL.test(entry.symbol)
-    ) continue
+      typeof entry.symbol !== 'string' ||
+      typeof entry.baseAsset !== 'string' ||
+      !SYMBOL.test(entry.symbol)
+    )
+      continue
     listings.push({
       ...(entry.quoteAsset === 'BTC' ? { quoteAsset: 'BTC' } : {}),
       symbol: entry.symbol,
@@ -138,9 +147,13 @@ export function parseBybitListings(payload: unknown): Listing[] {
   const listings: Listing[] = []
   for (const entry of list) {
     if (
-      entry?.status !== 'Trading' || entry.quoteCoin !== 'USDT' ||
-      typeof entry.symbol !== 'string' || typeof entry.baseCoin !== 'string' || !SYMBOL.test(entry.symbol)
-    ) continue
+      entry?.status !== 'Trading' ||
+      entry.quoteCoin !== 'USDT' ||
+      typeof entry.symbol !== 'string' ||
+      typeof entry.baseCoin !== 'string' ||
+      !SYMBOL.test(entry.symbol)
+    )
+      continue
     listings.push({
       exchange: 'bybit',
       symbol: entry.symbol,
@@ -159,9 +172,15 @@ export function parseBinanceFuturesListings(payload: unknown): Listing[] {
   const listings: Listing[] = []
   for (const entry of symbols) {
     if (
-      entry?.status !== 'TRADING' || entry.contractType !== 'PERPETUAL' || entry.quoteAsset !== 'USDT' ||
-      typeof entry.symbol !== 'string' || typeof entry.baseAsset !== 'string' || !SYMBOL.test(entry.symbol) || entry.symbol === 'BTCDOMUSDT'
-    ) continue
+      entry?.status !== 'TRADING' ||
+      entry.contractType !== 'PERPETUAL' ||
+      entry.quoteAsset !== 'USDT' ||
+      typeof entry.symbol !== 'string' ||
+      typeof entry.baseAsset !== 'string' ||
+      !SYMBOL.test(entry.symbol) ||
+      entry.symbol === 'BTCDOMUSDT'
+    )
+      continue
     listings.push({
       exchange: 'binance-futures',
       symbol: `${entry.symbol}.P`,
@@ -179,7 +198,9 @@ export function parseBinanceFuturesListings(payload: unknown): Listing[] {
  */
 export function mergeAllListings(binance: Listing[], bybit: Listing[], binanceFutures: Listing[], others: Listing[]): Listing[] {
   const seen = new Set(binance.map((item) => item.symbol))
-  const bybitSpot = bybit.map((item) => (seen.has(item.symbol) ? { ...item, symbol: `BYBIT:${item.symbol}`, apiSymbol: item.symbol } : item))
+  const bybitSpot = bybit.map((item) =>
+    seen.has(item.symbol) ? { ...item, symbol: `BYBIT:${item.symbol}`, apiSymbol: item.symbol } : item,
+  )
   const all = [...binance, ...binanceFutures, ...bybitSpot, ...others]
   const unique = new Set<string>()
   return all.filter((item) => (unique.has(item.symbol) ? false : (unique.add(item.symbol), true)))
@@ -210,7 +231,11 @@ export function createMarketService({ dataDir, fetchImpl = (url, init) => fetch(
   }
 
   if (existsSync(catalogFile)) {
-    try { setCatalog(JSON.parse(readFileSync(catalogFile, 'utf8')) as Catalog) } catch { /* refetched below */ }
+    try {
+      setCatalog(JSON.parse(readFileSync(catalogFile, 'utf8')) as Catalog)
+    } catch {
+      /* refetched below */
+    }
   }
 
   async function getJson(url: string): Promise<unknown> {
@@ -224,14 +249,18 @@ export function createMarketService({ dataDir, fetchImpl = (url, init) => fetch(
     refreshing = (async () => {
       const binance = parseBinanceListings(await getJson(BINANCE_EXCHANGE_INFO))
       // Bybit is optional: without it the catalog is Binance only.
-      const bybit = await getJson(BYBIT_INSTRUMENTS).then(parseBybitListings).catch((error: unknown): Listing[] => {
-        log.warn?.(`[markets] Bybit list unavailable: ${messageOf(error)}`)
-        return []
-      })
-      const futures = await getJson(BINANCE_FUTURES_INFO).then(parseBinanceFuturesListings).catch((error: unknown): Listing[] => {
-        log.warn?.(`[markets] Binance futures list unavailable: ${messageOf(error)}`)
-        return []
-      })
+      const bybit = await getJson(BYBIT_INSTRUMENTS)
+        .then(parseBybitListings)
+        .catch((error: unknown): Listing[] => {
+          log.warn?.(`[markets] Bybit list unavailable: ${messageOf(error)}`)
+          return []
+        })
+      const futures = await getJson(BINANCE_FUTURES_INFO)
+        .then(parseBinanceFuturesListings)
+        .catch((error: unknown): Listing[] => {
+          log.warn?.(`[markets] Binance futures list unavailable: ${messageOf(error)}`)
+          return []
+        })
       const others = await fetchVenueListings(getJson, log)
       const next: Catalog = { fetchedAtMs: Date.now(), listings: mergeAllListings(binance, bybit, futures, others) }
       setCatalog(next)
@@ -242,26 +271,39 @@ export function createMarketService({ dataDir, fetchImpl = (url, init) => fetch(
         log.warn?.(`[markets] could not save the catalog: ${messageOf(error)}`)
       }
       log.log?.(`[markets] catalog refreshed: ${next.listings.length} pairs`)
-    })().catch((error: unknown) => {
-      log.warn?.(`[markets] catalog refresh failed: ${messageOf(error)}`)
-    }).finally(() => { refreshing = undefined })
+    })()
+      .catch((error: unknown) => {
+        log.warn?.(`[markets] catalog refresh failed: ${messageOf(error)}`)
+      })
+      .finally(() => {
+        refreshing = undefined
+      })
     return refreshing
   }
 
   // CoinGecko: one shared copy for all users, with the last good copy served if CoinGecko is down.
-  const gecko: Record<string, CacheSlot<unknown>> = { global: { at: 0, data: undefined, inflight: undefined }, markets: { at: 0, data: undefined, inflight: undefined } }
+  const gecko: Record<string, CacheSlot<unknown>> = {
+    global: { at: 0, data: undefined, inflight: undefined },
+    markets: { at: 0, data: undefined, inflight: undefined },
+  }
   async function coingecko(name: string): Promise<unknown> {
     const slot = gecko[name]
     const url = (COINGECKO as Record<string, string | undefined>)[name]
     if (!url) throw new Error('unknown dataset')
     if (slot.data && Date.now() - slot.at < COINGECKO_TTL_MS) return slot.data
     slot.inflight ??= getJson(url)
-      .then((data) => { slot.data = data; slot.at = Date.now(); return data })
+      .then((data) => {
+        slot.data = data
+        slot.at = Date.now()
+        return data
+      })
       .catch((error) => {
         if (slot.data) return slot.data
         throw error
       })
-      .finally(() => { slot.inflight = undefined })
+      .finally(() => {
+        slot.inflight = undefined
+      })
     return slot.inflight
   }
 
@@ -272,7 +314,11 @@ export function createMarketService({ dataDir, fetchImpl = (url, init) => fetch(
     caps.inflight ??= (async () => {
       const pages: unknown[] = []
       for (const url of COINGECKO_CAP_PAGES) {
-        try { pages.push(await getJson(url)) } catch (error) { if (pages.length === 0) throw error }
+        try {
+          pages.push(await getJson(url))
+        } catch (error) {
+          if (pages.length === 0) throw error
+        }
       }
       caps.data = compactMarketCaps(pages)
       caps.at = Date.now()
@@ -282,7 +328,9 @@ export function createMarketService({ dataDir, fetchImpl = (url, init) => fetch(
         if (caps.data) return caps.data
         throw error
       })
-      .finally(() => { caps.inflight = undefined })
+      .finally(() => {
+        caps.inflight = undefined
+      })
     return caps.inflight
   }
 
@@ -294,7 +342,9 @@ export function createMarketService({ dataDir, fetchImpl = (url, init) => fetch(
       timer = setInterval(() => void refreshCatalog(), CATALOG_REFRESH_MS)
       timer.unref()
     },
-    stop() { clearInterval(timer) },
+    stop() {
+      clearInterval(timer)
+    },
     refreshCatalog,
     getCatalog: () => catalog,
     /** Where a symbol trades, or undefined when it is not a listed pair (for example an index like BTC.D). */
@@ -308,7 +358,12 @@ export function createMarketService({ dataDir, fetchImpl = (url, init) => fetch(
     },
     /** The exchange's own symbol for one of ours ("OKX:BTCUSDT" -> "BTC-USDT", "BYBIT:SOLUSDT.P" -> "SOLUSDT"). */
     apiSymbolOf(symbol: string): string {
-      return bySymbol.get(symbol)?.apiSymbol ?? String(symbol).replace(/^[A-Z]+:/, '').replace(/\.P$/, '')
+      return (
+        bySymbol.get(symbol)?.apiSymbol ??
+        String(symbol)
+          .replace(/^[A-Z]+:/, '')
+          .replace(/\.P$/, '')
+      )
     },
     coingecko,
   }

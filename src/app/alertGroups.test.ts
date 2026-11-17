@@ -2,7 +2,13 @@ import { describe, expect, it } from 'vitest'
 import { groupAlerts, moveAlert, type PriceAlert } from './alerts'
 
 const alert = (id: string, symbol: string, targetPrice: number, extra: Partial<PriceAlert> = {}): PriceAlert => ({
-  id, symbol, targetPrice, direction: 'above', enabled: true, createdAtMs: 1, ...extra,
+  id,
+  symbol,
+  targetPrice,
+  direction: 'above',
+  enabled: true,
+  createdAtMs: 1,
+  ...extra,
 })
 
 const list = [
