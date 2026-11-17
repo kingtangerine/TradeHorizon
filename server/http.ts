@@ -3,6 +3,7 @@ import type { IncomingMessage, OutgoingHttpHeaders, ServerResponse } from 'node:
 import type { TLSSocket } from 'node:tls'
 import { gzip } from 'node:zlib'
 import { promisify } from 'node:util'
+import { addVary } from './cors.ts'
 
 const gzipAsync = promisify(gzip)
 
@@ -40,7 +41,9 @@ export async function sendCompressed(
   cacheControl = 'no-store',
 ): Promise<void> {
   const text = JSON.stringify(body)
-  const headers: OutgoingHttpHeaders = { 'Content-Type': 'application/json', 'Cache-Control': cacheControl, Vary: 'Accept-Encoding' }
+  // Added to any Vary already set (CORS sets Origin); passing Vary to writeHead would replace it.
+  addVary(res, 'Accept-Encoding')
+  const headers: OutgoingHttpHeaders = { 'Content-Type': 'application/json', 'Cache-Control': cacheControl }
   if (text.length > 1024 && /\bgzip\b/.test(String(req.headers['accept-encoding'] ?? ''))) {
     const data = await gzipAsync(text)
     res.writeHead(status, { ...headers, 'Content-Encoding': 'gzip', 'Content-Length': data.length })
