@@ -1,0 +1,10 @@
+# Generated or not ours to format
+dist/
+build/
+coverage/
+node_modules/
+server/data/
+package-lock.json
+
+# Prose: formatted by hand
+*.md
