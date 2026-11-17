@@ -1,0 +1,6 @@
+# Git hooks, installed with `lefthook install` (see CONTRIBUTING.md).
+pre-commit:
+  commands:
+    secrets:
+      # Blocks the commit if a staged change contains a secret.
+      run: gitleaks git --pre-commit --staged --redact --no-banner
