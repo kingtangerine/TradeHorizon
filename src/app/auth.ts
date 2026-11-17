@@ -133,6 +133,7 @@ export async function logOut(): Promise<void> {
   const session = readSession()
   localStorage.removeItem(SESSION_KEY)
   localStorage.removeItem(LEGACY_SESSION_KEY)
+  // The local sign-out above already happened; if the server cannot be reached, its session simply expires.
   if (session) await request('/api/auth/logout', { method: 'POST', token: session.token }).catch(() => undefined)
 }
 

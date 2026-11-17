@@ -428,6 +428,7 @@ async function handleApi(req, res, path) {
 }
 
 function databaseStatus() {
+  // The -wal file only exists while SQLite has unmerged writes, so a missing file means 0 bytes.
   const fileSize = (suffix) => { try { return statSync(databaseFile + suffix).size } catch { return 0 } }
   return {
     file: databaseFile,

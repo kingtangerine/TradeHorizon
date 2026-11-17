@@ -15,6 +15,12 @@ function report(message: string, source: string, stack?: string): void {
   }
 }
 
+/** Reports a failure the app recovered from but should not hide: logged in the console and sent to the server log. */
+export function reportProblem(message: string, source: string): void {
+  console.warn(`[${source}] ${message}`)
+  report(message, source)
+}
+
 export function installErrorReporting(): void {
   window.addEventListener('error', (event) => {
     report(event.message || 'Script error', `${event.filename}:${event.lineno}`, event.error instanceof Error ? event.error.stack : undefined)

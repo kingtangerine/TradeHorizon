@@ -17,6 +17,7 @@ export function applyTheme(theme: Theme): void {
   try { localStorage.setItem(DEVICE_KEY, theme) } catch { /* storage unavailable */ }
 }
 
+// Reading localStorage throws when storage is blocked; the dark default is then the right answer, not an error.
 export function initialTheme(): Theme {
   try { return parse(localStorage.getItem(DEVICE_KEY)) ?? 'dark' } catch { return 'dark' }
 }

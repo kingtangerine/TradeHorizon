@@ -227,6 +227,7 @@ export async function startUserSync(userId: string): Promise<void> {
   let queue: Promise<unknown> = Promise.resolve()
   const serial = <T>(task: () => Promise<T>): Promise<T> => {
     const run = queue.then(task, task)
+    // The caller gets the error through `run`; the queue itself must keep going after a failed request.
     queue = run.catch(() => undefined)
     return run
   }
