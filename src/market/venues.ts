@@ -100,7 +100,7 @@ export function groupRows(rows: readonly Row[], interval: MarketInterval): Row[]
 
 async function getJson(url: string, fetcher: MarketDataFetch, signal?: AbortSignal): Promise<unknown> {
   const response = await fetcher(url, { method: 'GET', headers: { Accept: 'application/json' }, signal })
-  if (!response.ok) throw new MarketDataHttpError(response.status, response.statusText)
+  if (!response.ok) throw new MarketDataHttpError(response.status, response.statusText, url)
   return response.json()
 }
 

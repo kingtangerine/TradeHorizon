@@ -90,7 +90,7 @@ export async function fetchBinanceSpotListings(
 
   const response = await fetcher(url, { method: 'GET', headers: { Accept: 'application/json' }, signal })
   if (!response.ok) {
-    throw new MarketDataHttpError(response.status, response.statusText)
+    throw new MarketDataHttpError(response.status, response.statusText, url)
   }
 
   return parseBinanceExchangeInfo(await response.json())

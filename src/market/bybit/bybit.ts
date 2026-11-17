@@ -117,7 +117,7 @@ async function fetchNativePage(
   if (range.startTimeMs !== undefined) url.searchParams.set('start', String(range.startTimeMs))
   if (range.endTimeMs !== undefined) url.searchParams.set('end', String(range.endTimeMs))
   const response = await fetcher(url, { method: 'GET', headers: { Accept: 'application/json' }, signal })
-  if (!response.ok) throw new MarketDataHttpError(response.status, response.statusText)
+  if (!response.ok) throw new MarketDataHttpError(response.status, response.statusText, url)
   const payload = (await response.json()) as { retCode?: number; retMsg?: string }
   if (payload.retCode !== 0) throw new MarketDataConnectionError(`Bybit: ${payload.retMsg ?? 'request failed'}`)
   return parseBybitRestKlines(payload, symbol, interval)
@@ -199,7 +199,7 @@ export async function fetchBybitSpotListings(
   url.searchParams.set('category', 'spot')
   url.searchParams.set('limit', '1000')
   const response = await fetcher(url, { method: 'GET', headers: { Accept: 'application/json' }, signal })
-  if (!response.ok) throw new MarketDataHttpError(response.status, response.statusText)
+  if (!response.ok) throw new MarketDataHttpError(response.status, response.statusText, url)
   return parseBybitInstruments(await response.json())
 }
 
