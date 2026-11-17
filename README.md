@@ -120,3 +120,7 @@ Links are stored in `server/data/telegram.json` (back it up with the rest of the
 ## Documentation
 
 - [`CHANGELOG.md`](./CHANGELOG.md): Version history, stable releases, and change log.
+- [`CONTRIBUTING.md`](./CONTRIBUTING.md): Setup, branch, commit and pull request rules.
+- [`.env.example`](./.env.example): Every server setting with placeholder values.
+- [`THIRD_PARTY_NOTICES.md`](./THIRD_PARTY_NOTICES.md) and [`ASSETS.md`](./ASSETS.md): Dependencies and assets, with their licences.
+- [`LICENSE`](./LICENSE): Proprietary licence.
