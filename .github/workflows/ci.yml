@@ -39,7 +39,7 @@ jobs:
 
       - name: Server starts and answers its health check
         run: |
-          TH_DATA_DIR="$RUNNER_TEMP/th-data" PORT=8787 node server/index.mjs &
+          TH_DATA_DIR="$RUNNER_TEMP/th-data" PORT=8787 node build/server/index.js &
           for i in $(seq 1 20); do
             curl -fsS http://127.0.0.1:8787/healthz && exit 0
             sleep 1

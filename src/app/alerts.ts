@@ -1,7 +1,7 @@
-import { conditionMet, isValidAlert, type AlertCondition, type AlertLineAnchors } from '../../server/alertRules.mjs'
+import { conditionMet, isValidAlert, type AlertCondition, type AlertLineAnchors } from '../../server/alertRules.ts'
 
 export type AlertDirection = 'above' | 'below'
-export type { AlertCondition } from '../../server/alertRules.mjs'
+export type { AlertCondition } from '../../server/alertRules.ts'
 
 /** Conditions, trend lines, repeat, expiry and message are optional: older alerts are "crossing" a level, once. */
 export interface PriceAlert {

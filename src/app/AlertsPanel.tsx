@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { groupAlerts, isTriggered, type AlertCondition, type AlertDirection, type AlertFilter, type AlertOptions, type PriceAlert } from './alerts'
-import { MAX_MESSAGE_LENGTH, MOVE_WINDOWS_MS, describeAlert, isExpired } from '../../server/alertRules.mjs'
+import { MAX_MESSAGE_LENGTH, MOVE_WINDOWS_MS, describeAlert, isExpired } from '../../server/alertRules.ts'
 import { BellIcon, ChevronIcon, CloseIcon, EyeIcon, EyeOffIcon, PauseIcon, PlayIcon, SearchIcon, TrashIcon } from './Icons'
 import type { CryptoMarket } from '../chart/markets'
 

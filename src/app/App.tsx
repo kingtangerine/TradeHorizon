@@ -21,7 +21,7 @@ import {
 } from '../drawings'
 import { MARKET_INTERVALS, MARKET_INTERVAL_SPECS, type MarketInterval } from '../market'
 import { isTriggered, loadAlerts, moveAlert, saveAlerts, type AlertOptions, type PriceAlert } from './alerts'
-import { evaluateAlert, targetAt, type AlertState } from '../../server/alertRules.mjs'
+import { evaluateAlert, targetAt, type AlertState } from '../../server/alertRules.ts'
 import { AlertsPanel } from './AlertsPanel'
 import { TimeZoneMenu } from './TimeZoneMenu'
 import { INTERVAL_INPUT_CHARS, isChartTypingKey, parseIntervalInput } from './hotkeys'
@@ -1081,7 +1081,7 @@ function WorkspaceApp({ user, onLogout, onUserRefresh }: WorkspaceAppProps) {
     if (price === undefined) return
     previousPriceRef.current = price
 
-    // Same rules as the server (alertRules.mjs). "Moving N%" needs a price history, so only the server checks it.
+    // Same rules as the server (alertRules.ts). "Moving N%" needs a price history, so only the server checks it.
     const now = Date.now()
     const triggered = alerts.filter((alert) => {
       if (!alert.enabled || alert.triggeredAtMs || alert.symbol !== market.symbol || alert.condition === 'movePercent') return false

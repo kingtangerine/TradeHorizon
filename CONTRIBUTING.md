@@ -4,7 +4,7 @@ This repository is private and proprietary (see [LICENSE](./LICENSE)). These rul
 
 ## One-time setup
 
-1. Install Node.js 22.13 or newer, then `npm ci`.
+1. Install Node.js 22.18 or newer, then `npm ci`. Node runs the TypeScript server and scripts directly (`npm run dev`).
 2. Install [gitleaks](https://github.com/gitleaks/gitleaks) and [Lefthook](https://github.com/evilmartians/lefthook)
    (Windows: `winget install Gitleaks.Gitleaks evilmartians.lefthook`; macOS: `brew install gitleaks lefthook`).
 3. Run `lefthook install` in the repository. Every commit is then scanned for secrets first (see `lefthook.yml`).

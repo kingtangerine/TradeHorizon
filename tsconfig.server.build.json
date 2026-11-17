@@ -1,0 +1,13 @@
+{
+  // Compiles the server and scripts to plain JavaScript in build/ for production (`npm start`).
+  "extends": "./tsconfig.server.json",
+  "compilerOptions": {
+    "noEmit": false,
+    "allowImportingTsExtensions": false,
+    "incremental": false,
+    "tsBuildInfoFile": null,
+    "rootDir": ".",
+    "outDir": "build"
+  },
+  "exclude": ["**/*.test.ts"]
+}
