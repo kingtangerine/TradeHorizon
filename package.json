@@ -27,8 +27,7 @@
   "dependencies": {
     "klinecharts": "10.0.3",
     "react": "^19.2.0",
-    "react-dom": "^19.2.0",
-    "web-push": "^3.6.7"
+    "react-dom": "^19.2.0"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
@@ -39,6 +38,7 @@
     "eslint": "^10.12.0",
     "eslint-plugin-react-hooks": "^7.1.1",
     "globals": "^17.13.0",
+    "http_ece": "1.2.0",
     "prettier": "3.10.1",
     "typescript": "^5.9.3",
     "typescript-eslint": "^8.71.1",

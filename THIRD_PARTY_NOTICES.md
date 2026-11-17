@@ -12,9 +12,8 @@ Allowed licences: MIT, BSD, Apache-2.0, ISC and zlib (see CONTRIBUTING.md).
 | klinecharts | 10.0.3 | Apache-2.0 | KLineChart contributors | https://github.com/klinecharts/KLineChart |
 | react | 19.3.0 | MIT | Meta Platforms, Inc. and affiliates | https://github.com/facebook/react |
 | react-dom | 19.3.0 | MIT | Meta Platforms, Inc. and affiliates | https://github.com/facebook/react |
-| web-push | 3.6.7 | MPL-2.0 ⚠️ | Marco Castelluccio | https://github.com/web-push-libs/web-push |
 
-⚠️ `web-push` is not under an allowed licence and is being replaced with our own implementation (issue #6).
+Browser push notifications are sent with our own implementation (`server/webPush.ts`, built on `node:crypto`).
 
 ## Development dependencies (build, lint and test only; not shipped)
 
@@ -26,8 +25,10 @@ Allowed licences: MIT, BSD, Apache-2.0, ISC and zlib (see CONTRIBUTING.md).
 | @types/react-dom | 19.3.0 | MIT | Microsoft Corporation | https://github.com/DefinitelyTyped/DefinitelyTyped |
 | @vitejs/plugin-react | 5.2.0 | MIT | Yuxi (Evan) You and Vite contributors | https://github.com/vitejs/vite-plugin-react |
 | eslint | 10.12.0 | MIT | OpenJS Foundation and other contributors | https://github.com/eslint/eslint |
+| prettier | 3.10.1 | MIT | James Long and contributors | https://github.com/prettier/prettier |
 | eslint-plugin-react-hooks | 7.1.1 | MIT | Meta Platforms, Inc. and affiliates | https://github.com/facebook/react |
 | globals | 17.13.0 | MIT | Sindre Sorhus | https://github.com/sindresorhus/globals |
+| http_ece | 1.2.0 | MIT | Martin Thomson | https://github.com/martinthomson/encrypted-content-encoding |
 | typescript | 5.9.3 | Apache-2.0 | Microsoft Corporation | https://github.com/microsoft/TypeScript |
 | typescript-eslint | 8.71.1 | MIT | typescript-eslint and other contributors | https://github.com/typescript-eslint/typescript-eslint |
 | vite | 7.3.6 | MIT | VoidZero Inc. and Vite contributors | https://github.com/vitejs/vite |
