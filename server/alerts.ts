@@ -7,7 +7,7 @@
 // user is notified (web push and Telegram).
 import { existsSync, readFileSync, renameSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
-import webpush from 'web-push'
+import { createWebPushSender, generateVapidKeys } from './webPush.ts'
 import { createSendQueue } from './sendQueue.ts'
 import type { SendQueueStatus, SendResult, ServiceLog } from './sendQueue.ts'
 import { alertMessage, conditionMet, conditionOf, evaluateAlert, isExpired, isValidAlert } from './alertRules.ts'
@@ -130,13 +130,13 @@ interface VapidKeys {
   readonly privateKey: string
 }
 
-/** What createPushService needs from the web-push package (tests pass a stand-in). */
+/** What createPushService needs to deliver notifications (webPush.ts; tests pass a stand-in). */
 export interface PushSender {
   setVapidDetails(subject: string, publicKey: string, privateKey: string): void
   sendNotification(subscription: WebPushSubscription, payload: string, options: { TTL: number }): Promise<unknown>
 }
 
-/** What a failed web-push send may carry; the queue reads `permanent` and `retryAfterMs` (see sendQueue.ts). */
+/** What a failed push send may carry; the queue reads `permanent` and `retryAfterMs` (see sendQueue.ts). */
 interface PushFailure {
   message?: string
   statusCode?: number
@@ -561,7 +561,7 @@ export function createAlertService({
 }
 
 /** Web-push: VAPID keys, each user's browser subscriptions, and delivery. */
-export function createPushService({ dataDir, subject, log = console, sender = webpush }: PushServiceOptions): PushService {
+export function createPushService({ dataDir, subject, log = console, sender = createWebPushSender() }: PushServiceOptions): PushService {
   const queue = createSendQueue({ name: 'push', perSecond: 50, log })
   const vapidFile = join(dataDir, 'vapid.json')
   const subsFile = join(dataDir, 'push.json')
@@ -576,7 +576,7 @@ export function createPushService({ dataDir, subject, log = console, sender = we
     }
   }
   if (!vapid?.publicKey || !vapid?.privateKey) {
-    vapid = webpush.generateVAPIDKeys()
+    vapid = generateVapidKeys()
     writeFileSync(vapidFile, JSON.stringify(vapid))
     log.log?.('[push] generated new VAPID keys (keep server/data/vapid.json in your backups)')
   }
@@ -656,7 +656,7 @@ export function createPushService({ dataDir, subject, log = console, sender = we
             try {
               await sender.sendNotification({ endpoint: subscription.endpoint, keys: subscription.keys }, body, { TTL: 3600 })
             } catch (caught) {
-              // web-push rejects with a WebPushError (statusCode, headers); anything else is reported the same way.
+              // The sender rejects with a WebPushError (statusCode, headers); anything else is reported the same way.
               const error = caught as PushFailure
               const status = error?.statusCode
               if (status === 404 || status === 410) {

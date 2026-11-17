@@ -171,12 +171,10 @@ describe('push subscriptions', () => {
     for (const dir of dirs.splice(0)) rmSync(dir, { recursive: true, force: true })
   })
 
-  // generateVAPIDKeys is ignored by the service (it always uses web-push's own); the tests pass it anyway.
   function push(
-    sender: PushSender & { readonly generateVAPIDKeys?: unknown } = {
+    sender: PushSender = {
       setVapidDetails: vi.fn(),
       sendNotification: vi.fn(async () => {}),
-      generateVAPIDKeys: undefined,
     },
   ) {
     const dir = mkdtempSync(join(tmpdir(), 'th-push-'))
@@ -193,7 +191,6 @@ describe('push subscriptions', () => {
     const { service } = push({
       setVapidDetails() {},
       sendNotification: async () => {},
-      generateVAPIDKeys: () => ({ publicKey: 'pub', privateKey: 'priv' }),
     })
     expect(service.subscribe('u1', sub('https://fcm.googleapis.com/fcm/send/abc'))).toBeUndefined()
     expect(service.subscribe('u1', sub('https://updates.push.services.mozilla.com/wpush/v2/x'))).toBeUndefined()
@@ -210,7 +207,6 @@ describe('push subscriptions', () => {
     const { service } = push({
       setVapidDetails() {},
       sendNotification,
-      generateVAPIDKeys: () => ({ publicKey: 'pub', privateKey: 'priv' }),
     })
     service.subscribe('u1', sub('https://fcm.googleapis.com/fcm/send/one'))
     service.subscribe('u1', sub('https://fcm.googleapis.com/fcm/send/one'))
