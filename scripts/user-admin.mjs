@@ -1,6 +1,6 @@
 // Account tools for the server, for when nobody can sign in to the admin page (e.g. the admin forgot their password).
 //   npm run user:list                         every account: email, name, joined, last active, admin or not
-//   npm run user:password -- someone@x.com    set a new temporary password (printed once) and sign them out everywhere
+//   npm run user:password -- someone@example.com    set a new temporary password (printed once) and sign them out everywhere
 // Run in the app folder on the server (Plesk: "Run Node.js commands", or SSH). Uses the same database and .env as the app.
 import { existsSync } from 'node:fs'
 import { dirname, join, resolve } from 'node:path'

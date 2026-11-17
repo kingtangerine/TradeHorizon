@@ -3,7 +3,7 @@
 import { existsSync, readdirSync, statSync, statfsSync } from 'node:fs'
 import { join } from 'node:path'
 
-/** TH_ADMIN_EMAILS="a@x.com, b@y.com" -> Set of lower-case emails. */
+/** TH_ADMIN_EMAILS="a@example.com, b@example.org" -> Set of lower-case emails. */
 export function adminEmails(value) {
   return new Set(String(value ?? '').split(',').map((email) => email.trim().toLowerCase()).filter(Boolean))
 }

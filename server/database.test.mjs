@@ -27,10 +27,10 @@ const account = (id, email, extra = {}) => ({ id, email, displayName: id, passwo
 describe('database: accounts and sessions', () => {
   it('creates, finds and counts accounts; emails are unique', () => {
     const { store } = fresh()
-    store.users.create(account('u1', 'a@x.com'))
-    expect(store.users.byEmail('a@x.com')).toMatchObject({ id: 'u1', displayName: 'u1', passwordHash: 'salt:hash', createdAtMs: 1000 })
+    store.users.create(account('u1', 'a@example.com'))
+    expect(store.users.byEmail('a@example.com')).toMatchObject({ id: 'u1', displayName: 'u1', passwordHash: 'salt:hash', createdAtMs: 1000 })
     expect(store.users.get('nope')).toBeUndefined()
-    expect(() => store.users.create(account('u2', 'a@x.com'))).toThrow()
+    expect(() => store.users.create(account('u2', 'a@example.com'))).toThrow()
     store.users.setLastLogin('u1', 5000)
     store.users.setPassword('u1', 'new:hash')
     expect(store.users.get('u1')).toMatchObject({ lastLoginAtMs: 5000, passwordHash: 'new:hash' })
@@ -39,7 +39,7 @@ describe('database: accounts and sessions', () => {
 
   it('finds the user of a live session only, and signs out', () => {
     const { store } = fresh()
-    store.users.create(account('u1', 'a@x.com'))
+    store.users.create(account('u1', 'a@example.com'))
     store.sessions.create('t1', 'u1', 10_000, 0)
     store.sessions.create('t2', 'u1', 10_000, 0)
     expect(store.sessions.user('t1', 5000)?.id).toBe('u1')
@@ -53,7 +53,7 @@ describe('database: accounts and sessions', () => {
 
   it('deleting an account removes its sessions and data', () => {
     const { store } = fresh()
-    store.users.create(account('u1', 'a@x.com'))
+    store.users.create(account('u1', 'a@example.com'))
     store.sessions.create('t1', 'u1', 10_000, 0)
     store.data.write('u1', 'layouts:v1', '[]', 0)
     store.users.remove('u1')
@@ -65,7 +65,7 @@ describe('database: accounts and sessions', () => {
 describe('database: synced data', () => {
   it('follows the same revision rules as before (ok, conflict, outdated, unchanged)', () => {
     const { store } = fresh()
-    store.users.create(account('u1', 'a@x.com'))
+    store.users.create(account('u1', 'a@example.com'))
     const first = store.data.write('u1', 'layouts:v1', 'A', 0, 10, { id: 'pc-1234', name: 'PC' })
     expect(first).toMatchObject({ status: 'ok', item: { value: 'A', rev: 1, updatedAtMs: 10, by: 'pc-1234', byName: 'PC' } })
     expect(store.data.write('u1', 'theme:v1', 'dark', 0).item.rev).toBe(2)
@@ -78,8 +78,8 @@ describe('database: synced data', () => {
 
   it('lists changes since a revision, the latest revision, sizes and server writes', () => {
     const { store } = fresh()
-    store.users.create(account('u1', 'a@x.com'))
-    store.users.create(account('u2', 'b@x.com'))
+    store.users.create(account('u1', 'a@example.com'))
+    store.users.create(account('u2', 'b@example.com'))
     store.data.write('u1', 'a', '1', 0)
     store.data.write('u1', 'b', 'ü', 0)
     store.data.store('u1', 'alerts:v1', '[]', 99)
@@ -103,7 +103,7 @@ describe('moving the old JSON files into the database', () => {
   it('imports accounts, live sessions and every item, keeps revisions, and keeps the old files renamed', () => {
     const { dir, store } = fresh()
     legacyFiles(dir, {
-      users: [account('u1', 'A@X.com', { lastLoginAtMs: 7 }), account('u2', 'b@x.com')],
+      users: [account('u1', 'A@Example.com', { lastLoginAtMs: 7 }), account('u2', 'b@example.com')],
       sessions: [{ tokenHash: 'live', userId: 'u1', expiresAtMs: 9e15 }, { tokenHash: 'old', userId: 'u1', expiresAtMs: 1 }],
       data: {
         u1: { 'layouts:v1': { value: '[{"id":"l"}]', updatedAtMs: 5, rev: 4, by: 'pc-1234', byName: 'PC' }, 'theme:v1': { value: 'dark', updatedAtMs: 6 } },
@@ -113,7 +113,7 @@ describe('moving the old JSON files into the database', () => {
     const result = importLegacyJson(store, dir, { now: 1000, log: quiet })
     expect(result).toMatchObject({ imported: true, users: 2, items: 2, sessions: 1 })
     expect(result.skipped).toEqual(['data without an account: orphan.json'])
-    expect(store.users.byEmail('a@x.com')).toMatchObject({ id: 'u1', lastLoginAtMs: 7 })
+    expect(store.users.byEmail('a@example.com')).toMatchObject({ id: 'u1', lastLoginAtMs: 7 })
     expect(store.sessions.user('live', 2000)?.id).toBe('u1')
     expect(store.data.get('u1', 'layouts:v1')).toMatchObject({ rev: 4, by: 'pc-1234', byName: 'PC' })
     expect(store.data.get('u1', 'theme:v1').rev).toBe(5) // item that had no revision gets the next one
@@ -127,7 +127,7 @@ describe('moving the old JSON files into the database', () => {
 
   it('keeps the first account when two share an email, and refuses to start on an unreadable users.json', () => {
     const one = fresh()
-    legacyFiles(one.dir, { users: [account('u1', 'a@x.com'), account('u2', 'A@x.com')] })
+    legacyFiles(one.dir, { users: [account('u1', 'a@example.com'), account('u2', 'A@example.com')] })
     expect(importLegacyJson(one.store, one.dir, { log: quiet })).toMatchObject({ imported: true, users: 1 })
 
     const two = fresh()
@@ -146,7 +146,7 @@ describe('moving the old JSON files into the database', () => {
 describe('backups', () => {
   it('copies the database, keeps the newest copies and only runs when due', () => {
     const { dir, store } = fresh()
-    store.users.create(account('u1', 'a@x.com'))
+    store.users.create(account('u1', 'a@example.com'))
     let time = Date.UTC(2026, 10, 1)
     const backups = createBackupService({ store, dir: join(dir, 'backups'), keep: 2, everyMs: 1000, log: quiet, now: () => time })
     for (let index = 0; index < 3; index += 1) { backups.run(); time += 2000 }
@@ -157,7 +157,7 @@ describe('backups', () => {
     // The copy is a working database with the account in it.
     const copy = openDatabase(join(dir, 'backups', status.newest.name))
     stores.push(copy)
-    expect(copy.users.byEmail('a@x.com')?.id).toBe('u1')
+    expect(copy.users.byEmail('a@example.com')?.id).toBe('u1')
 
     const before = backups.status().lastBackupAtMs
     backups.runIfDue() // last one was 2000 ms ago, every 1000 ms: due
@@ -177,13 +177,13 @@ describe('schema upgrades', () => {
     const old = new DatabaseSync(file)
     old.exec(MIGRATIONS[1])
     old.exec('PRAGMA user_version = 1')
-    old.prepare('INSERT INTO users (id, email, display_name, password_hash, created_at) VALUES (?, ?, ?, ?, ?)').run('u1', 'a@x.com', 'Ann', 'salt:hash', 5)
+    old.prepare('INSERT INTO users (id, email, display_name, password_hash, created_at) VALUES (?, ?, ?, ?, ?)').run('u1', 'a@example.com', 'Ann', 'salt:hash', 5)
     old.prepare('INSERT INTO user_data (user_id, key, value, updated_at, rev) VALUES (?, ?, ?, ?, ?)').run('u1', 'layouts:v1', '[]', 6, 1)
     old.close()
 
     const store = openDatabase(file)
     stores.push(store)
-    expect(store.users.get('u1')).toMatchObject({ email: 'a@x.com', passwordTemporary: false })
+    expect(store.users.get('u1')).toMatchObject({ email: 'a@example.com', passwordTemporary: false })
     expect(store.data.get('u1', 'layouts:v1')).toMatchObject({ value: '[]', rev: 1 })
     store.users.setPassword('u1', 'temp:hash', true)
     expect(store.users.get('u1')).toMatchObject({ passwordHash: 'temp:hash', passwordTemporary: true })
