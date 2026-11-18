@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!-- What the app's FileProvider may hand to other apps: only the "shared" folder in the app's private cache, where
+     FileSharePlugin writes the chart image or backup that the person chose to share. -->
 <paths xmlns:android="http://schemas.android.com/apk/res/android">
-    <external-path name="my_images" path="." />
-    <cache-path name="my_cache_images" path="." />
+    <cache-path name="shared" path="shared/" />
 </paths>

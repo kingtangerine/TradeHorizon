@@ -8,6 +8,7 @@ class MainActivity : BridgeActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         // Our own plugins must be registered before Capacitor starts the WebView.
         registerPlugin(WindowBackgroundPlugin::class.java)
+        registerPlugin(FileSharePlugin::class.java)
         super.onCreate(savedInstanceState)
     }
 }

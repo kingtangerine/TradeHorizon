@@ -3,7 +3,8 @@ import type { KLineChartController } from '../../chart/KLineChartController'
 import type { CryptoMarket } from '../../chart/markets'
 import { formatCrosshairTime } from '../../chart/timeAxis'
 import { MARKET_INTERVAL_SPECS, type MarketInterval } from '../../market'
-import { composeSnapshot, copyImage, downloadBlob, snapshotFileName, snapshotValues } from '../snapshot'
+import { saveFile } from '../../platform/files'
+import { composeSnapshot, copyImage, snapshotFileName, snapshotValues } from '../snapshot'
 import type { Theme } from '../theme'
 import { offsetLabel } from '../timeZones'
 
@@ -57,13 +58,15 @@ export function useChartSnapshot({
             ),
         )
       } else {
-        image.then(
-          (blob) => {
-            downloadBlob(blob, fileName)
-            showToast('Chart image saved')
-          },
-          () => showToast('Could not create the image'),
-        )
+        // In a browser this downloads the image; in the Android app it opens the share sheet, which needs no toast.
+        image
+          .then((blob) => saveFile(blob, fileName, `${market.pair} chart`))
+          .then(
+            (result) => {
+              if (result === 'downloaded') showToast('Chart image saved')
+            },
+            () => showToast('Could not create the image'),
+          )
       }
     },
     [chartTimeZone, controller, interval, market, setSnapshotMenuOpen, showToast, theme],

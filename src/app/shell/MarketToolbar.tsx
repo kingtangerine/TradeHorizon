@@ -15,6 +15,7 @@ import { defaultSplitName, type ChartTab, type SavedLayout, type UserWorkspace }
 import type { SymbolSearchMode } from './useWorkspaceHotkeys'
 import type { ToolbarMenus } from './useToolbarMenus'
 import { connectionCopy, countActiveIndicators, DEFAULT_LAYOUT_NAME } from './workspaceHelpers'
+import { isNative } from '../../platform/native'
 
 interface MarketToolbarProps {
   workspace: UserWorkspace
@@ -514,12 +515,21 @@ export function MarketToolbar({
         </button>
         {snapshotMenuOpen && (
           <div className="top-menu layout-menu snapshot-menu" role="menu">
-            <button type="button" role="menuitem" onClick={() => takeSnapshot('download')}>
-              Download image <span>Ctrl+Alt+S</span>
-            </button>
-            <button type="button" role="menuitem" onClick={() => takeSnapshot('copy')}>
-              Copy image <span>Ctrl+Shift+S</span>
-            </button>
+            {isNative ? (
+              // The Android app shares the image (save to the phone, send to an app); a WebView cannot copy images.
+              <button type="button" role="menuitem" onClick={() => takeSnapshot('download')}>
+                Share image…
+              </button>
+            ) : (
+              <>
+                <button type="button" role="menuitem" onClick={() => takeSnapshot('download')}>
+                  Download image <span>Ctrl+Alt+S</span>
+                </button>
+                <button type="button" role="menuitem" onClick={() => takeSnapshot('copy')}>
+                  Copy image <span>Ctrl+Shift+S</span>
+                </button>
+              </>
+            )}
           </div>
         )}
       </div>

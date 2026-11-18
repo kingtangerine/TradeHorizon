@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom'
 import { changePassword, type AppUser } from './auth'
 import { backupFileName, buildBackup, parseBackup, restoreBackup, type BackupFile } from './dataTransfer'
 import { CloseIcon, UserIcon } from './Icons'
+import { saveFile } from '../platform/files'
 import { SyncPanel } from './SyncPanel'
 import type { Theme } from './theme'
 import { versionDetails } from '../version'
@@ -106,13 +107,20 @@ export function ProfileDialog({
 
   const exportData = () => {
     const backup = buildBackup(user.id, user)
-    const url = URL.createObjectURL(new Blob([JSON.stringify(backup)], { type: 'application/json' }))
-    const link = document.createElement('a')
-    link.href = url
-    link.download = backupFileName()
-    link.click()
-    setTimeout(() => URL.revokeObjectURL(url), 1000)
-    setDataMessage({ ok: true, text: `Exported ${Object.keys(backup.items).length} items.` })
+    const file = new Blob([JSON.stringify(backup)], { type: 'application/json' })
+    // A download in a browser; the share sheet in the Android app (save to the phone, send to another app).
+    saveFile(file, backupFileName(), 'TradeHorizon backup').then(
+      (result) => {
+        const count = Object.keys(backup.items).length
+        // The share sheet does not report what the person picked, so the app only says the backup is ready.
+        setDataMessage({
+          ok: true,
+          text: result === 'shared' ? `Backup of ${count} items ready to save or send.` : `Exported ${count} items.`,
+        })
+      },
+      (error: unknown) =>
+        setDataMessage({ ok: false, text: `Could not export: ${error instanceof Error ? error.message : 'the file could not be saved'}.` }),
+    )
   }
 
   const chooseFile = async (file: File | undefined) => {

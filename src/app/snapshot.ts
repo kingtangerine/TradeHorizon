@@ -126,18 +126,6 @@ export async function composeSnapshot(input: SnapshotInput): Promise<Blob> {
   })
 }
 
-/** Saves a blob to the user's downloads under the given file name via a temporary link. */
-export function downloadBlob(blob: Blob, fileName: string): void {
-  const url = URL.createObjectURL(blob)
-  const link = document.createElement('a')
-  link.href = url
-  link.download = fileName
-  document.body.append(link)
-  link.click()
-  link.remove()
-  globalThis.setTimeout(() => URL.revokeObjectURL(url), 10_000)
-}
-
 /** Copies the image. The blob is passed as a promise so Safari still sees the click that asked for it. */
 export async function copyImage(blob: Promise<Blob>): Promise<void> {
   if (typeof ClipboardItem === 'undefined' || !navigator.clipboard?.write) throw new Error('This browser cannot copy images')
