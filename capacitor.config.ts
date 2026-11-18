@@ -22,7 +22,7 @@ const config: CapacitorConfig = {
   },
   plugins: {
     SystemBars: {
-      // Light clock and icons on the dark bars (android/app/src/main/res/values/styles.xml), whatever the phone's own mode.
+      // The style at launch, before the page loads; after that the bars follow the app's theme (src/platform/systemBars.ts).
       style: 'DARK',
     },
     SplashScreen: {

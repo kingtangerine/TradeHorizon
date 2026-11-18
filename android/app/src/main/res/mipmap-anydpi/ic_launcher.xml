@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Android 7 (before adaptive icons): the whole icon as one drawing, the same as public/favicon.svg. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="48dp"
+    android:height="48dp"
+    android:viewportWidth="64"
+    android:viewportHeight="64">
+    <path
+        android:fillColor="#0B1017"
+        android:pathData="M14,0 L50,0 A14,14 0 0 1 64,14 L64,50 A14,14 0 0 1 50,64 L14,64 A14,14 0 0 1 0,50 L0,14 A14,14 0 0 1 14,0 Z" />
+    <path
+        android:pathData="M13,43 L24,31 L32,38 L50,18"
+        android:strokeColor="#36D399"
+        android:strokeWidth="6"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round" />
+    <path
+        android:pathData="M42,18 L50,18 L50,26"
+        android:strokeColor="#F4B860"
+        android:strokeWidth="5"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round" />
+</vector>

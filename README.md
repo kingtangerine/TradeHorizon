@@ -145,7 +145,11 @@ npm run android:sync -- --dev
 - The app's version is the one in `package.json`.
 - `android/capacitor.settings.gradle` and `android/app/capacitor.build.gradle` are written by the sync step and are
   not in git, so run `npm run android:sync` once before opening `android/` in Android Studio.
-- Not in the app yet: push alerts, the TradeHorizon icon and splash screen, and release signing.
+- The launcher icon and splash screen are vector drawings of the TradeHorizon mark, and the status and navigation
+  bars follow the app's dark or light theme.
+- If a build cannot find a resource right after resource files were moved or renamed, run `gradlew clean` in
+  `android/` once.
+- Not in the app yet: push alerts and release signing.
 
 ## Documentation
 

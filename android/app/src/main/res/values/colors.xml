@@ -2,4 +2,6 @@
 <resources>
     <!-- The web app's dark background (the same colour as in src/styles.css), shown behind the system bars and while loading. -->
     <color name="appBackground">#080B10</color>
+    <!-- The tile behind the mark in the launcher icon (the same as public/favicon.svg). -->
+    <color name="iconBackground">#0B1017</color>
 </resources>
