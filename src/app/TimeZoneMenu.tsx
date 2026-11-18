@@ -1,9 +1,11 @@
 import { useEffect, useRef, useState } from 'react'
 import { AUTO_TIME_ZONE, TIME_ZONES, browserTimeZone, resolveTimeZone, timeZoneLabel } from './timeZones'
+import { useBackHandler } from '../platform/backStack'
 
 /** Status-bar time zone button with TradingView's list (bottom right in TradingView). */
 export function TimeZoneMenu({ value, onChange }: { value: string; onChange(zone: string): void }) {
   const [open, setOpen] = useState(false)
+  useBackHandler(open, () => setOpen(false))
   const rootRef = useRef<HTMLSpanElement>(null)
   const listRef = useRef<HTMLDivElement>(null)
   const current = resolveTimeZone(value)

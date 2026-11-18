@@ -3,6 +3,7 @@ import type { KLineChartController, ScaleMode } from '../chart/KLineChartControl
 import { DATE_RANGES, rangeStart, zonedInputToTime } from '../chart/dateRanges'
 import { localTime } from '../chart/timeAxis'
 import type { MarketInterval } from '../market'
+import { useBackHandler } from '../platform/backStack'
 
 // TradingView's bar under the chart: date ranges and Go to date on the left, scale toggles and fullscreen on the right.
 
@@ -57,6 +58,7 @@ function GoToDate({
   interval: MarketInterval
 }) {
   const [open, setOpen] = useState(false)
+  useBackHandler(open, () => setOpen(false))
   const [value, setValue] = useState('')
   const [error, setError] = useState('')
   const ref = useRef<HTMLDivElement>(null)

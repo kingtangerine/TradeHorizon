@@ -12,6 +12,7 @@ import { MAX_STUDIES, newStudy, type Study, type StudyType } from '../../chart/s
 import type { Preferences } from '../preferences'
 import { loadScripts, type UserScript } from '../scripts'
 import type { UserWorkspace } from '../workspace'
+import { useBackHandler } from '../../platform/backStack'
 
 /**
  * Indicators on the chart: the built-in ones, studies, compared symbols and the user's own scripts ("My scripts"),
@@ -74,6 +75,12 @@ export function useIndicatorActions(
   const [scripts, setScripts] = useState<UserScript[]>(() => loadScripts(userId))
   const [scriptEditor, setScriptEditor] = useState<{ script?: UserScript }>()
   const [scriptSettingsId, setScriptSettingsId] = useState<string>()
+
+  // Android Back closes the indicator windows, the one opened last first (see platform/backStack.ts).
+  useBackHandler(indicatorsOpen, () => setIndicatorsOpen(false))
+  useBackHandler(studySettingsId !== undefined, () => setStudySettingsId(undefined))
+  useBackHandler(scriptEditor !== undefined, () => setScriptEditor(undefined))
+  useBackHandler(scriptSettingsId !== undefined, () => setScriptSettingsId(undefined))
   const addScriptInstance = useCallback(
     (script: UserScript) => {
       updateIndicators((current) =>

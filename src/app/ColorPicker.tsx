@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
+import { useBackHandler } from '../platform/backStack'
 
 // TradingView-style palette: a grey row, then ten hues from light to dark.
 const GREYS = ['#ffffff', '#dbdbdb', '#b2b5be', '#9598a1', '#787b86', '#5d606b', '#434651', '#2a2e39', '#1e222d', '#000000']
@@ -28,6 +29,7 @@ interface ColorPickerProps {
 /** A colour swatch button that opens the palette popover, with an optional "No color" choice. */
 export function ColorPicker({ value, label, onChange, onNone, none = false }: ColorPickerProps) {
   const [open, setOpen] = useState(false)
+  useBackHandler(open, () => setOpen(false))
   const [position, setPosition] = useState({ top: 0, left: 0 })
   const buttonRef = useRef<HTMLButtonElement>(null)
   const popoverRef = useRef<HTMLDivElement>(null)
