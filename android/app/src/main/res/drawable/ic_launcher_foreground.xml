@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The TradeHorizon mark (public/favicon.svg) for adaptive icons and the splash screen.
+     The 108dp canvas keeps the mark inside the centre 66dp, which launchers never crop. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <!-- The paths use the favicon's 64-unit coordinates, scaled and centred here. -->
+    <group
+        android:scaleX="1.3"
+        android:scaleY="1.3"
+        android:translateX="13.05"
+        android:translateY="14.35">
+        <path
+            android:pathData="M13,43 L24,31 L32,38 L50,18"
+            android:strokeColor="#36D399"
+            android:strokeWidth="6"
+            android:strokeLineCap="round"
+            android:strokeLineJoin="round" />
+        <path
+            android:pathData="M42,18 L50,18 L50,26"
+            android:strokeColor="#F4B860"
+            android:strokeWidth="5"
+            android:strokeLineCap="round"
+            android:strokeLineJoin="round" />
+    </group>
+</vector>
