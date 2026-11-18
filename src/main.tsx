@@ -3,13 +3,15 @@ import { createRoot } from 'react-dom/client'
 import { App } from './app/App'
 import { installErrorReporting, reportProblem } from './app/errorReport'
 import { applyTheme, initialTheme } from './app/theme'
+import { isNative } from './platform/native'
 import './styles.css'
 
 applyTheme(initialTheme())
 installErrorReporting()
 
 // The service worker delivers price alerts while the app is closed and lets the app be installed.
-if ('serviceWorker' in navigator) {
+// The Android app has no use for it: its pages are bundled, and its alerts arrive through native push.
+if (!isNative && 'serviceWorker' in navigator) {
   window.addEventListener('load', () => {
     // Without the worker, background alerts and installing the app stop working, so the failure is reported.
     navigator.serviceWorker.register('/sw.js').catch((error: unknown) => {
