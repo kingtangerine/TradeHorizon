@@ -8,15 +8,17 @@ import { RectangleTemplates } from '../RectangleTemplates'
 import { rectangleStyleOf, type TemplateState } from '../templates'
 import { CommittedTextInput } from './CommittedTextInput'
 import { TOOL_ICONS } from './toolIcons'
+import { isTouchDevice, touchHint } from '../../platform/input'
 import { colorInputValue, isPositionTool, styleNumber } from './workspaceHelpers'
 
-/** Hint over the chart while a drawing tool is active: how to place it, and Esc to cancel. */
+/** Hint over the chart while a drawing tool is active: how to place it (worded for touch on a phone), and Esc to cancel. */
 export function DrawingHint({ tool }: { tool: DrawingType }) {
   const Icon = TOOL_ICONS[tool]
+  const hint = DRAWING_TOOLS[tool].hint
   return (
     <div className="drawing-hint" role="status">
       <Icon />
-      {DRAWING_TOOLS[tool].hint}
+      {isTouchDevice() ? touchHint(hint) : hint}
       <kbd>Esc</kbd>
     </div>
   )
@@ -97,6 +99,8 @@ interface SelectedDrawingToolbarProps {
   drawingStore: DrawingStore
   positionSettingsOpen: boolean
   setPositionSettingsOpen: Dispatch<SetStateAction<boolean>>
+  /** Opens the full settings window of the selected drawing (what a double-click does with a mouse). */
+  openSettings(): void
   toggleDca(): void
   updateSelectedStyle(changes: Record<string, string | number | boolean>): void
   templateState: TemplateState
@@ -110,6 +114,7 @@ export function SelectedDrawingToolbar({
   drawingStore,
   positionSettingsOpen,
   setPositionSettingsOpen,
+  openSettings,
   toggleDca,
   updateSelectedStyle,
   templateState,
@@ -143,7 +148,7 @@ export function SelectedDrawingToolbar({
             />
           </label>
           <select
-            className="toolbar-select thickness-select"
+            className="toolbar-select thickness-select line-thickness"
             aria-label="Line thickness"
             title="Line thickness"
             value={styleNumber(selectedDrawing.style.lineWidth, 1)}
@@ -242,7 +247,7 @@ export function SelectedDrawingToolbar({
             </label>
           )}
           <select
-            className="toolbar-select thickness-select"
+            className="toolbar-select thickness-select line-thickness"
             aria-label="Line thickness"
             title="Line thickness"
             value={styleNumber(selectedDrawing.style.lineWidth, 2)}
@@ -308,6 +313,11 @@ export function SelectedDrawingToolbar({
       )}
 
       <span className="toolbar-separator" />
+      {!isPositionTool(selectedDrawing.type) && (
+        <button type="button" className="toolbar-action" aria-label="Drawing settings" title="Settings…" onClick={openSettings}>
+          <SettingsIcon />
+        </button>
+      )}
       <button
         type="button"
         className="toolbar-action"

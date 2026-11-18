@@ -11,6 +11,7 @@ import {
 import { MAX_MESSAGE_LENGTH, MOVE_WINDOWS_MS, describeAlert, isExpired } from '../../server/alertRules.ts'
 import { BellIcon, ChevronIcon, CloseIcon, EyeIcon, EyeOffIcon, PauseIcon, PlayIcon, SearchIcon, TrashIcon } from './Icons'
 import type { CryptoMarket } from '../chart/markets'
+import { isTouchDevice } from '../platform/input'
 
 interface AlertsPanelProps {
   /** Alt+A: start the form at this price and put the cursor in it. */
@@ -279,7 +280,9 @@ export function AlertsPanel({
           </div>
         )}
         <small className="alert-note">
-          Tip: right-click the chart or use the + next to the price scale to place an alert, then drag its line to move it.
+          {isTouchDevice()
+            ? 'Tip: type a price and tap Add. The alert shows as a line on the chart.'
+            : 'Tip: right-click the chart or use the + next to the price scale to place an alert, then drag its line to move it.'}
           {market.kind === 'dominance' && ' Index alerts only fire while TradeHorizon is open.'}
         </small>
       </form>

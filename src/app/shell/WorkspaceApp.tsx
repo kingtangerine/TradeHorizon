@@ -525,6 +525,7 @@ export function WorkspaceApp({ user, onLogout, onUserRefresh }: WorkspaceAppProp
               drawingStore={drawingStore}
               positionSettingsOpen={positionSettingsOpen}
               setPositionSettingsOpen={setPositionSettingsOpen}
+              openSettings={() => setDrawingSettings({ id: selectedDrawing.id, tab: 'style' })}
               toggleDca={toggleDca}
               updateSelectedStyle={updateSelectedStyle}
               templateState={templateState}

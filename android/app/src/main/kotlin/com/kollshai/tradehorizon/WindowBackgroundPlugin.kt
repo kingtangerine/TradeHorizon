@@ -1,7 +1,7 @@
 package com.kollshai.tradehorizon
 
 import android.graphics.Color
-import android.graphics.drawable.ColorDrawable
+import androidx.core.view.ViewCompat
 import com.getcapacitor.Plugin
 import com.getcapacitor.PluginCall
 import com.getcapacitor.PluginMethod
@@ -27,8 +27,14 @@ class WindowBackgroundPlugin : Plugin() {
             return
         }
         activity.runOnUiThread {
-            activity.window.setBackgroundDrawable(ColorDrawable(color))
-            activity.window.decorView.setBackgroundColor(color)
+            val decorView = activity.window.decorView
+            // Only the colour of the existing background is changed. Replacing the window's background drawable
+            // (Window.setBackgroundDrawable) makes Android reset the decor view's padding, which is what Capacitor
+            // uses to keep the page between the system bars: the page then slides under them until the next inset
+            // pass, and stays there if that pass does not come.
+            decorView.setBackgroundColor(color)
+            // Safeguard: have the insets applied again, so the padding is right whatever touched it before.
+            ViewCompat.requestApplyInsets(decorView)
             call.resolve()
         }
     }
