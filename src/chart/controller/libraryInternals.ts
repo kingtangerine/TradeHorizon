@@ -5,7 +5,7 @@ import { DRAWING_GROUP_ID } from '../model'
 // directly (pinned version 10.0.3).
 
 interface ChartStoreInternals {
-  getPressedOverlayInfo?(): { overlay?: unknown }
+  getPressedOverlayInfo?(): { overlay?: { id?: string; groupId?: string } | null }
   getHoverOverlayInfo?(): { overlay?: { id?: string; groupId?: string } | null; figureType?: string }
   setClickOverlayInfo?(info: unknown, onSelected: () => void, onDeselected: () => void): void
 }
@@ -18,6 +18,15 @@ function chartStore(chart: Chart): ChartStoreInternals | undefined {
 export function drawingIsPressed(chart: Chart): boolean {
   const store = chartStore(chart)
   return !!store?.getPressedOverlayInfo?.().overlay
+}
+
+/**
+ * Id of the drawing that a finger (or the mouse button) is holding right now, if any. The library sets this on press
+ * and clears it on release; it does not set it for locked drawings, which cannot be dragged.
+ */
+export function pressedDrawingId(chart: Chart): string | undefined {
+  const overlay = chartStore(chart)?.getPressedOverlayInfo?.().overlay
+  return overlay?.groupId === DRAWING_GROUP_ID ? overlay.id : undefined
 }
 
 /** Id of the overlay under the pointer, if any. */
