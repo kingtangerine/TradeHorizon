@@ -14,6 +14,7 @@ import {
 } from '../market'
 import { DOMINANCE_LABELS, type DominanceKey } from './indicators'
 import { allMarkets } from './markets'
+import { apiUrl } from '../platform/api'
 
 const WEIGHTS_CACHE_KEY = 'trade-horizon:dominance-weights:v2'
 const WEIGHTS_TTL_MS = 30 * 60 * 1000
@@ -107,7 +108,7 @@ export function loadDominanceWeights(): Promise<DominanceWeights> {
       .filter((item) => item.kind === 'spot')
       .map((item) => item.symbol),
   )
-  inflightWeights = fetchDominanceWeights(symbols, { cachedBase: '/api/cg' })
+  inflightWeights = fetchDominanceWeights(symbols, { cachedBase: apiUrl('/api/cg') })
     .then((weights) => {
       try {
         localStorage.setItem(WEIGHTS_CACHE_KEY, JSON.stringify(weights))

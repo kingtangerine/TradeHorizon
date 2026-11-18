@@ -9,6 +9,7 @@ import {
   type MarketDataFetch,
 } from '../market'
 import type { ExchangeId } from '../market/sources'
+import { apiUrl } from '../platform/api'
 
 /** A symbol the chart can show: a crypto pair or an index, with display details and price/volume precision. */
 export interface CryptoMarket {
@@ -340,7 +341,7 @@ export function allMarkets(): CryptoMarket[] {
 
 async function fetchServerCatalog(fetcher: MarketDataFetch | undefined, signal?: AbortSignal): Promise<BinanceSpotListing[] | null> {
   try {
-    const response = await (fetcher ?? ((input, init) => globalThis.fetch(input, init)))('/api/markets', {
+    const response = await (fetcher ?? ((input, init) => globalThis.fetch(input, init)))(apiUrl('/api/markets'), {
       headers: { Accept: 'application/json' },
       signal,
     })

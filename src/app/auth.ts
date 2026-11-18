@@ -1,3 +1,5 @@
+import { apiUrl } from '../platform/api'
+
 /** The public profile of the signed-in account. */
 export interface AppUser {
   readonly id: string
@@ -51,7 +53,7 @@ class AuthRequestError extends Error {
 async function request<T>(path: string, init: { method?: string; body?: unknown; token?: string } = {}): Promise<T> {
   let response: Response
   try {
-    response = await fetch(path, {
+    response = await fetch(apiUrl(path), {
       method: init.method ?? 'GET',
       headers: {
         ...(init.body ? { 'Content-Type': 'application/json' } : {}),

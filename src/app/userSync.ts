@@ -1,5 +1,6 @@
 import { getSessionToken } from './auth'
 import { baseOfRaw, mergeRaw, type Base } from './syncMerge'
+import { apiUrl } from '../platform/api'
 
 // Keeps every `trade-horizon:user:<id>:*` localStorage entry (workspace, layouts, drawings, alerts…) in step
 // with the server, so a user sees the same data on every device. The rest of the app keeps reading and writing
@@ -290,7 +291,7 @@ export async function startUserSync(userId: string): Promise<void> {
   }
 
   const request = (path: string, init: RequestInit = {}, timeoutMs = REQUEST_TIMEOUT_MS) =>
-    fetch(path, {
+    fetch(apiUrl(path), {
       ...init,
       headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
       signal: init.keepalive ? undefined : AbortSignal.timeout(timeoutMs),
