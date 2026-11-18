@@ -3,6 +3,7 @@
 // serves dist/ and /api from one port.
 //   Environment: PORT, HOST, TH_DATA_DIR, TH_TRUST_PROXY=1 (behind nginx/Cloudflare), TH_VAPID_SUBJECT, TH_TELEGRAM_TOKEN (bot token from @BotFather, enables Telegram alerts),
 //   TH_ADMIN_EMAILS (comma-separated emails of the accounts that may open the admin page),
+//   TH_ALLOWED_ORIGINS (origins allowed to call the API cross-origin; default: the Android app, see cors.ts),
 //   TH_PUBLIC_URL (optional: the site's address for the keep-alive ping; otherwise learned from requests),
 //   TH_BACKUP_KEEP (how many daily database backups to keep, default 14).
 // Storage: SQLite database server/data/tradehorizon.db (accounts, sessions, synced data), daily copies in server/data/backups.
@@ -27,6 +28,7 @@ import { createPriceFeed } from './priceFeed.ts'
 import { makeHash, temporaryPassword, verifyHash } from './passwords.ts'
 import { createLoopLagMonitor } from './loopLag.ts'
 import { projectRoot } from './paths.ts'
+import { applyCors, parseAllowedOrigins } from './cors.ts'
 
 const root = projectRoot
 // Settings can also come from a .env file in the app folder (hosts like Plesk do not always pass environment variables).
@@ -65,6 +67,8 @@ const backups = createBackupService({ store, dir: join(dataDir, 'backups'), keep
 const tokenHash = (token: string) => createHash('sha256').update(token).digest('hex')
 /** Accounts allowed on the admin page (TH_ADMIN_EMAILS). Decided here only: the app just hides the button. */
 const admins = adminEmails(process.env.TH_ADMIN_EMAILS)
+/** Other origins whose pages may call the API: the Android app's WebView by default (TH_ALLOWED_ORIGINS). */
+const allowedOrigins = parseAllowedOrigins(process.env.TH_ALLOWED_ORIGINS)
 const isAdmin = (user: User) => admins.has(user.email)
 const publicUser = (user: User) => ({
   id: user.id,
@@ -538,6 +542,8 @@ const server = createServer(async (req, res) => {
   keepAlive.observe(req)
   const path = new URL(req.url ?? '/', 'http://localhost').pathname
   try {
+    // The Android app calls the API and the health check from its own origin.
+    if ((path === '/healthz' || path.startsWith('/api/')) && applyCors(req, res, allowedOrigins)) return
     if (path === '/healthz') {
       const status = health()
       return send(res, status.ok ? 200 : 503, status)

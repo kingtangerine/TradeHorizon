@@ -58,6 +58,7 @@ npm run build
 | `PORT`, `HOST` | Where to listen (default `0.0.0.0:8787`). |
 | `TH_DATA_DIR` | Where accounts, user data, push keys and the market cache live (default `server/data`). **Back this folder up.** |
 | `TH_TRUST_PROXY=1` | Set when running behind nginx/Cloudflare so login limits use the real visitor IP and HTTPS is detected. |
+| `TH_ALLOWED_ORIGINS` | Other origins whose pages may call the API (CORS), comma-separated. Default: the Android app's own origin (`https://localhost,capacitor://localhost`); set it empty to allow none. The API uses Bearer tokens, never cookies, so this gives those pages no ambient login. |
 | `TH_TELEGRAM_TOKEN` | Bot token from @BotFather. Turns on Telegram alerts (see below). Leave unset to keep the feature off. |
 | `TH_ADMIN_EMAILS` | Comma-separated emails of the accounts that may open the admin page (users, storage, server health). |
 | `TH_BACKUP_KEEP` | How many daily database backups to keep (default 14). |
