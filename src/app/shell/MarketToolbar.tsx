@@ -383,7 +383,7 @@ export function MarketToolbar({
           aria-haspopup="dialog"
           onClick={() => setIndicatorsOpen(true)}
         >
-          <LayersIcon /> Indicators
+          <LayersIcon /> <span className="toolbar-label">Indicators</span>
         </button>
       </div>
 
@@ -393,7 +393,7 @@ export function MarketToolbar({
         aria-pressed={alertsOpen}
         onClick={() => setAlertsOpen((open) => !open)}
       >
-        <BellIcon /> Alert
+        <BellIcon /> <span className="toolbar-label">Alert</span>
       </button>
 
       <button
@@ -412,7 +412,7 @@ export function MarketToolbar({
         }}
         disabled={!controller || !quote}
       >
-        <ReplayIcon /> Replay
+        <ReplayIcon /> <span className="toolbar-label">Replay</span>
       </button>
 
       <span className="toolbar-divider" />
@@ -424,7 +424,7 @@ export function MarketToolbar({
         disabled={!controller}
       >
         <TargetIcon />
-        Go live
+        <span className="toolbar-label">Go live</span>
       </button>
 
       <span className="toolbar-spacer" />

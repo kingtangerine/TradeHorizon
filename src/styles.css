@@ -8511,3 +8511,113 @@ button:disabled {
 .chart-loupe[hidden] {
   display: none;
 }
+
+/* Between a phone and a full desktop window (a tablet held upright, a phone held sideways, a narrow browser window)
+   the toolbar does not fit with every label, so the labels give way to their icons. */
+@media (min-width: 761px) and (max-width: 1100px) {
+  .layout-name-button {
+    width: auto;
+    max-width: 150px;
+  }
+  .layout-name-button small {
+    display: none;
+  }
+}
+@media (min-width: 761px) and (max-width: 1000px) {
+  /* Hidden from view only: the label still names the button for screen readers. */
+  .market-toolbar .toolbar-label {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+  .market-toolbar .indicators-button,
+  .market-toolbar .live-button {
+    position: relative;
+  }
+  /* The timeframes that do not fit can be reached by swiping the row, as on a phone. */
+  .timeframe-group {
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+  .timeframe-group::-webkit-scrollbar {
+    display: none;
+  }
+}
+
+/* The drawing tools scroll when the rail is too short for them; they must not be squashed instead. */
+.tool-rail > * {
+  flex-shrink: 0;
+}
+
+/* Tablets and phones held sideways use the desktop layout, with controls large enough for a finger. */
+@media (pointer: coarse) and (min-width: 761px) {
+  .terminal-shell {
+    grid-template-rows: 44px 46px minmax(0, 1fr) 36px;
+  }
+  .workspace {
+    grid-template-columns: 54px minmax(0, 1fr) 52px;
+  }
+  .workspace.object-tree-visible {
+    grid-template-columns: 54px minmax(0, 1fr) 310px 52px;
+  }
+  .tool-rail .tool-button,
+  .panel-rail .tool-button {
+    width: 44px;
+    height: 44px;
+  }
+  .market-toolbar .symbol-button,
+  .market-toolbar .timeframe-button,
+  .market-toolbar .more-timeframes-button,
+  .market-toolbar .indicators-button,
+  .market-toolbar .live-button,
+  .market-toolbar .layout-name-button {
+    /* An explicit minimum width would let these shrink below their content, so shrinking is turned off. */
+    flex-shrink: 0;
+    min-width: 40px;
+    height: 38px;
+  }
+  .market-toolbar .compare-button {
+    flex-shrink: 0;
+    min-width: 34px;
+    height: 38px;
+  }
+  .chart-tab-close {
+    width: 32px;
+    height: 32px;
+  }
+  .new-chart-tab {
+    width: 38px;
+    height: 38px;
+  }
+  .statusbar button {
+    min-width: 36px;
+    min-height: 30px;
+  }
+  .top-menu button {
+    min-height: 40px;
+  }
+  /* There is no Esc key to press; Back or the tool button puts a tool away. */
+  .drawing-hint kbd {
+    display: none;
+  }
+}
+
+/* A phone held sideways is wide but very short: the page must not be taller than the screen, and the status bar
+   gives its row to the chart, as it does on a phone held upright. */
+@media (min-width: 761px) and (max-height: 500px) {
+  .terminal-shell {
+    min-height: 0;
+    grid-template-rows: 36px 38px minmax(0, 1fr);
+  }
+  .statusbar {
+    display: none;
+  }
+}
+@media (pointer: coarse) and (min-width: 761px) and (max-height: 500px) {
+  .terminal-shell {
+    grid-template-rows: 44px 46px minmax(0, 1fr);
+  }
+}
