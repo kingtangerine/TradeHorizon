@@ -2,6 +2,7 @@ import { useEffect, useLayoutEffect, useRef, useState, type ComponentType, type 
 import { createPortal } from 'react-dom'
 import { DRAWING_TOOLS } from '../chart/tools'
 import type { DrawingType } from '../drawings'
+import { useBackHandler } from '../platform/backStack'
 
 // One tool-rail button for a group of drawing tools (TradingView's fly-outs): it shows the group's last used tool;
 // the small arrow in its corner lists the others. The fly-out is portalled to <body> with fixed coordinates,
@@ -21,6 +22,7 @@ interface ToolGroupProps {
 /** A tool-rail button for a group of drawing tools, with a fly-out listing the rest of the group. */
 export function ToolGroup({ label, tools, shown, activeTool, icons, disabled, onChoose, onCursor }: ToolGroupProps) {
   const [open, setOpen] = useState(false)
+  useBackHandler(open, () => setOpen(false))
   const [position, setPosition] = useState<CSSProperties>()
   const ref = useRef<HTMLDivElement>(null)
   const flyoutRef = useRef<HTMLDivElement>(null)

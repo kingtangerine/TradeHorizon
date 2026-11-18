@@ -53,6 +53,7 @@ import { useCloseMenusOnOutsideClick, useToolbarMenus } from './useToolbarMenus'
 import { useUserDataPersistence } from './useUserDataPersistence'
 import { useWorkspaceHotkeys, type SymbolSearchMode } from './useWorkspaceHotkeys'
 import { INITIAL_INTERVAL, isPositionTool } from './workspaceHelpers'
+import { useBackHandler } from '../../platform/backStack'
 
 interface WorkspaceAppProps {
   user: AppUser
@@ -170,6 +171,22 @@ export function WorkspaceApp({ user, onLogout, onUserRefresh }: WorkspaceAppProp
     controller?.clearDrawingSelection()
     setActiveTool('cursor')
   }, [controller])
+
+  // Android Back closes whatever was opened last (see platform/backStack.ts); the menus and the indicator windows
+  // register themselves in their hooks. An armed tool or a selected drawing is the last thing Back undoes.
+  useBackHandler(activeTool !== 'cursor' || selectedDrawingId !== undefined || multiSelection.length > 0, chooseCursor)
+  useBackHandler(objectTreeOpen, () => setObjectTreeOpen(false))
+  useBackHandler(watchlistOpen, () => setWatchlistOpen(false))
+  useBackHandler(alertsOpen, () => setAlertsOpen(false))
+  useBackHandler(superchartOpen, () => setSuperchartOpen(false))
+  useBackHandler(symbolSearch !== null, () => setSymbolSearch(null))
+  useBackHandler(intervalInput !== null, () => setIntervalInput(null))
+  useBackHandler(adminOpen, () => setAdminOpen(false))
+  useBackHandler(chartSettingsOpen, () => setChartSettingsOpen(false))
+  useBackHandler(saveAsOpen, () => setSaveAsOpen(false))
+  useBackHandler(positionSettingsOpen, () => setPositionSettingsOpen(false))
+  useBackHandler(drawingSettings !== undefined, () => setDrawingSettings(undefined))
+  useBackHandler(drawingMenu !== undefined, () => setDrawingMenu(undefined))
 
   /** Tool rail: the last tool used in each group is the one its button shows. */
   const [groupTools, setGroupTools] = useState<Record<string, DrawingType>>({})

@@ -27,6 +27,7 @@ import type { ScriptInstance } from '../chart/indicators'
 import type { PriceAlert } from './alerts'
 import { capTier, coinSymbol, formatUsdCompact, loadMarketCaps, type MarketCapInfo } from './marketCap'
 import type { AlertLine } from '../chart/KLineChartController'
+import { useBackHandler } from '../platform/backStack'
 
 interface ChartPaneProps {
   index: number
@@ -135,6 +136,7 @@ export function ChartPane({
   const [runtime, setRuntime] = useState<ChartRuntimeState>(() => INITIAL_RUNTIME(interval))
   const [controller, setController] = useState<KLineChartController | null>(null)
   const [contextMenu, setContextMenu] = useState<{ left: number; top: number; price: number | null } | null>(null)
+  useBackHandler(contextMenu !== null, () => setContextMenu(null))
   const closeContextMenu = useCallback(() => setContextMenu(null), [])
   // Market cap of the coin (from the server's cached CoinGecko top 500), shown as a colour-coded size tier.
   const [cap, setCap] = useState<{ symbol: string; info?: MarketCapInfo } | null>(null)

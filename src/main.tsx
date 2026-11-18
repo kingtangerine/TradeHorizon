@@ -3,11 +3,13 @@ import { createRoot } from 'react-dom/client'
 import { App } from './app/App'
 import { installErrorReporting, reportProblem } from './app/errorReport'
 import { applyTheme, initialTheme } from './app/theme'
+import { installBackButton } from './platform/backButton'
 import { isNative } from './platform/native'
 import './styles.css'
 
 applyTheme(initialTheme())
 installErrorReporting()
+installBackButton()
 
 // The service worker delivers price alerts while the app is closed and lets the app be installed.
 // The Android app has no use for it: its pages are bundled, and its alerts arrive through native push.

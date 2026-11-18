@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { useBackHandler } from '../../platform/backStack'
 
 /** Open state of the top bar's drop-down menus (profile, layout, timeframes, chart type, split, snapshot) and their elements. */
 export function useToolbarMenus() {
@@ -16,6 +17,14 @@ export function useToolbarMenus() {
   const [snapshotMenuOpen, setSnapshotMenuOpen] = useState(false)
   const indicatorMenuRef = useRef<HTMLDivElement>(null)
   const splitMenuRef = useRef<HTMLDivElement>(null)
+
+  // Android Back closes an open menu (see platform/backStack.ts).
+  useBackHandler(profileOpen, () => setProfileOpen(false))
+  useBackHandler(layoutMenuOpen, () => setLayoutMenuOpen(false))
+  useBackHandler(timeframeMenuOpen, () => setTimeframeMenuOpen(false))
+  useBackHandler(splitMenuOpen, () => setSplitMenuOpen(false))
+  useBackHandler(chartTypeMenuOpen, () => setChartTypeMenuOpen(false))
+  useBackHandler(snapshotMenuOpen, () => setSnapshotMenuOpen(false))
 
   return {
     profileOpen,

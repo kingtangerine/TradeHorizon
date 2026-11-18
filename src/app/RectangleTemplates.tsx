@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { CloseIcon, StarIcon, TemplateIcon } from './Icons'
 import { deleteTemplate, saveTemplate, toggleDefaultTemplate, type RectangleStyle, type TemplateState } from './templates'
+import { useBackHandler } from '../platform/backStack'
 
 interface RectangleTemplatesProps {
   state: TemplateState
@@ -19,6 +20,7 @@ function rgba(hex: string, opacityPercent: number): string {
 /** Templates button for rectangles: a popover to save the selected rectangle's look and apply or delete saved ones. */
 export function RectangleTemplates({ state, current, onApply, onChange }: RectangleTemplatesProps) {
   const [open, setOpen] = useState(false)
+  useBackHandler(open, () => setOpen(false))
   const [name, setName] = useState('')
   const [position, setPosition] = useState({ top: 0, left: 0 })
   const buttonRef = useRef<HTMLButtonElement>(null)
