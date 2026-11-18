@@ -8,3 +8,6 @@
 *.gif binary
 *.ico binary
 *.woff2 binary
+
+# Windows batch files need CRLF to run reliably (the Gradle wrapper for the Android app).
+*.bat text eol=crlf
