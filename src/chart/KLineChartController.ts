@@ -23,6 +23,7 @@ import { appearanceStyles, chartInitOptions, chartTypeStyles, themeStyles } from
 import { CompareLayer } from './controller/compareLayer'
 import { DataFeed } from './controller/dataFeed'
 import { DrawingLayer } from './controller/drawingLayer'
+import { DrawingLoupe } from './controller/drawingLoupe'
 import { DrawingTool } from './controller/drawingTool'
 import {
   HISTORY_PAGE_SIZE,
@@ -91,6 +92,7 @@ export class KLineChartController {
   readonly #alerts: AlertLines
   readonly #drawings: DrawingLayer
   readonly #tools: DrawingTool
+  readonly #loupe: DrawingLoupe
   readonly #hover: HoverTracker
 
   #interval: MarketInterval
@@ -238,6 +240,7 @@ export class KLineChartController {
       isDisposed,
       onToolSettled: () => this.#callbacks.onToolSettled(),
     })
+    this.#loupe = new DrawingLoupe({ chart, host, isPlacing: () => this.#tools.active })
 
     chart.overrideYAxis({ paneId: 'candle_pane', createRange: this.#priceAxis.createPriceRange })
     // TradingView-style time axis and crosshair date, in the user's time zone.
@@ -306,6 +309,11 @@ export class KLineChartController {
     globalThis.addEventListener('pointermove', tools.handleToolPointerMove, true)
     globalThis.addEventListener('pointerup', tools.handleToolPointerUp, true)
     globalThis.addEventListener('pointercancel', tools.handleToolPointerUp, true)
+    // After the tool's own listeners, so the loupe paints the drawing as it is after this event.
+    host.addEventListener('pointerdown', this.#loupe.handlePointerDown, true)
+    globalThis.addEventListener('pointermove', this.#loupe.handlePointerMove, true)
+    globalThis.addEventListener('pointerup', this.#loupe.handlePointerEnd, true)
+    globalThis.addEventListener('pointercancel', this.#loupe.handlePointerEnd, true)
 
     this.#drawingStoreUnsubscribe = drawingStore.subscribe(() => this.#drawings.sync())
     this.#drawings.sync()
@@ -725,6 +733,11 @@ export class KLineChartController {
     globalThis.removeEventListener('pointermove', tools.handleToolPointerMove, true)
     globalThis.removeEventListener('pointerup', tools.handleToolPointerUp, true)
     globalThis.removeEventListener('pointercancel', tools.handleToolPointerUp, true)
+    this.#host.removeEventListener('pointerdown', this.#loupe.handlePointerDown, true)
+    globalThis.removeEventListener('pointermove', this.#loupe.handlePointerMove, true)
+    globalThis.removeEventListener('pointerup', this.#loupe.handlePointerEnd, true)
+    globalThis.removeEventListener('pointercancel', this.#loupe.handlePointerEnd, true)
+    this.#loupe.dispose()
     this.#host.classList.remove('tool-active')
     this.#navigation.dispose()
     dispose(this.#chart)

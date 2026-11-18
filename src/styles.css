@@ -8497,3 +8497,17 @@ button:disabled {
 .fib-actions {
   margin: 8px 0 4px;
 }
+
+/* Finger drawing: the magnifier that shows what the fingertip covers (chart/controller/drawingLoupe.ts). */
+.chart-loupe {
+  position: fixed;
+  z-index: 60;
+  box-sizing: border-box;
+  border: 2px solid;
+  border-radius: 50%;
+  box-shadow: 0 6px 18px rgb(0 0 0 / 35%);
+  pointer-events: none;
+}
+.chart-loupe[hidden] {
+  display: none;
+}
