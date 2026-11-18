@@ -1,4 +1,5 @@
 import { getSessionToken } from './auth'
+import { apiUrl } from '../platform/api'
 
 // Alerts that reach you with TradeHorizon closed: the server watches prices and sends a web-push
 // notification through the browser's push service. This module turns that on and off for this device.
@@ -60,7 +61,7 @@ export async function enablePush(): Promise<PushStatus> {
 
   let keyResponse: Response
   try {
-    keyResponse = await fetch('/api/push/key')
+    keyResponse = await fetch(apiUrl('/api/push/key'))
   } catch {
     throw new Error('Could not reach the TradeHorizon server. Check your connection and try again.')
   }
@@ -87,7 +88,7 @@ export async function enablePush(): Promise<PushStatus> {
       userVisibleOnly: true,
       applicationServerKey: applicationServerKey(publicKey),
     }))
-  const response = await fetch('/api/push/subscribe', {
+  const response = await fetch(apiUrl('/api/push/subscribe'), {
     method: 'POST',
     headers: authHeaders(),
     body: JSON.stringify({ subscription: subscription.toJSON() }),
@@ -107,7 +108,7 @@ export async function disablePush(): Promise<PushStatus> {
   const subscription = await (await registration()).pushManager.getSubscription()
   if (subscription) {
     // Turning alerts off must work offline too: the server drops dead subscriptions on its own when a send fails.
-    await fetch('/api/push/unsubscribe', {
+    await fetch(apiUrl('/api/push/unsubscribe'), {
       method: 'POST',
       headers: authHeaders(),
       body: JSON.stringify({ endpoint: subscription.endpoint }),
@@ -120,7 +121,7 @@ export async function disablePush(): Promise<PushStatus> {
 /** Alerts the server has triggered since `sinceMs`. Returns an empty list when the server cannot be reached. */
 export async function fetchAlertEvents(sinceMs: number): Promise<AlertEvent[]> {
   try {
-    const response = await fetch(`/api/alerts/events?since=${sinceMs}`, { headers: authHeaders() })
+    const response = await fetch(apiUrl(`/api/alerts/events?since=${sinceMs}`), { headers: authHeaders() })
     if (!response.ok) return []
     return ((await response.json()) as { events: AlertEvent[] }).events
   } catch {

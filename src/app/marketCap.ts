@@ -1,6 +1,8 @@
 // Market capitalisation of the coin on the chart, from the server's cached CoinGecko list (top 500),
 // grouped into four tiers so a trader sees at a glance how big (and roughly how volatile) a coin is.
 
+import { apiUrl } from '../platform/api'
+
 /** Market data of one coin from CoinGecko: name, market cap and 24h volume in USD, and rank. */
 export interface MarketCapInfo {
   readonly name: string
@@ -87,7 +89,7 @@ const REFRESH_MS = 30 * 60_000
 export function loadMarketCaps(): Promise<Map<string, MarketCapInfo>> {
   if (!loading || Date.now() - loadedAtMs > REFRESH_MS) {
     loadedAtMs = Date.now()
-    loading = fetch('/api/cg/caps')
+    loading = fetch(apiUrl('/api/cg/caps'))
       .then(async (response) => (response.ok ? indexMarketCaps((await response.json()) as CapRow[]) : new Map<string, MarketCapInfo>()))
       .catch(() => new Map<string, MarketCapInfo>())
       .then((index) => {

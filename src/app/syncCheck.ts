@@ -2,6 +2,7 @@ import { getSessionToken } from './auth'
 import { fingerprint } from './syncMerge'
 import { describeHttpProblem, getDevice, getSyncStatus, syncKeyStates, type DeviceInfo, type SyncStatus } from './userSync'
 import { APP_VERSION } from '../version'
+import { apiUrl } from '../platform/api'
 
 // The sync check behind "Save & check sync" in the account window: compares every synced item on this device
 // with the server's copy (when it was saved, from which device, what it contains) and spells out what is wrong.
@@ -162,8 +163,8 @@ export async function runSyncCheck(userId: string): Promise<SyncCheckReport> {
   let values: Record<string, { value: string }> = {}
   try {
     const [statusResponse, dataResponse] = await Promise.all([
-      fetch('/api/sync/status', { headers, cache: 'no-store' }),
-      fetch('/api/data?since=0', { headers, cache: 'no-store' }),
+      fetch(apiUrl('/api/sync/status'), { headers, cache: 'no-store' }),
+      fetch(apiUrl('/api/data?since=0'), { headers, cache: 'no-store' }),
     ])
     if (statusResponse.ok) description = (await statusResponse.json()) as ServerDescription
     else

@@ -1,4 +1,5 @@
 import { getSessionToken } from './auth'
+import { apiUrl } from '../platform/api'
 
 // Admin API (server/index.ts, handleAdmin). The server decides who is an admin (TH_ADMIN_EMAILS).
 
@@ -116,7 +117,7 @@ export interface AdminOverview {
 }
 
 async function call<T>(path: string, init: RequestInit = {}): Promise<T> {
-  const response = await fetch(path, {
+  const response = await fetch(apiUrl(path), {
     ...init,
     cache: 'no-store',
     headers: { Authorization: `Bearer ${getSessionToken() ?? ''}`, 'Content-Type': 'application/json' },

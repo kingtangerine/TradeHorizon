@@ -1,4 +1,5 @@
 import { getSessionToken } from './auth'
+import { apiUrl } from '../platform/api'
 
 // Telegram alerts: the server runs a bot; this module links the signed-in account to a Telegram chat.
 
@@ -26,7 +27,7 @@ async function failure(response: Response, fallback: string): Promise<Error> {
 /** Undefined when the server cannot be reached or does not know Telegram (older server). */
 export async function getTelegramStatus(): Promise<TelegramStatus | undefined> {
   try {
-    const response = await fetch('/api/telegram/status', { headers: authHeaders() })
+    const response = await fetch(apiUrl('/api/telegram/status'), { headers: authHeaders() })
     return response.ok ? ((await response.json()) as TelegramStatus) : undefined
   } catch {
     return undefined
@@ -35,19 +36,19 @@ export async function getTelegramStatus(): Promise<TelegramStatus | undefined> {
 
 /** A one-time https://t.me link that opens the bot and links this account when the user presses Start. */
 export async function startTelegramLink(): Promise<string> {
-  const response = await fetch('/api/telegram/link', { method: 'POST', headers: authHeaders() })
+  const response = await fetch(apiUrl('/api/telegram/link'), { method: 'POST', headers: authHeaders() })
   if (!response.ok) throw await failure(response, 'Could not start the Telegram connection.')
   return ((await response.json()) as { url: string }).url
 }
 
 /** Disconnects the account from its Telegram chats; throws with the server's message on failure. */
 export async function unlinkTelegram(): Promise<void> {
-  const response = await fetch('/api/telegram/unlink', { method: 'POST', headers: authHeaders() })
+  const response = await fetch(apiUrl('/api/telegram/unlink'), { method: 'POST', headers: authHeaders() })
   if (!response.ok) throw await failure(response, 'Could not disconnect Telegram.')
 }
 
 /** Asks the server to send a test message to the linked Telegram chats; throws with the server's message on failure. */
 export async function sendTelegramTest(): Promise<void> {
-  const response = await fetch('/api/telegram/test', { method: 'POST', headers: authHeaders() })
+  const response = await fetch(apiUrl('/api/telegram/test'), { method: 'POST', headers: authHeaders() })
   if (!response.ok) throw await failure(response, 'Could not send the test message.')
 }
