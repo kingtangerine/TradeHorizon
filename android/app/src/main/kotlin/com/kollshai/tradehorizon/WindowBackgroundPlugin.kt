@@ -1,5 +1,6 @@
 package com.kollshai.tradehorizon
 
+import android.content.res.Configuration
 import android.graphics.Color
 import androidx.core.view.ViewCompat
 import com.getcapacitor.Plugin
@@ -27,15 +28,33 @@ class WindowBackgroundPlugin : Plugin() {
             return
         }
         activity.runOnUiThread {
-            val decorView = activity.window.decorView
-            // Only the colour of the existing background is changed. Replacing the window's background drawable
-            // (Window.setBackgroundDrawable) makes Android reset the decor view's padding, which is what Capacitor
-            // uses to keep the page between the system bars: the page then slides under them until the next inset
-            // pass, and stays there if that pass does not come.
-            decorView.setBackgroundColor(color)
-            // Safeguard: have the insets applied again, so the padding is right whatever touched it before.
-            ViewCompat.requestApplyInsets(decorView)
+            lastColor = color
+            applyColor(color)
             call.resolve()
         }
     }
+
+    /**
+     * Turning the device (or resizing the window) makes Android paint the window in its theme colour again, so the
+     * colour the page asked for is put back once that change has been applied.
+     */
+    override fun handleOnConfigurationChanged(newConfig: Configuration) {
+        super.handleOnConfigurationChanged(newConfig)
+        val color = lastColor ?: return
+        activity.window.decorView.post { applyColor(color) }
+    }
+
+    private fun applyColor(color: Int) {
+        val decorView = activity.window.decorView
+        // Only the colour of the existing background is changed. Replacing the window's background drawable
+        // (Window.setBackgroundDrawable) makes Android reset the decor view's padding, which is what Capacitor
+        // uses to keep the page between the system bars: the page then slides under them until the next inset
+        // pass, and stays there if that pass does not come.
+        decorView.setBackgroundColor(color)
+        // Safeguard: have the insets applied again, so the padding is right whatever touched it before.
+        ViewCompat.requestApplyInsets(decorView)
+    }
+
+    /** The colour last asked for by the page; null until it asks. Only touched on the UI thread. */
+    private var lastColor: Int? = null
 }
