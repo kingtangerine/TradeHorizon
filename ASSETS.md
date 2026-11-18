@@ -9,6 +9,7 @@ Every image, icon, font, sound or other non-code asset in the repository, and wh
 | `public/icons/icon-maskable-512.png` | Made by the TradeHorizon team | Proprietary (see LICENSE) |
 | `public/favicon.svg` | Made by the TradeHorizon team (same mark as the app icons) | Proprietary (see LICENSE) |
 | Interface icons in `src/app/Icons.tsx` | Drawn as SVG paths in code by the TradeHorizon team | Proprietary (see LICENSE) |
+| Launcher icons and splash images in `android/app/src/main/res/` (`mipmap-*`, `drawable*`) | Capacitor's default project template (Drifty Co.); placeholders until the TradeHorizon icon and splash are added | MIT |
 
 Fonts: none are bundled. The interface uses the fonts already installed on the viewer's device (system UI fonts,
 and IBM Plex Mono only if the viewer has it installed).

@@ -4,6 +4,8 @@ build/
 coverage/
 node_modules/
 server/data/
+android/
+.claude/
 package-lock.json
 
 # Prose: formatted by hand

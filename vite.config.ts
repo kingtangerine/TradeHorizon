@@ -1,4 +1,5 @@
-import { defineConfig, transformWithEsbuild, type Plugin } from 'vite'
+import { transformWithEsbuild, type Plugin } from 'vite'
+import { configDefaults, defineConfig } from 'vitest/config'
 import react from '@vitejs/plugin-react'
 import { execSync } from 'node:child_process'
 import { readFileSync } from 'node:fs'
@@ -42,6 +43,10 @@ function gitCommit(): string {
 
 export default defineConfig({
   plugins: [react(), serviceWorker()],
+  test: {
+    // Not our tests: the Android project (it holds a copy of the built app) and local tool folders.
+    exclude: [...configDefaults.exclude, 'android/**', '.claude/**', 'build/**'],
+  },
   define: {
     __APP_VERSION__: JSON.stringify(version),
     __APP_BUILD__: JSON.stringify(gitCommit()),
