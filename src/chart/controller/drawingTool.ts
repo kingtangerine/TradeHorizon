@@ -266,11 +266,15 @@ export class DrawingTool {
     if (source && insidePane(this.#deps.chart, source.clientX, source.clientY)) event.stopPropagation()
   }
 
-  /** A right-click puts the tool (or the replay picker) away. */
+  /**
+   * A right-click puts the tool (or the replay picker) away. A long press with a finger also arrives as a context
+   * menu event, but there it only means the finger is resting while it aims, so the tool stays and no menu opens.
+   */
   public readonly handleToolContextMenu = (event: MouseEvent): void => {
     if (!this.#tool && !this.#deps.replay.picking) return
     event.preventDefault()
     event.stopPropagation()
+    if ((event as PointerEvent).pointerType === 'touch') return
     this.cancel()
     this.#deps.replay.cancelSelection()
   }

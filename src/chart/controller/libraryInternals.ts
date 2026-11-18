@@ -5,7 +5,7 @@ import { DRAWING_GROUP_ID } from '../model'
 // directly (pinned version 10.0.3).
 
 interface ChartStoreInternals {
-  getPressedOverlayInfo?(): { overlay?: { id?: string; groupId?: string } | null }
+  getPressedOverlayInfo?(): { overlay?: { id?: string; groupId?: string } | null; figureType?: string }
   getHoverOverlayInfo?(): { overlay?: { id?: string; groupId?: string } | null; figureType?: string }
   setClickOverlayInfo?(info: unknown, onSelected: () => void, onDeselected: () => void): void
 }
@@ -27,6 +27,12 @@ export function drawingIsPressed(chart: Chart): boolean {
 export function pressedDrawingId(chart: Chart): string | undefined {
   const overlay = chartStore(chart)?.getPressedOverlayInfo?.().overlay
   return overlay?.groupId === DRAWING_GROUP_ID ? overlay.id : undefined
+}
+
+/** True while a finger (or the mouse button) is holding one of a drawing's points, as opposed to its body. */
+export function pressedDrawingHandle(chart: Chart): boolean {
+  const pressed = chartStore(chart)?.getPressedOverlayInfo?.()
+  return pressed?.overlay?.groupId === DRAWING_GROUP_ID && pressed.figureType === 'point'
 }
 
 /** Id of the overlay under the pointer, if any. */
