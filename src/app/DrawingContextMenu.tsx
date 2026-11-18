@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { BellIcon, CopyIcon, EyeOffIcon, LockIcon, SettingsIcon, TrashIcon, UnlockIcon } from './Icons'
 
@@ -58,7 +58,19 @@ export function DrawingContextMenu({
     onClose()
   }
   const single = count <= 1
-  const style = { left: Math.min(left, globalThis.innerWidth - 230), top: Math.min(top, globalThis.innerHeight - 260) }
+  // The menu opens at the pointer, then moves in if it would stick out of the screen. Its size is measured rather
+  // than assumed: the rows are taller on a phone.
+  const [style, setStyle] = useState({ left, top })
+  useLayoutEffect(() => {
+    const menu = ref.current
+    if (!menu) return
+    const margin = 8
+    const { width, height } = menu.getBoundingClientRect()
+    setStyle({
+      left: Math.max(margin, Math.min(left, globalThis.innerWidth - width - margin)),
+      top: Math.max(margin, Math.min(top, globalThis.innerHeight - height - margin)),
+    })
+  }, [left, top, count])
   return createPortal(
     <div
       ref={ref}

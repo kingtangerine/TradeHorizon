@@ -236,7 +236,8 @@ export function CryptoChartSurface({
     }
   }, [countdown, drawingStore, market, onControllerChange])
 
-  // Right-click menu. The controller has already handled right-clicks that cancel a drawing tool (and stopped them).
+  // Right-click menu, which a long press also opens on a phone (Android sends the same event for it).
+  // The controller has already handled right-clicks that cancel a drawing tool (and stopped them).
   const contextMenuRef = useRef(onChartContextMenu)
   contextMenuRef.current = onChartContextMenu
   useEffect(() => {
@@ -245,7 +246,15 @@ export function CryptoChartSurface({
     const open = (event: MouseEvent) => {
       const controller = controllerRef.current
       event.preventDefault()
-      if (!controller || !contextMenuRef.current || controller.drawingUnderPointer()) return
+      if (!controller) return
+      // The chart library reports a right-click on a drawing only for a mouse. For a long press, the drawing the
+      // finger is holding gets its menu from here instead.
+      const heldDrawing = (event as PointerEvent).pointerType === 'touch' ? controller.pressedDrawingId() : undefined
+      if (heldDrawing) {
+        controller.openDrawingMenu(heldDrawing, event.clientX, event.clientY)
+        return
+      }
+      if (!contextMenuRef.current || controller.drawingUnderPointer()) return
       const hostRect = host.getBoundingClientRect()
       const pane = controller.pricePaneBounds()
       const onPriceChart =

@@ -16,7 +16,7 @@ import type { CryptoMarket } from '../markets'
 import { DRAWING_GROUP_ID, decimalString, drawingFromOverlay, drawingPoints } from '../model'
 import { DRAWING_TOOLS } from '../tools'
 import { MAGNET_TOLERANCE_PX, anchorsEqual, colorWithOpacity, createId, intervalDurationMs } from './helpers'
-import { drawingUnderPointer, hoveredOverlayId, resetClickedOverlay, showHandles } from './libraryInternals'
+import { drawingUnderPointer, hoveredOverlayId, pressedDrawingId, resetClickedOverlay, showHandles } from './libraryInternals'
 import { paneRect, positionDefaults } from './paneGeometry'
 import type { DrawingEvent, DrawingModes, KLineChartControllerCallbacks } from './types'
 
@@ -244,6 +244,21 @@ export class DrawingLayer {
     return drawingUnderPointer(this.#deps.chart)
   }
 
+  /** Id of the drawing a finger is holding right now (see pressedDrawingId), for the long-press menu. */
+  public pressedDrawingId(): string | undefined {
+    return pressedDrawingId(this.#deps.chart)
+  }
+
+  /**
+   * Selects a drawing and asks the app to open its menu at a point on the screen: what a right-click on it does with
+   * a mouse, and a long press on it does on a phone. A drawing outside the multi-selection replaces that selection.
+   */
+  public openContextMenu(id: string, clientX: number, clientY: number): void {
+    if (!this.#multiSelection.has(id)) this.#setMultiSelection([])
+    this.selectOverlay(id)
+    this.#emitDrawing({ kind: 'contextMenu', id, clientX, clientY })
+  }
+
   /** Deletes the selected drawing (or the whole multi-selection, as one undo step). */
   public deleteSelected(): void {
     if (this.#multiSelection.size > 1) {
@@ -360,11 +375,12 @@ export class DrawingLayer {
       // The library deletes an overlay on right-click unless this is prevented.
       onRightClick: (event) => {
         event.preventDefault?.()
-        if (!this.#multiSelection.has(event.overlay.id)) this.#setMultiSelection([])
-        this.selectOverlay(event.overlay.id)
         const rect = paneRect(this.#deps.chart)
         if (rect && event.x !== undefined && event.y !== undefined) {
-          this.#emitDrawing({ kind: 'contextMenu', id: event.overlay.id, clientX: rect.left + event.x, clientY: rect.top + event.y })
+          this.openContextMenu(event.overlay.id, rect.left + event.x, rect.top + event.y)
+        } else {
+          if (!this.#multiSelection.has(event.overlay.id)) this.#setMultiSelection([])
+          this.selectOverlay(event.overlay.id)
         }
       },
       onDoubleClick: (event) => {

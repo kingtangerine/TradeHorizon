@@ -7765,6 +7765,19 @@ button:disabled {
   position: fixed;
   z-index: 2100;
 }
+/* On a phone these menus open on a long press: rows are finger-sized and keyboard shortcuts are left out. */
+@media (pointer: coarse) {
+  .chart-context-menu {
+    min-width: 230px;
+    font-size: 0.9rem;
+  }
+  .chart-context-menu button {
+    height: 44px;
+  }
+  .drawing-context-menu kbd {
+    display: none;
+  }
+}
 .drawing-context-menu kbd {
   margin-left: auto;
   color: var(--muted);

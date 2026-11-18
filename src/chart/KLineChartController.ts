@@ -633,6 +633,16 @@ export class KLineChartController {
     return this.#drawings.drawingUnderPointer()
   }
 
+  /** Id of the drawing a finger is holding right now, if any; used to open its menu on a long press. */
+  public pressedDrawingId(): string | undefined {
+    return this.#drawings.pressedDrawingId()
+  }
+
+  /** Selects a drawing and opens its menu at a point on the screen (client coordinates). */
+  public openDrawingMenu(id: string, clientX: number, clientY: number): void {
+    this.#drawings.openContextMenu(id, clientX, clientY)
+  }
+
   /** Deletes the selected drawing (or the whole multi-selection). */
   public deleteSelected(): void {
     this.#drawings.deleteSelected()
