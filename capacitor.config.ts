@@ -21,6 +21,10 @@ const config: CapacitorConfig = {
     allowMixedContent: false,
   },
   plugins: {
+    SystemBars: {
+      // Light clock and icons on the dark bars (android/app/src/main/res/values/styles.xml), whatever the phone's own mode.
+      style: 'DARK',
+    },
     SplashScreen: {
       launchAutoHide: true,
       launchShowDuration: 600,
