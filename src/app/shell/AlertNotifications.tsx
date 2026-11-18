@@ -1,4 +1,5 @@
 import { getTelegramStatus, sendTelegramTest, unlinkTelegram } from '../telegram'
+import { isNative } from '../../platform/native'
 import type { AlertChannels } from './useAlertChannels'
 
 /** Alerts panel section: background (push) notifications on this device and Telegram alerts. */
@@ -26,7 +27,9 @@ export function AlertNotifications({ channels }: { channels: AlertChannels }) {
             {pushStatus === 'off' && 'Get a notification on this device when a price alert triggers, even with TradeHorizon closed.'}
             {pushStatus === 'blocked' && 'Notifications are blocked for this site. Allow them in your browser settings, then try again.'}
             {pushStatus === 'unsupported' &&
-              'This browser does not support background notifications. On iPhone, add TradeHorizon to the Home Screen first.'}
+              (isNative
+                ? 'Notifications from the Android app are not available yet. Until then, connect Telegram below to get alerts on your phone.'
+                : 'This browser does not support background notifications. On iPhone, add TradeHorizon to the Home Screen first.')}
           </small>
           {pushError && (
             <small className="alert-error" role="alert">

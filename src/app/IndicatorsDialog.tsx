@@ -21,6 +21,7 @@ import type { CryptoMarket } from '../chart/markets'
 import { compiledScript } from '../chart/scriptIndicator'
 import { CloseIcon, PlusIcon, SearchIcon, StarIcon, TrashIcon, SettingsIcon } from './Icons'
 import type { UserScript } from './scripts'
+import { isTouchDevice } from '../platform/input'
 
 // TradingView's "Indicators, metrics & strategies" window: sections on the left (Favorites, My scripts, Technicals,
 // Trending, Market dominance), the list on the right, one search over everything. Rows are starred to keep them in
@@ -100,7 +101,8 @@ export function IndicatorsDialog(props: IndicatorsDialogProps) {
   const searchRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
-    searchRef.current?.focus()
+    // With a mouse, typing can start at once. On a phone, focusing would open the keyboard over the list.
+    if (!isTouchDevice()) searchRef.current?.focus()
     const escape = (event: KeyboardEvent) => {
       if (event.key === 'Escape') onClose()
     }

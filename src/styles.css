@@ -489,6 +489,10 @@ body {
 
 button {
   font: inherit;
+  /* A button's label is not text to select: a long press on a phone would otherwise select it and open the copy menu. */
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
 }
 
 button:focus-visible {
@@ -3212,6 +3216,8 @@ button:disabled {
   display: flex;
   flex-direction: column;
   width: min(720px, 100%);
+  /* Lets the window shrink to a phone screen: its scrolling pills row would otherwise set a minimum width. */
+  min-width: 0;
   max-height: min(640px, 80vh);
   border-radius: 8px;
   color: var(--text);
@@ -5325,6 +5331,16 @@ button:disabled {
     min-width: 38px;
     min-height: 38px;
   }
+  /* On a phone the toolbar keeps colour and the actions in view; the grip (it cannot be dragged here), the tool
+     icon, line width, line style and fill opacity are in the drawing's Settings window instead. */
+  .floating-object-toolbar .toolbar-grip,
+  .floating-object-toolbar .toolbar-object-type,
+  .floating-object-toolbar .toolbar-object-type + .toolbar-separator,
+  .floating-object-toolbar .line-thickness,
+  .floating-object-toolbar .style-select,
+  .floating-object-toolbar .toolbar-opacity {
+    display: none;
+  }
   .drawing-hint {
     bottom: 10px;
     max-width: calc(100% - 20px);
@@ -5434,8 +5450,13 @@ button:disabled {
     display: none;
   }
   .chart-pane .chart-ohlc-row {
-    gap: 6px;
+    /* On a narrow chart the change value moves to a second line instead of being cut off. */
+    flex-wrap: wrap;
+    gap: 2px 6px;
     font-size: 0.68rem;
+  }
+  .chart-pane .chart-ohlc-row span {
+    white-space: nowrap;
   }
   .chart-pane .chart-watermark {
     top: 6px;
