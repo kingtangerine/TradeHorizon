@@ -11,6 +11,9 @@ This repository is private and proprietary (see [LICENSE](./LICENSE)). These rul
    checked with Prettier and ESLint (see `lefthook.yml`). `npm run format` fixes formatting.
 4. Run `git config blame.ignoreRevsFile .git-blame-ignore-revs` so `git blame` skips formatting-only commits.
 5. Set your Git identity to the agreed team identity (your GitHub noreply address), before your first commit.
+6. Only for work on the Android app: the Android SDK and JDK 21 or newer (see "Android app" in the README). Android
+   code is Kotlin, and Gradle build files use the Kotlin DSL (`*.gradle.kts`). Never commit keystores or
+   `google-services.json`; `android/.gitignore` blocks both.
 
 ## Branches
 

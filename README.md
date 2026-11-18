@@ -119,6 +119,34 @@ Links are stored in `server/data/telegram.json` (back it up with the rest of the
 
 ---
 
+## Android app
+
+The Android app is the same web app inside a native shell ([Capacitor](https://capacitorjs.com/)). The built web app
+is copied into the APK, and the server's address is compiled in, so the app always talks to one server.
+
+**You need:** the Android SDK (platform 36), JDK 21 or newer (Android Studio's bundled JDK works; point `JAVA_HOME`
+at it), and `ANDROID_HOME` set to the SDK folder.
+
+```bash
+# Local testing on an emulator, against the server on this computer
+npm run android:server            # the normal server, also allowing the app's local-testing origin
+npm run android:apk -- --dev      # build the web app, sync it, build android/app/build/outputs/apk/debug/app-debug.apk
+
+# A build that talks to a real server (HTTPS only)
+npm run android:apk -- --api https://your-server.example
+
+# Only rebuild and sync the web app into android/ (then run it from Android Studio)
+npm run android:sync -- --dev
+```
+
+- `--dev` compiles in `http://10.0.2.2:8787`, the emulator's name for this computer. Plain HTTP is allowed in debug
+  builds only; release builds accept HTTPS only.
+- The server must allow the app's origin: `https://localhost` is allowed by default (`TH_ALLOWED_ORIGINS`).
+- The app's version is the one in `package.json`.
+- `android/capacitor.settings.gradle` and `android/app/capacitor.build.gradle` are written by the sync step and are
+  not in git, so run `npm run android:sync` once before opening `android/` in Android Studio.
+- Not in the app yet: push alerts, the TradeHorizon icon and splash screen, and release signing.
+
 ## Documentation
 
 - [`CHANGELOG.md`](./CHANGELOG.md): Version history, stable releases, and change log.
