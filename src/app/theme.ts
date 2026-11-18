@@ -1,3 +1,6 @@
+import { reportProblem } from './errorReport'
+import { syncSystemBars } from '../platform/systemBars'
+
 /** The app's color theme. */
 export type Theme = 'dark' | 'light'
 
@@ -22,6 +25,10 @@ export function applyTheme(theme: Theme): void {
   } catch {
     /* storage unavailable */
   }
+  // In the Android app the status and navigation bars follow the theme; a failure there only affects their colour.
+  syncSystemBars(theme).catch((error: unknown) => {
+    reportProblem(`System bars could not follow the theme: ${error instanceof Error ? error.message : String(error)}`, 'system-bars')
+  })
 }
 
 // Reading localStorage throws when storage is blocked; the dark default is then the right answer, not an error.
