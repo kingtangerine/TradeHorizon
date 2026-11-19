@@ -1,5 +1,5 @@
-// Starts the server for testing the Android app on an emulator (`npm run android:sync -- --dev`).
-// In that mode the app's pages are served from http://localhost inside the emulator, so that origin must be allowed
+// Starts the server for testing the Android app on an emulator or a phone (`npm run android:sync -- --dev` or `--usb`).
+// In those modes the app's pages are served from http://localhost on the device, so that origin must be allowed
 // to call the API (see server/cors.ts). Everything else is the normal development server.
 import { spawn } from 'node:child_process'
 import { DEFAULT_ALLOWED_ORIGINS } from '../server/cors.ts'
