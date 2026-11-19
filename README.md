@@ -158,6 +158,8 @@ npm run android:sync -- --dev
   bars follow the app's dark or light theme.
 - If a build cannot find a resource right after resource files were moved or renamed, run `gradlew clean` in
   `android/` once.
+- Every pull request builds the `--usb` debug APK in CI (job `android-apk`); download it from the run's artifacts
+  (`tradehorizon-debug-apk`, kept for 14 days).
 - Not in the app yet: push alerts and release signing.
 
 ## Documentation
