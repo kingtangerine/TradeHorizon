@@ -5,6 +5,8 @@ import { DRAWING_GROUP_ID } from '../model'
 // directly (pinned version 10.0.3).
 
 interface ChartStoreInternals {
+  getCrosshair?(): { x?: number; y?: number; paneId?: string }
+  setCrosshair?(crosshair?: CrosshairPoint): void
   getPressedOverlayInfo?(): { overlay?: { id?: string; groupId?: string } | null; figureType?: string }
   getHoverOverlayInfo?(): { overlay?: { id?: string; groupId?: string } | null; figureType?: string }
   setClickOverlayInfo?(info: unknown, onSelected: () => void, onDeselected: () => void): void
@@ -12,6 +14,53 @@ interface ChartStoreInternals {
 
 function chartStore(chart: Chart): ChartStoreInternals | undefined {
   return (chart as unknown as { _chartStore?: ChartStoreInternals })._chartStore
+}
+
+/** The library's touch state: where a tap put the crosshair, and whether the next tap should not show one. */
+interface ChartEventInternals {
+  _touchCoordinate?: { x: number; y: number } | null
+  _touchCancelCrosshair?: boolean
+}
+
+function chartEvent(chart: Chart): ChartEventInternals | undefined {
+  return (chart as unknown as { _chartEvent?: ChartEventInternals })._chartEvent
+}
+
+/** The crosshair's place: pixels from the top-left corner of the pane it is in. */
+export interface CrosshairPoint {
+  x: number
+  y: number
+  paneId: string
+}
+
+/**
+ * The crosshair that a tap left on screen, if there is one. A crosshair that merely follows the mouse does not
+ * count: only a tap puts the library into the state where the crosshair stays after the finger lifts.
+ */
+export function tappedCrosshair(chart: Chart): CrosshairPoint | undefined {
+  if (!chartEvent(chart)?._touchCoordinate) return undefined
+  const crosshair = chartStore(chart)?.getCrosshair?.()
+  if (typeof crosshair?.x !== 'number' || typeof crosshair.y !== 'number' || typeof crosshair.paneId !== 'string') return undefined
+  return { x: crosshair.x, y: crosshair.y, paneId: crosshair.paneId }
+}
+
+/** Moves the crosshair that a tap left on screen, keeping the library's own record of it in step. */
+export function moveTappedCrosshair(chart: Chart, point: CrosshairPoint): void {
+  const event = chartEvent(chart)
+  const store = chartStore(chart)
+  if (!event || !store?.setCrosshair) return
+  event._touchCoordinate = { x: point.x, y: point.y }
+  store.setCrosshair(point)
+}
+
+/** Removes the crosshair that a tap left on screen, so that the next tap shows one again. */
+export function clearTappedCrosshair(chart: Chart): void {
+  const event = chartEvent(chart)
+  if (event) {
+    event._touchCoordinate = null
+    event._touchCancelCrosshair = false
+  }
+  chartStore(chart)?.setCrosshair?.()
 }
 
 /** True while the library is dragging a drawing or one of its handles, in which case the chart must not pan. */

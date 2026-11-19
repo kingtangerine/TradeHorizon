@@ -21,6 +21,7 @@ import { AlertLines } from './controller/alertLines'
 import { ChartSyncLink, NavigationGuard } from './controller/chartSyncLink'
 import { appearanceStyles, chartInitOptions, chartTypeStyles, themeStyles } from './controller/chartStyles'
 import { CompareLayer } from './controller/compareLayer'
+import { CrosshairDrag } from './controller/crosshairDrag'
 import { DataFeed } from './controller/dataFeed'
 import { DrawingLayer } from './controller/drawingLayer'
 import { DrawingLoupe } from './controller/drawingLoupe'
@@ -93,6 +94,7 @@ export class KLineChartController {
   readonly #drawings: DrawingLayer
   readonly #tools: DrawingTool
   readonly #loupe: DrawingLoupe
+  readonly #crosshairDrag: CrosshairDrag
   readonly #hover: HoverTracker
 
   #interval: MarketInterval
@@ -216,7 +218,7 @@ export class KLineChartController {
       widenRange: this.#compare.withCompareRange,
       emitView: this.#emitView,
       onPriceViewChange: (manual) => this.#callbacks.onPriceViewChange?.(manual),
-      panBlocked: () => this.#tools.active || this.#replay.picking,
+      panBlocked: () => this.#tools.active || this.#replay.picking || this.#crosshairDrag.active,
     })
     this.#indicators = new IndicatorLayers({ chart, market, interval: currentInterval, isDisposed, runtimeState, patchRuntime })
     this.#alerts = new AlertLines(chart, callbacks)
@@ -241,6 +243,11 @@ export class KLineChartController {
       onToolSettled: () => this.#callbacks.onToolSettled(),
     })
     this.#loupe = new DrawingLoupe({ chart, host, isPlacing: () => this.#tools.active })
+    this.#crosshairDrag = new CrosshairDrag({
+      chart,
+      isBusy: () => this.#tools.active || this.#replay.picking,
+      onCrosshairRemoved: () => this.#hover.handleHostLeave(),
+    })
 
     chart.overrideYAxis({ paneId: 'candle_pane', createRange: this.#priceAxis.createPriceRange })
     // TradingView-style time axis and crosshair date, in the user's time zone.
@@ -303,9 +310,14 @@ export class KLineChartController {
     globalThis.addEventListener('blur', drawings.handleWindowBlur)
     host.addEventListener('mousedown', tools.blockChartWhileDrawing, true)
     host.addEventListener('touchstart', tools.blockChartWhileDrawing, true)
+    // With the crosshair showing, a finger drag moves the crosshair instead of panning (see CrosshairDrag).
+    host.addEventListener('touchstart', this.#crosshairDrag.handleTouchStart, true)
+    host.addEventListener('touchmove', this.#crosshairDrag.handleTouchMove, { capture: true, passive: false })
+    host.addEventListener('touchend', this.#crosshairDrag.handleTouchEnd, true)
+    host.addEventListener('touchcancel', this.#crosshairDrag.handleTouchEnd, true)
     host.addEventListener('contextmenu', tools.handleToolContextMenu, true)
     host.addEventListener('pointerdown', drawings.trackSelectionPress, true)
-    host.addEventListener('pointerleave', this.#hover.handleHostLeave)
+    host.addEventListener('pointerleave', this.#handleHostLeave)
     globalThis.addEventListener('pointermove', tools.handleToolPointerMove, true)
     globalThis.addEventListener('pointerup', tools.handleToolPointerUp, true)
     globalThis.addEventListener('pointercancel', tools.handleToolPointerUp, true)
@@ -725,9 +737,13 @@ export class KLineChartController {
     globalThis.removeEventListener('blur', drawings.handleWindowBlur)
     this.#host.removeEventListener('mousedown', tools.blockChartWhileDrawing, true)
     this.#host.removeEventListener('touchstart', tools.blockChartWhileDrawing, true)
+    this.#host.removeEventListener('touchstart', this.#crosshairDrag.handleTouchStart, true)
+    this.#host.removeEventListener('touchmove', this.#crosshairDrag.handleTouchMove, true)
+    this.#host.removeEventListener('touchend', this.#crosshairDrag.handleTouchEnd, true)
+    this.#host.removeEventListener('touchcancel', this.#crosshairDrag.handleTouchEnd, true)
     this.#host.removeEventListener('contextmenu', tools.handleToolContextMenu, true)
     this.#host.removeEventListener('pointerdown', drawings.trackSelectionPress, true)
-    this.#host.removeEventListener('pointerleave', this.#hover.handleHostLeave)
+    this.#host.removeEventListener('pointerleave', this.#handleHostLeave)
     this.#chart.unsubscribeAction('onCrosshairChange', this.#hover.handleCrosshair)
     this.#hover.clearListeners()
     globalThis.removeEventListener('pointermove', tools.handleToolPointerMove, true)
@@ -741,6 +757,14 @@ export class KLineChartController {
     this.#host.classList.remove('tool-active')
     this.#navigation.dispose()
     dispose(this.#chart)
+  }
+
+  /**
+   * The pointer left the chart. A lifted finger also counts as leaving, but a crosshair that a tap put on screen
+   * stays there, and so does the candle it points at.
+   */
+  readonly #handleHostLeave = (): void => {
+    if (!this.#crosshairDrag.active) this.#hover.handleHostLeave()
   }
 
   #patchRuntime(patch: Partial<ChartRuntimeState>): void {
