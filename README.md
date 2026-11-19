@@ -132,6 +132,12 @@ at it), and `ANDROID_HOME` set to the SDK folder.
 npm run android:server            # the normal server, also allowing the app's local-testing origin
 npm run android:apk -- --dev      # build the web app, sync it, build android/app/build/outputs/apk/debug/app-debug.apk
 
+# Local testing on a real phone over its USB cable (USB debugging on), against the server on this computer
+npm run android:server
+npm run android:apk -- --usb
+adb install -r android/app/build/outputs/apk/debug/app-debug.apk
+adb reverse tcp:8787 tcp:8787     # the phone's port 8787 now leads to this computer; repeat after every replug
+
 # A build that talks to a real server (HTTPS only)
 npm run android:apk -- --api https://your-server.example
 
@@ -141,6 +147,9 @@ npm run android:sync -- --dev
 
 - `--dev` compiles in `http://10.0.2.2:8787`, the emulator's name for this computer. Plain HTTP is allowed in debug
   builds only; release builds accept HTTPS only.
+- `--usb` compiles in `http://localhost:8787`. It needs no network setup: it works when the phone is on another
+  network, and when a firewall on this computer blocks other devices (a sign-up that stays on "Please wait" on a phone
+  usually means that). The phone must stay on the cable.
 - The server must allow the app's origin: `https://localhost` is allowed by default (`TH_ALLOWED_ORIGINS`).
 - The app's version is the one in `package.json`.
 - `android/capacitor.settings.gradle` and `android/app/capacitor.build.gradle` are written by the sync step and are
