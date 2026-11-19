@@ -1,6 +1,7 @@
 name: CI
 
-# Runs on every push to main and on every pull request: formatting, lint, type-check, tests and a production build.
+# Runs on every push to main and on every pull request: formatting, lint, type-check, tests and a production build,
+# and a debug build of the Android app, kept as a downloadable artifact.
 on:
   push:
     branches: [main]
@@ -48,3 +49,42 @@ jobs:
             sleep 1
           done
           echo "Server did not become healthy" && exit 1
+
+  android:
+    name: android-apk
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      # The Android build needs JDK 21 or newer; the Android SDK itself is already on the runner (ANDROID_HOME).
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+          cache: gradle
+          cache-dependency-path: |
+            android/*.gradle.kts
+            android/app/build.gradle.kts
+            android/gradle/wrapper/gradle-wrapper.properties
+
+      - name: Install dependencies
+        run: npm ci
+
+      # The --usb build talks to a server on the tester's own computer (see README, "Android app"), so the artifact
+      # can be tried on a phone without any server address or secret in CI.
+      - name: Build the debug APK
+        run: npm run android:apk -- --usb
+
+      - name: Keep the APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: tradehorizon-debug-apk
+          path: android/app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
+          retention-days: 14
